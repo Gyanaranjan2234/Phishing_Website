@@ -19,6 +19,7 @@ const getRiskLevel = (score: number | undefined): string => {
   return "HIGH";
 };
 
+
 const getRiskIcon = (level: string): string => {
   switch (level) {
     case "HIGH": return "🔴";
