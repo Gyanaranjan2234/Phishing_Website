@@ -1,37 +1,47 @@
 import { useState } from "react";
-import { Search, Loader2, CheckCircle, AlertTriangle, Shield, Link, FileText, Lock, Download, Type } from "lucide-react";
+import { Search, Loader2, CheckCircle, AlertTriangle, Shield, Link, FileText, Lock, Download, Type, AlertCircle, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 import { analyzeUrl, type UrlAnalysis } from "@/lib/mockData";
-import { generateReport } from "@/lib/generateReport";
+import { downloadReport, type PDFReportData } from "@/lib/pdfReportGenerator";
 
 interface UrlScannerProps {
   onScanComplete: () => void;
+  isAuthenticated?: boolean;
+  userName?: string;
 }
 
 const getScoreColor = (score: number) => {
-  if (score >= 75) return { bar: "bg-primary", text: "text-primary", label: "Safe" };
-  if (score >= 50) return { bar: "bg-accent", text: "text-accent", label: "Suspicious" };
-  return { bar: "bg-destructive", text: "text-destructive", label: "High Risk" };
+  if (score <= 30) return { bar: "bg-[#00ff9c]", text: "text-[#00ff9c]", bg: "bg-[#00ff9c]/10", label: "Safe", description: "Low risk URL" };
+  if (score <= 70) return { bar: "bg-[#ffcc00]", text: "text-[#ffcc00]", bg: "bg-[#ffcc00]/10", label: "Suspicious", description: "Medium risk URL" };
+  return { bar: "bg-[#ff4d4d]", text: "text-[#ff4d4d]", bg: "bg-[#ff4d4d]/10", label: "High Risk", description: "Phishing threat detected" };
 };
 
 const reasonIcons: Record<string, React.ReactNode> = {
   "URL Length": <Link className="w-4 h-4" />,
   "Suspicious Keywords": <Type className="w-4 h-4" />,
-  "Special Characters": <Shield className="w-4 h-4" />,
-  "Protocol": <Lock className="w-4 h-4" />,
+  "Special Characters": <AlertCircle className="w-4 h-4" />,
+  "Protocol (HTTPS)": <Lock className="w-4 h-4" />,
 };
 
-const UrlScanner = ({ onScanComplete }: UrlScannerProps) => {
+const UrlScanner = ({ onScanComplete, isAuthenticated = false, userName }: UrlScannerProps) => {
   const [url, setUrl] = useState("");
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<UrlAnalysis | null>(null);
+  const [downloadingReport, setDownloadingReport] = useState(false);
+
+  const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
+    toast({
+      title: message,
+      variant: type === "error" ? "destructive" : "default",
+    });
+  };
 
   const handleAnalyze = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url.trim()) { toast.error("Enter a URL to analyze"); return; }
+    if (!url.trim()) { showToast("Enter a URL to analyze", "error"); return; }
     setScanning(true);
     setResult(null);
     setTimeout(() => {
@@ -39,18 +49,51 @@ const UrlScanner = ({ onScanComplete }: UrlScannerProps) => {
       setResult(analysis);
       setScanning(false);
       onScanComplete();
-      if (analysis.status === "phishing") toast.error("⚠️ Phishing threat detected!");
-      else toast.success("✅ URL appears safe");
+      if (analysis.status === "phishing") showToast("⚠️ Phishing threat detected!", "error");
+      else showToast("✅ URL appears safe", "success");
     }, 2000);
   };
 
   const scoreInfo = result ? getScoreColor(result.score) : null;
+
+  const handleGenerateReport = async () => {
+    if (!result) return;
+    
+    setDownloadingReport(true);
+    try {
+      const reportData: PDFReportData = {
+        scanType: "url",
+        target: result.url,
+        result: result,
+        userName: userName
+      };
+
+      downloadReport(reportData);
+      toast({
+        title: "✅ Report Downloaded",
+        description: "Risk report has been saved to your device"
+      });
+    } catch (error) {
+      toast({
+        title: "❌ Error",
+        description: "Failed to generate report",
+        variant: "destructive"
+      });
+    } finally {
+      setDownloadingReport(false);
+    }
+  };
 
   return (
     <section className="bg-card border border-border rounded-lg p-6 animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
       <h2 className="font-heading font-semibold text-foreground mb-4 flex items-center gap-2">
         <Search className="w-5 h-5 text-primary" /> URL Phishing Detector
       </h2>
+      {!isAuthenticated && (
+        <div className="mb-4 rounded-lg border border-border/40 bg-primary/10 p-3 text-sm text-primary">
+          Login to save your scan history when signed in.
+        </div>
+      )}
       <form onSubmit={handleAnalyze} className="flex gap-3 flex-col sm:flex-row">
         <Input
           type="text"
@@ -72,68 +115,136 @@ const UrlScanner = ({ onScanComplete }: UrlScannerProps) => {
       )}
 
       {result && scoreInfo && (
-        <div className="mt-4 space-y-4 animate-fade-in-up">
-          {/* Status banner */}
-          <div className={`p-4 rounded-md border flex items-center gap-3 ${
-            result.status === "safe" ? "bg-primary/10 border-primary/30" : "bg-destructive/10 border-destructive/30"
+        <div className="mt-6 space-y-5 animate-fade-in-up">
+          {/* Status Banner */}
+          <div className={`p-4 rounded-lg border-2 flex items-center gap-3 transition-all duration-500 ${
+            result.status === "safe" 
+              ? "bg-primary/10 border-primary/40 shadow-[0_0_20px_hsl(150_100%_45%/0.2)]" 
+              : "bg-destructive/10 border-destructive/40 shadow-[0_0_20px_hsl(0_72%_51%/0.2)]"
           }`}>
-            {result.status === "safe" ? <CheckCircle className="w-6 h-6 text-primary shrink-0" /> : <AlertTriangle className="w-6 h-6 text-destructive shrink-0" />}
+            {result.status === "safe" ? (
+              <CheckCircle className="w-6 h-6 text-primary shrink-0" />
+            ) : (
+              <AlertTriangle className="w-6 h-6 text-destructive shrink-0" />
+            )}
             <div className="flex-1 min-w-0">
-              <p className={`font-heading font-semibold ${result.status === "safe" ? "text-primary" : "text-destructive"}`}>
-                {result.status === "safe" ? "Safe" : "Phishing Detected"}
+              <p className={`font-heading font-bold text-sm ${result.status === "safe" ? "text-primary" : "text-destructive"}`}>
+                {result.status === "safe" ? "✓ URL Appears Safe" : "⚠ Phishing Threat Detected"}
               </p>
-              <p className="text-muted-foreground text-sm truncate">{result.url}</p>
+              <p className="text-muted-foreground text-xs truncate font-mono">{result.url}</p>
             </div>
           </div>
 
-          {/* Risk Score Bar */}
-          <div className="bg-muted/50 rounded-lg border border-border p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-heading text-foreground">Risk Score</span>
-              <span className={`font-mono font-bold text-lg ${scoreInfo.text}`}>
-                {result.score}/100
-              </span>
-            </div>
-            <div className="relative h-3 w-full overflow-hidden rounded-full bg-secondary">
-              <div
-                className={`h-full rounded-full transition-all duration-700 ease-out ${scoreInfo.bar}`}
-                style={{ width: `${result.score}%` }}
-              />
-            </div>
-            <p className={`text-xs font-heading ${scoreInfo.text}`}>{scoreInfo.label}</p>
-          </div>
-
-          {/* Detailed Findings */}
-          <div className="grid gap-2">
-            {result.reasons.map((r, i) => (
-              <div key={i} className="flex items-center justify-between p-3 bg-muted/50 rounded border border-border text-sm gap-2">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <span className={r.flagged ? "text-destructive" : "text-primary"}>
-                    {reasonIcons[r.label] || <Shield className="w-4 h-4" />}
-                  </span>
-                  {r.label}
-                </div>
-                <span className={`font-mono text-right ${r.flagged ? "text-destructive" : "text-primary"}`}>{r.value}</span>
+          {/* Risk Score Card */}
+          <div className={`rounded-lg border p-5 space-y-4 transition-all duration-500 ${scoreInfo.bg}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="text-xs font-heading text-muted-foreground uppercase tracking-wide">Risk Score</p>
+                <p className={`font-heading font-bold text-3xl ${scoreInfo.text} drop-shadow-[0_0_8px_currentColor/0.3]`}>
+                  {result.score}
+                </p>
               </div>
-            ))}
+              <div className="text-right">
+                <p className={`font-heading font-bold text-lg ${scoreInfo.text}`}>{scoreInfo.label}</p>
+                <p className="text-muted-foreground text-xs">{scoreInfo.description}</p>
+              </div>
+            </div>
+            
+            {/* Visual Progress Bar */}
+            <div className="space-y-2">
+              <div className="relative h-4 w-full overflow-hidden rounded-full bg-secondary/50 border border-border">
+                <div
+                  className={`h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_12px_currentColor/0.5] ${scoreInfo.bar}`}
+                  style={{ width: `${result.score}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground font-mono">
+                <span>0 - Safe</span>
+                <span>50 - Neutral</span>
+                <span>100 - Danger</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Detailed Risk Analysis */}
+          <div className="space-y-3">
+            <h3 className="font-heading font-semibold text-foreground text-sm flex items-center gap-2">
+              <Shield className="w-4 h-4 text-primary" /> Detailed Risk Analysis
+            </h3>
+            
+            <div className="grid gap-2 max-h-96 overflow-y-auto">
+              {result.reasons.map((r, i) => {
+                const isWarning = r.flagged;
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-start gap-3 p-3 rounded-lg border transition-all duration-300 hover:shadow-[0_0_12px_currentColor/0.2] ${
+                      isWarning
+                        ? "bg-destructive/5 border-destructive/30 hover:border-destructive/50"
+                        : "bg-primary/5 border-primary/30 hover:border-primary/50"
+                    }`}
+                  >
+                    <div className="mt-0.5">
+                      {isWarning ? (
+                        <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
+                      ) : (
+                        <Check className="w-4 h-4 text-primary shrink-0" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-heading font-semibold text-sm ${isWarning ? "text-destructive" : "text-primary"}`}>
+                        {r.label}
+                      </p>
+                      <p className="text-muted-foreground text-xs mt-1 font-mono">{r.value}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Report Preview & Download */}
-          <div className="bg-muted/30 rounded-lg border border-border p-4 space-y-3 animate-fade-in-up">
+          <div className="rounded-lg border border-border/50 bg-gradient-to-br from-purple-500/5 to-cyan-500/5 p-5 space-y-4 animate-fade-in-up shadow-[0_0_15px_hsl(150_100%_45%/0.1)]">
             <div className="flex items-center gap-2 text-foreground font-heading text-sm">
-              <FileText className="w-4 h-4 text-primary" /> Report Preview
+              <FileText className="w-5 h-5 text-primary drop-shadow-[0_0_6px_currentColor/0.4]" /> 
+              <span>PDF Report Ready</span>
             </div>
-            <div className="text-xs text-muted-foreground space-y-1 font-mono">
-              <p>APGS Security Risk Report</p>
-              <p>URL: {result.url.length > 50 ? result.url.substring(0, 50) + "..." : result.url}</p>
-              <p>Result: {result.status === "safe" ? "SAFE" : "PHISHING"} | Score: {result.score}/100</p>
-              <p>Findings: {result.reasons.length} analysis points</p>
+            
+            <div className="bg-muted/50 rounded border border-border p-3 space-y-2 text-xs font-mono">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Report Type:</span>
+                <span className="text-foreground font-semibold">APGS Security Risk Report</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">URL Analyzed:</span>
+                <span className="text-foreground font-semibold truncate max-w-xs">{result.url.substring(0, 30)}...</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Result:</span>
+                <span className={result.status === "safe" ? "text-primary font-semibold" : "text-destructive font-semibold"}>
+                  {result.status === "safe" ? "✓ SAFE" : "⚠ PHISHING"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Risk Score:</span>
+                <span className={`${scoreInfo.text} font-semibold`}>{result.score}/100</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Analysis Points:</span>
+                <span className="text-foreground font-semibold">{result.reasons.length} factors</span>
+              </div>
             </div>
+            
             <Button
-              onClick={() => generateReport(result)}
-              className="w-full font-heading hover:shadow-[0_0_20px_hsl(150_100%_45%/0.4)] transition-shadow animate-pulse-glow"
+              onClick={handleGenerateReport}
+              disabled={downloadingReport}
+              className="w-full font-heading hover:shadow-[0_0_20px_hsl(150_100%_45%/0.4)] transition-all duration-300"
             >
-              <Download className="w-4 h-4 mr-2" /> Download PDF Report
+              {downloadingReport ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
+              ) : (
+                <><Download className="w-4 h-4 mr-2" /> Download Risk Report</>
+              )}
             </Button>
           </div>
         </div>

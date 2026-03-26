@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Shield, Lock, Mail, User, Eye, EyeOff } from "lucide-react";
+import { Shield, Lock, Mail, User, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -8,6 +8,14 @@ import { toast } from "sonner";
 const Signup = () => {
   const navigate = useNavigate();
   const [name, setName] = useState("");
+
+  const goBack = () => {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      navigate("/");
+    }
+  };
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -27,13 +35,21 @@ const Signup = () => {
     setTimeout(() => {
       localStorage.setItem("apgs-auth", "true");
       toast.success("Account created successfully");
-      navigate("/dashboard");
+      navigate("/");
       setLoading(false);
     }, 1000);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center cyber-grid px-4">
+    <div className="min-h-screen flex items-center justify-center cyber-grid px-4 relative">
+      <Button
+        onClick={goBack}
+        variant="ghost"
+        className="absolute top-4 left-4 flex items-center gap-2 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back
+      </Button>
       <div className="w-full max-w-md animate-fade-in-up">
         <div className="flex items-center justify-center gap-3 mb-8">
           <Shield className="w-10 h-10 text-primary" />
