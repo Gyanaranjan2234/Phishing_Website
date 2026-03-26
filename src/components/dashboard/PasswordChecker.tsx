@@ -8,9 +8,10 @@ import { analyzePassword, type PasswordResult } from "@/lib/mockData";
 
 interface PasswordCheckerProps {
   onScanComplete: () => void;
+  isAuthenticated?: boolean;
 }
 
-const PasswordChecker = ({ onScanComplete }: PasswordCheckerProps) => {
+const PasswordChecker = ({ onScanComplete, isAuthenticated = false }: PasswordCheckerProps) => {
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -37,6 +38,11 @@ const PasswordChecker = ({ onScanComplete }: PasswordCheckerProps) => {
       <h2 className="font-heading font-semibold text-foreground mb-4 flex items-center gap-2">
         <Lock className="w-5 h-5 text-primary" /> Password Leak Checker
       </h2>
+      {!isAuthenticated && (
+        <div className="mb-4 rounded-lg border border-border/40 bg-primary/10 p-3 text-sm text-primary">
+          Login to save your scan history when signed in.
+        </div>
+      )}
       <form onSubmit={handleCheck} className="flex gap-3 flex-col sm:flex-row">
         <div className="relative flex-1">
           <Input

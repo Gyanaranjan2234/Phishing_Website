@@ -7,9 +7,10 @@ import { checkEmailBreach, type BreachResult } from "@/lib/mockData";
 
 interface EmailBreachCheckerProps {
   onScanComplete: () => void;
+  isAuthenticated?: boolean;
 }
 
-const EmailBreachChecker = ({ onScanComplete }: EmailBreachCheckerProps) => {
+const EmailBreachChecker = ({ onScanComplete, isAuthenticated = false }: EmailBreachCheckerProps) => {
   const [email, setEmail] = useState("");
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<BreachResult | null>(null);
@@ -34,6 +35,11 @@ const EmailBreachChecker = ({ onScanComplete }: EmailBreachCheckerProps) => {
       <h2 className="font-heading font-semibold text-foreground mb-4 flex items-center gap-2">
         <Mail className="w-5 h-5 text-primary" /> Email Breach Checker
       </h2>
+      {!isAuthenticated && (
+        <div className="mb-4 rounded-lg border border-border/40 bg-primary/10 p-3 text-sm text-primary">
+          Login to save your scan history when signed in.
+        </div>
+      )}
       <form onSubmit={handleCheck} className="flex gap-3 flex-col sm:flex-row">
         <Input
           type="email"
@@ -52,7 +58,7 @@ const EmailBreachChecker = ({ onScanComplete }: EmailBreachCheckerProps) => {
           result.breached ? "bg-destructive/10 border-destructive/30" : "bg-primary/10 border-primary/30"
         }`}>
           {result.breached ? <ShieldAlert className="w-6 h-6 text-destructive shrink-0 mt-0.5" /> : <ShieldCheck className="w-6 h-6 text-primary shrink-0 mt-0.5" />}
-          <div>
+          <div className="flex-1">
             <p className={`font-heading font-semibold ${result.breached ? "text-destructive" : "text-primary"}`}>
               {result.breached ? `Found in ${result.count} breach${result.count > 1 ? "es" : ""}` : "No Breaches Found"}
             </p>
