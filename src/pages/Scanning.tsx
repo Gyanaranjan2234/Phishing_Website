@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Globe, FileText, Mail, Lock, ShieldCheck, Zap, Users, Phone, Loader2, User } from "lucide-react";
+import { Globe, FileText, Mail, Lock, ShieldCheck, Zap, Users, Phone, Loader2, User, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -18,6 +18,13 @@ const Scanning = () => {
   const [theme, setTheme] = useState<"dark" | "light">(() => (localStorage.getItem("apgs-theme") === "light" ? "light" : "dark"));
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [userName, setUserName] = useState<string>("");
+  
+  // Scan state management - preserved across tab switches
+  const [urlScanData, setUrlScanData] = useState({ input: "", result: null as any });
+  const [emailScanData, setEmailScanData] = useState({ input: "", result: null as any });
+  const [fileScanData, setFileScanData] = useState({ file: null as File | null, result: null as any });
+  const [passwordScanData, setPasswordScanData] = useState({ input: "", result: null as any });
+  
   const [activeTab, setActiveTab] = useState<"url" | "email" | "file" | "password">(() => {
     const state = location.state as { openTab?: string } | null;
     const tab = state?.openTab;
@@ -82,8 +89,8 @@ const Scanning = () => {
   const refreshHistory = () => { refetch(); };
 
   return (
-    <div className="min-h-screen cyber-grid text-foreground">
-      <header className="sticky top-0 z-30 border-b border-border bg-card/90 backdrop-blur-lg">
+    <div className="min-h-screen cyber-grid text-foreground transition-colors duration-300" style={{ scrollBehavior: 'smooth' }}>
+      <header className="sticky top-0 z-30 border-b border-border bg-card/90 backdrop-blur-lg transition-all duration-300">
         <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="text-2xl font-heading font-bold text-primary">APGS</span>
@@ -121,13 +128,34 @@ const Scanning = () => {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-10 space-y-8">
+      <main className="max-w-6xl mx-auto px-4 py-10 space-y-8 transition-opacity duration-300">
+        {/* Login CTA Section */}
+        {!isAuthenticated && (
+          <section className="bg-gradient-to-r from-primary/20 to-primary/10 rounded-xl border border-primary/40 p-6 shadow-lg transition-all duration-300">
+            <div className="flex items-center justify-between gap-4 flex-col sm:flex-row">
+              <div>
+                <h2 className="text-xl font-heading font-bold text-primary mb-1">Save Your Scan History</h2>
+                <p className="text-muted-foreground text-sm">Sign in to automatically save all scan results and track security threats over time.</p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button onClick={() => navigate("/login")} className="gap-2 hover:shadow-[0_0_16px_hsl(150_100%_45%/0.3)] transition-shadow">
+                  <LogIn className="w-4 h-4" />
+                  <span>Login</span>
+                </Button>
+                <Button onClick={() => navigate("/login?view=signup")} variant="outline" className="gap-2 border-border hover:bg-card/70 transition">
+                  <span>Sign Up</span>
+                </Button>
+              </div>
+            </div>
+          </section>
+        )}
+        
         <section className="bg-card/70 rounded-xl border border-border p-6 shadow-lg">
           <h1 className="text-3xl font-heading font-bold mb-2">Scanning Hub</h1>
-          <p className="text-muted-foreground">Access all scanning modules in one place. Guest mode works without login. Sign in to save history and view results.</p>
+          <p className="text-muted-foreground">Access all scanning modules in one place. {isAuthenticated ? "Your scan history is automatically saved." : "Guest mode works without login. Sign in to save history and view results."}</p>
         </section>
 
-        <section className="border border-border rounded-xl bg-card/70 p-4">
+        <section className="border border-border rounded-xl bg-card/70 p-4 transition-all duration-300">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
               { id: "url", label: "URL Scan", icon: Globe },
@@ -138,7 +166,7 @@ const Scanning = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as "url" | "email" | "file" | "password")}
-                className={`py-2 px-3 rounded-lg border transition ${activeTab === tab.id ? "border-primary text-primary bg-primary/10" : "border-border text-muted-foreground hover:border-primary/70"}`}
+                className={`py-2 px-3 rounded-lg border transition-all duration-200 ${activeTab === tab.id ? "border-primary text-primary bg-primary/10 shadow-[0_0_8px_hsl(150_100%_45%_/_0.2)]" : "border-border text-muted-foreground hover:border-primary/70"}`}
               >
                 <div className="flex items-center justify-center gap-2 text-sm font-medium">
                   <tab.icon className="w-4 h-4" />
@@ -149,11 +177,11 @@ const Scanning = () => {
           </div>
         </section>
 
-        <section className="space-y-4">
-          {activeTab === "url" && <UrlScanner onScanComplete={refreshHistory} isAuthenticated={!!isAuthenticated} userName={userName} />}
-          {activeTab === "email" && <EmailBreachChecker onScanComplete={refreshHistory} isAuthenticated={!!isAuthenticated} />}
-          {activeTab === "file" && <FileScanner onScanComplete={refreshHistory} isAuthenticated={!!isAuthenticated} userName={userName} />}
-          {activeTab === "password" && <PasswordChecker onScanComplete={refreshHistory} isAuthenticated={!!isAuthenticated} />}
+        <section className="space-y-4 transition-all duration-300">
+          {activeTab === "url" && <UrlScanner onScanComplete={refreshHistory} isAuthenticated={!!isAuthenticated} userName={userName} scanData={urlScanData} setScanData={setUrlScanData} />}
+          {activeTab === "email" && <EmailBreachChecker onScanComplete={refreshHistory} isAuthenticated={!!isAuthenticated} scanData={emailScanData} setScanData={setEmailScanData} />}
+          {activeTab === "file" && <FileScanner onScanComplete={refreshHistory} isAuthenticated={!!isAuthenticated} userName={userName} scanData={fileScanData} setScanData={setFileScanData} />}
+          {activeTab === "password" && <PasswordChecker onScanComplete={refreshHistory} isAuthenticated={!!isAuthenticated} scanData={passwordScanData} setScanData={setPasswordScanData} />}
         </section>
 
         {isAuthenticated ? (

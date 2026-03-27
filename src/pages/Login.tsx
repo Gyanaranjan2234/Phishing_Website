@@ -14,33 +14,6 @@ const Login = () => {
   const location = useLocation();
   const [currentView, setCurrentView] = useState<ViewType>('login');
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const { session } = await apiAuth.getSession();
-        if (session && session.user) {
-          navigate("/");
-          return;
-        }
-      } catch (err) {
-        // no session
-      }
-
-      const params = new URLSearchParams(location.search);
-      const view = params.get("view");
-      if (view === "signup" || view === "forgot") {
-        setCurrentView(view);
-      } else {
-        setCurrentView("login");
-      }
-    };
-    checkAuth();
-  }, [location.search, navigate]);
-
-  const switchView = (newView: ViewType) => {
-    setCurrentView(newView);
-  };
-
   // Login state
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -60,6 +33,58 @@ const Login = () => {
   const [resetSent, setResetSent] = useState(false);
 
   const [loading, setLoading] = useState(false);
+
+  // Function to reset all form fields
+  const resetAllForms = () => {
+    // Reset login form
+    setLoginEmail("");
+    setLoginPassword("");
+    setShowLoginPassword(false);
+    setRememberMe(false);
+    
+    // Reset signup form
+    setSignupUsername("");
+    setSignupEmail("");
+    setSignupPassword("");
+    setSignupConfirmPassword("");
+    setShowSignupPassword(false);
+    setShowSignupConfirmPassword(false);
+    
+    // Reset forgot password form
+    setForgotEmail("");
+    setResetSent(false);
+  };
+
+  const switchView = (newView: ViewType) => {
+    // Reset forms when switching views to ensure clean state
+    resetAllForms();
+    setCurrentView(newView);
+  };
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { session } = await apiAuth.getSession();
+        if (session && session.user) {
+          navigate("/");
+          return;
+        }
+      } catch (err) {
+        // no session
+      }
+
+      const params = new URLSearchParams(location.search);
+      const view = params.get("view");
+      if (view === "signup" || view === "forgot") {
+        setCurrentView(view);
+      } else {
+        // Default to login view and reset all forms for clean slate
+        resetAllForms();
+        setCurrentView("login");
+      }
+    };
+    checkAuth();
+  }, [location.search, navigate]);
 
   const goBack = () => {
     if (window.history.length > 1) {
@@ -121,7 +146,8 @@ const Login = () => {
 
       if (data.success) {
         toast.success("Account created successfully! Please sign in.");
-        setCurrentView("login");
+        // Use switchView instead of setCurrentView to reset all forms
+        switchView('login');
       }
     } catch (err: any) {
       toast.error(err.message || "An error occurred during signup");

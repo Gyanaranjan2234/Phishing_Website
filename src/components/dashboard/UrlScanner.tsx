@@ -1,16 +1,20 @@
 import { useState } from "react";
-import { Search, Loader2, CheckCircle, AlertTriangle, Shield, Link, FileText, Lock, Download, Type, AlertCircle, Check } from "lucide-react";
+import { Search, Loader2, CheckCircle, AlertTriangle, Shield, Link, FileText, Lock, Download, Type, AlertCircle, Check, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
 import { analyzeUrl, type UrlAnalysis } from "@/lib/mockData";
 import { downloadReport, type PDFReportData } from "@/lib/pdfReportGenerator";
+import { apiScans } from "@/lib/api";
+import RiskAnalysisReport from "@/components/RiskAnalysisReport";
 
 interface UrlScannerProps {
   onScanComplete: () => void;
   isAuthenticated?: boolean;
   userName?: string;
+  scanData: { input: string; result: any };
+  setScanData: (data: { input: string; result: any }) => void;
 }
 
 const getScoreColor = (score: number) => {
@@ -26,10 +30,10 @@ const reasonIcons: Record<string, React.ReactNode> = {
   "Protocol (HTTPS)": <Lock className="w-4 h-4" />,
 };
 
-const UrlScanner = ({ onScanComplete, isAuthenticated = false, userName }: UrlScannerProps) => {
-  const [url, setUrl] = useState("");
+const UrlScanner = ({ onScanComplete, isAuthenticated = false, userName, scanData, setScanData }: UrlScannerProps) => {
+  const [url, setUrl] = useState(scanData.input);
   const [scanning, setScanning] = useState(false);
-  const [result, setResult] = useState<UrlAnalysis | null>(null);
+  const [result, setResult] = useState<UrlAnalysis | null>(scanData.result);
   const [downloadingReport, setDownloadingReport] = useState(false);
 
   const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
@@ -39,16 +43,41 @@ const UrlScanner = ({ onScanComplete, isAuthenticated = false, userName }: UrlSc
     });
   };
 
+  const handleReset = () => {
+    setUrl("");
+    setResult(null);
+    setScanData({ input: "", result: null });
+    showToast("URL scan cleared", "info");
+  };
+
   const handleAnalyze = (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) { showToast("Enter a URL to analyze", "error"); return; }
     setScanning(true);
     setResult(null);
-    setTimeout(() => {
+    setTimeout(async () => {
       const analysis = analyzeUrl(url);
       setResult(analysis);
+      setScanData({ input: url, result: analysis });
       setScanning(false);
       onScanComplete();
+      
+      // Save to history if authenticated
+      if (isAuthenticated) {
+        try {
+          await apiScans.saveScan({
+            type: "url",
+            target: url,
+            status: analysis.status
+          });
+          showToast("✅ Result saved to history", "success");
+        } catch (err) {
+          console.error("Failed to save scan:", err);
+        }
+      } else {
+        showToast("📝 Guest scan (not saved - login to save history)", "info");
+      }
+      
       if (analysis.status === "phishing") showToast("⚠️ Phishing threat detected!", "error");
       else showToast("✅ URL appears safe", "success");
     }, 2000);
@@ -102,9 +131,17 @@ const UrlScanner = ({ onScanComplete, isAuthenticated = false, userName }: UrlSc
           onChange={(e) => setUrl(e.target.value)}
           className="flex-1 bg-muted border-border text-foreground placeholder:text-muted-foreground focus:shadow-[0_0_12px_hsl(150_100%_45%/0.2)]"
         />
-        <Button type="submit" disabled={scanning} className="font-heading shrink-0 hover:shadow-[0_0_16px_hsl(150_100%_45%/0.3)] transition-shadow">
-          {scanning ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Scanning...</> : "Analyze URL"}
-        </Button>
+        <div className="flex gap-2">
+          <Button type="submit" disabled={scanning} className="font-heading shrink-0 hover:shadow-[0_0_16px_hsl(150_100%_45%/0.3)] transition-shadow">
+            {scanning ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Scanning...</> : "Analyze URL"}
+          </Button>
+          {(url || result) && (
+            <Button type="button" onClick={handleReset} variant="outline" disabled={scanning} className="font-heading shrink-0 border-border hover:bg-card/70 transition gap-2">
+              <RotateCcw className="w-4 h-4" />
+              <span className="hidden sm:inline">Reset</span>
+            </Button>
+          )}
+        </div>
       </form>
 
       {scanning && (
@@ -166,10 +203,26 @@ const UrlScanner = ({ onScanComplete, isAuthenticated = false, userName }: UrlSc
             </div>
           </div>
 
+          {/* Modern Risk Analysis Report */}
+          <div className="mt-8">
+            <RiskAnalysisReport
+              data={{
+                scanType: "url",
+                status: result.status,
+                score: result.score,
+                details: result.reasons.map(r => r.label).join(", "),
+                threats: result.reasons.filter(r => r.flagged).map(r => r.label),
+                timestamp: new Date().toISOString(),
+                userName: userName,
+                targetItem: result.url
+              }}
+            />
+          </div>
+
           {/* Detailed Risk Analysis */}
           <div className="space-y-3">
             <h3 className="font-heading font-semibold text-foreground text-sm flex items-center gap-2">
-              <Shield className="w-4 h-4 text-primary" /> Detailed Risk Analysis
+              <Shield className="w-4 h-4 text-primary" /> Analysis Details
             </h3>
             
             <div className="grid gap-2 max-h-96 overflow-y-auto">

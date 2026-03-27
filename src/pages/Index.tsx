@@ -1,13 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { Globe, FileText, Mail, Lock, ShieldCheck, Zap, Users, Phone, Loader2, User, ChevronDown, ArrowUp } from "lucide-react";
+import { useEffect, useMemo, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { Globe, FileText, Mail, Lock, ShieldCheck, Zap, Phone, Loader2, User, ChevronDown, ArrowUp, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { apiAuth, apiScans } from "@/lib/api";
+import { useScrollActiveSection } from "@/hooks/use-scroll-active-section";
+import UrlScanner from "@/components/dashboard/UrlScanner";
+import EmailBreachChecker from "@/components/dashboard/EmailBreachChecker";
+import FileScanner from "@/components/dashboard/FileScanner";
+import PasswordChecker from "@/components/dashboard/PasswordChecker";
+import ActivityHistory from "@/components/dashboard/ActivityHistory";
 
+/**
+ * FaqItem Component
+ * No memo needed - simple enough that re-render cost is minimal
+ */
 const FaqItem = ({ question, answer }: { question: string; answer: string }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -29,29 +39,71 @@ const FaqItem = ({ question, answer }: { question: string; answer: string }) => 
   );
 };
 
+/**
+ * Main Index Component - Consolidated Layout
+ * 
+ * STRICT CONTROL PRINCIPLES:
+ * 1. All content sections rendered once at mount in a hidden state
+ * 2. Visibility toggled via CSS (opacity + transform), never mount/unmount
+ * 3. Scan state preserved across view switches - NEVER reset unless user clicks Reset button
+ * 4. Navbar structure ALWAYS the same - no dynamic add/remove of items
+ * 5. UseRef to track manually overridden state to prevent re-renders
+ */
 const Index = () => {
   const navigate = useNavigate();
-  const location = useLocation();
+  const mountTimeRef = useRef<number>(Date.now());
+
+  // ============= THEME & AUTHENTICATION =============
   const [theme, setTheme] = useState<"dark" | "light">(() => (localStorage.getItem("apgs-theme") === "light" ? "light" : "dark"));
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [userName, setUserName] = useState<string>("");
+
+  // ============= VIEW MANAGEMENT =============
+  // Single source of truth for current view - NO ROUTING
+  // "home" | "scanning" - determines which section is visible via CSS
+  const [currentView, setCurrentView] = useState<"home" | "scanning">("home");
+  const [scanActiveTab, setScanActiveTab] = useState<"url" | "email" | "file" | "password">("url");
+
+  // ============= HOME PAGE STATE =============
   const [stats, setStats] = useState({ totalScans: 0, threats: 0, safe: 0, activeUsers: 0 });
-  const [activeSection, setActiveSection] = useState<string>("home");
   const [featureLoading, setFeatureLoading] = useState<string | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [contact, setContact] = useState({ name: "", email: "", message: "" });
+  const [sent, setSent] = useState(false);
+
+  // ============= SCAN STATE - PRESERVED ACROSS TAB SWITCHES =============
+  const [urlScanData, setUrlScanData] = useState({ input: "", result: null as any });
+  const [emailScanData, setEmailScanData] = useState({ input: "", result: null as any });
+  const [fileScanData, setFileScanData] = useState({ file: null as File | null, result: null as any });
+  const [passwordScanData, setPasswordScanData] = useState({ input: "", result: null as any });
+
+  // ============= SCROLL-BASED ACTIVE SECTION (HOME PAGE ONLY) =============
+  const { activeSection, setActiveSection } = useScrollActiveSection({
+    sectionIds: ["home", "about", "contact"],
+    rootMargin: "-35% 0px -65% 0px",
+    threshold: [0.1, 0.5],
+  });
+
+  // ============= HISTORY DATA =============
+  const { data: historyData, refetch: refetchHistory } = useQuery({
+    queryKey: ['history'],
+    queryFn: apiScans.getHistory,
+    enabled: !!isAuthenticated,
+  });
 
   const { data: statsData, refetch: refetchStats } = useQuery({
     queryKey: ['stats'],
     queryFn: apiScans.getStats,
   });
 
-
+  // ============= EFFECTS: THEME =============
   useEffect(() => {
     document.documentElement.classList.toggle("light", theme === "light");
     document.documentElement.classList.toggle("dark", theme === "dark");
     localStorage.setItem("apgs-theme", theme);
   }, [theme]);
 
+  // ============= EFFECTS: AUTHENTICATION =============
   useEffect(() => {
     const getSession = async () => {
       try {
@@ -69,6 +121,8 @@ const Index = () => {
     };
     getSession();
   }, []);
+
+  // ============= EFFECTS: STATS ANIMATION =============
   useEffect(() => {
     if (!statsData?.stats) return;
     const target = statsData.stats;
@@ -89,29 +143,7 @@ const Index = () => {
     return () => cancelAnimationFrame(raf);
   }, [statsData]);
 
-  useEffect(() => {
-    const sectionIds = ["home", "about", "faq", "contact"];
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setActiveSection(entry.target.id);
-          }
-        });
-      },
-      { rootMargin: "-40% 0px -55% 0px", threshold: 0.3 }
-    );
-
-    sectionIds.forEach((id) => {
-      const element = document.getElementById(id);
-      if (element) {
-        observer.observe(element);
-      }
-    });
-
-    return () => observer.disconnect();
-  }, []);
-
+  // ============= EFFECTS: BACK TO TOP =============
   useEffect(() => {
     const handleScroll = () => {
       setShowBackToTop(window.scrollY > 300);
@@ -121,10 +153,9 @@ const Index = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // ============= HANDLERS =============
   const refreshStats = () => refetchStats();
-
-  const [contact, setContact] = useState({ name: "", email: "", message: "" });
-  const [sent, setSent] = useState(false);
+  const refreshHistory = () => refetchHistory();
 
   const handleContactSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,23 +165,35 @@ const Index = () => {
     setTimeout(() => setSent(false), 2200);
   };
 
-  const goToScan = () => {
-    navigate("/scanning");
-  };
-
-  const logout = async () => {
-    await apiAuth.logout();
-    setIsAuthenticated(false);
-    setUserName("");
-    navigate("/");
-  };
-
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
     if (element) {
-      element.scrollIntoView({ behavior: "smooth" });
       setActiveSection(sectionId);
+      element.scrollIntoView({ behavior: "smooth" });
     }
+  };
+
+  const navTo = (anchor: string) => {
+    // Always switch to home view, then scroll
+    setCurrentView("home");
+    setTimeout(() => {
+      scrollToSection(anchor);
+    }, 100);
+  };
+
+  const switchToScanning = (tabName?: "url" | "email" | "file" | "password") => {
+    // Switch to scanning view with optional tab
+    if (tabName) {
+      setScanActiveTab(tabName);
+      console.log("[DEBUG] Switching to scanning with tab:", tabName);
+    }
+    setCurrentView("scanning");
+    console.log("[DEBUG] Set currentView to scanning");
+    // Scroll to top of scanning section
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      console.log("[DEBUG] Scrolled to top, currentView is now:", "scanning");
+    }, 100);
   };
 
   const handleFeatureCardClick = (sectionId: string) => {
@@ -164,22 +207,24 @@ const Index = () => {
     const tab = tabMap[sectionId] || "url";
     setTimeout(() => {
       setFeatureLoading(null);
-      navigate("/scanning", { state: { openTab: tab } });
+      switchToScanning(tab);
     }, 350);
-  };
-
-  const navTo = (anchor: string) => {
-    if (location.pathname !== "/") {
-      navigate("/");
-      setTimeout(() => scrollToSection(anchor), 250);
-    } else {
-      scrollToSection(anchor);
-    }
   };
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const logout = async () => {
+    await apiAuth.logout();
+    setIsAuthenticated(false);
+    setUserName("");
+    navTo("home");
+  };
+
+  // ============= COMPUTED VALUES =============
+  // Determine navbar active state based on current view
+  const navActiveSection = currentView === "scanning" ? "scanning" : activeSection;
 
   const featureCards = useMemo(
     () => [
@@ -191,14 +236,19 @@ const Index = () => {
     []
   );
 
+  const historyList = historyData?.history || [];
+
   return (
-    <div className="min-h-screen cyber-grid text-foreground">
-      <header className="sticky top-0 z-30 border-b border-border bg-card/90 backdrop-blur-lg">
+    <div className="min-h-screen cyber-grid text-foreground bg-background" style={{ scrollBehavior: 'smooth' }}>
+      {/* ========== NAVBAR: ALWAYS VISIBLE, STRUCTURE CONSTANT ========== */}
+      <header className="sticky top-0 z-50 border-b border-border bg-card/90 backdrop-blur-lg transition-all duration-200">
         <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="text-2xl font-heading font-bold text-primary">APGS</span>
             <span className="text-xs text-muted-foreground">Authentication Protocol Gateway Secure</span>
           </div>
+
+          {/* NAVBAR: ALWAYS THE SAME STRUCTURE - NO DYNAMIC ADD/REMOVE */}
           <nav className="flex items-center gap-2 text-sm flex-wrap">
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">{theme === "dark" ? "Dark" : "Light"}</span>
@@ -208,24 +258,63 @@ const Index = () => {
                 className="data-[state=checked]:bg-primary"
               />
             </div>
-            <button onClick={() => navTo("home")} className={`px-3 py-1 rounded-lg border ${activeSection === "home" ? "border-primary text-primary" : "border-border"} hover:bg-card/70 transition`}>
+
+            <button
+              onClick={() => navTo("home")}
+              className={`px-3 py-1 rounded-lg border transition-all duration-200 ${
+                navActiveSection === "home"
+                  ? "border-primary text-primary shadow-[0_0_8px_hsl(150_100%_45%_/_0.3)]"
+                  : "border-border hover:bg-card/70"
+              }`}
+            >
               Home
             </button>
-            <button onClick={() => navTo("about")} className={`px-3 py-1 rounded-lg border ${activeSection === "about" ? "border-primary text-primary" : "border-border"} hover:bg-card/70 transition`}>
+
+            <button
+              onClick={() => navTo("about")}
+              className={`px-3 py-1 rounded-lg border transition-all duration-200 ${
+                navActiveSection === "about"
+                  ? "border-primary text-primary shadow-[0_0_8px_hsl(150_100%_45%_/_0.3)]"
+                  : "border-border hover:bg-card/70"
+              }`}
+            >
               About
             </button>
-            <button onClick={() => navTo("contact")} className={`px-3 py-1 rounded-lg border ${activeSection === "contact" ? "border-primary text-primary" : "border-border"} hover:bg-card/70 transition`}>
+
+            <button
+              onClick={() => navTo("contact")}
+              className={`px-3 py-1 rounded-lg border transition-all duration-200 ${
+                navActiveSection === "contact"
+                  ? "border-primary text-primary shadow-[0_0_8px_hsl(150_100%_45%_/_0.3)]"
+                  : "border-border hover:bg-card/70"
+              }`}
+            >
               Contact
             </button>
-            <button onClick={() => navigate("/scanning")} className={`px-3 py-1 rounded-lg border ${window.location.pathname === "/scanning" ? "border-primary text-primary" : "border-border"} hover:bg-card/70 transition`}>
+
+            <button
+              onClick={() => switchToScanning()}
+              className={`px-3 py-1 rounded-lg border transition-all duration-200 ${
+                navActiveSection === "scanning"
+                  ? "border-primary text-primary shadow-[0_0_8px_hsl(150_100%_45%_/_0.3)]"
+                  : "border-border hover:bg-card/70"
+              }`}
+            >
               Scanning
             </button>
+
             {!isAuthenticated ? (
               <>
-                <button onClick={() => navigate("/login")} className="px-3 py-1 rounded-lg border border-border hover:bg-card/70 transition">
+                <button
+                  onClick={() => navigate("/login")}
+                  className="px-3 py-1 rounded-lg border border-border hover:bg-card/70 transition"
+                >
                   Login
                 </button>
-                <button onClick={() => navigate("/login?view=signup")} className="px-3 py-1 rounded-lg border border-border hover:bg-card/70 transition">
+                <button
+                  onClick={() => navigate("/login?view=signup")}
+                  className="px-3 py-1 rounded-lg border border-border hover:bg-card/70 transition"
+                >
                   Sign Up
                 </button>
               </>
@@ -250,174 +339,320 @@ const Index = () => {
         </div>
       </header>
 
-      <main id="home" className="max-w-6xl mx-auto px-4 py-10 space-y-16">
-        <section className="grid gap-8 lg:grid-cols-2 items-center">
-          <div className="space-y-6">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-heading font-bold">
-              Authentication Protocol<br /> Gateway Secure
-            </h1>
-            <p className="text-muted-foreground text-base sm:text-lg">
-              Powerful web security scanning for URLs, emails, files and passwords. No required signup for quick testing, with full historical tracking for signed-in users.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={goToScan} className="px-6 py-2.5">Start Scanning</Button>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-card/70 p-4 border border-border hover:border-primary/50 shadow-[0_0_12px_hsl(150_100%_45%_/_0.15)] hover:shadow-[0_0_16px_hsl(150_100%_45%_/_0.25)] transition-all duration-300 hover:scale-105 cursor-default">Secure Live URL Checks</div>
-            <div className="rounded-xl bg-card/70 p-4 border border-border hover:border-primary/50 shadow-[0_0_12px_hsl(150_100%_45%_/_0.15)] hover:shadow-[0_0_16px_hsl(150_100%_45%_/_0.25)] transition-all duration-300 hover:scale-105 cursor-default">Email Breach Discovery</div>
-            <div className="rounded-xl bg-card/70 p-4 border border-border hover:border-primary/50 shadow-[0_0_12px_hsl(150_100%_45%_/_0.15)] hover:shadow-[0_0_16px_hsl(150_100%_45%_/_0.25)] transition-all duration-300 hover:scale-105 cursor-default">File Malware Analysis</div>
-            <div className="rounded-xl bg-card/70 p-4 border border-border hover:border-primary/50 shadow-[0_0_12px_hsl(150_100%_45%_/_0.15)] hover:shadow-[0_0_16px_hsl(150_100%_45%_/_0.25)] transition-all duration-300 hover:scale-105 cursor-default">Password Strength AI</div>
-          </div>
-        </section>
+      {/* ========== MAIN CONTENT: USE CSS TO TOGGLE VISIBILITY ========== */}
+      {/* All sections rendered once, visibility controlled by CSS opacity + transform */}
 
-        <section id="about" className="space-y-10 scroll-mt-32">
-          <div className="space-y-6">
-            <h2 className="text-2xl font-heading font-bold">About APGS</h2>
-            <div className="grid lg:grid-cols-2 gap-8 items-center">
-              <div className="space-y-4">
-                <p className="text-muted-foreground text-base leading-relaxed">
-                  APGS is a powerful, unified security scanning platform designed to protect you from modern threats. Our advanced phishing detection system analyzes URLs in real-time to identify malicious links that could compromise your security. Using machine learning algorithms and comprehensive threat databases, we check for suspicious patterns, domain reputation, and known phishing indicators.
-                </p>
-                <p className="text-muted-foreground text-base leading-relaxed">
-                  Whether you're clicking a link in an email, checking file safety, validating passwords, or verifying suspicious URLs, our tool provides instant results with detailed explanations of potential risks and security recommendations. No required signup for quick testing, with full historical tracking for signed-in users.
-                </p>
-                <div className="flex flex-wrap gap-3 pt-2">
-                  <div className="flex items-center gap-2 text-sm text-primary">
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>Real-time Analysis</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-primary">
-                    <Zap className="w-4 h-4" />
-                    <span>Instant Results</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-primary">
-                    <Lock className="w-4 h-4" />
-                    <span>Privacy Focused</span>
-                  </div>
-                </div>
+      {/* ========== HOME VIEW SECTION ========== */}
+      <div
+        className={`transition-all duration-300 ${
+          currentView === "home" ? "block opacity-100" : "hidden opacity-0"
+        }`}
+      >
+        {currentView === "home" && console.log("[DEBUG] Rendering home view")}
+        <main id="home" className="max-w-6xl mx-auto px-4 py-10 space-y-16">
+          {/* Hero Section */}
+          <section className="grid gap-8 lg:grid-cols-2 items-center transition-all duration-300">
+            <div className="space-y-6">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-heading font-bold">
+                Authentication Protocol<br /> Gateway Secure
+              </h1>
+              <p className="text-muted-foreground text-base sm:text-lg">
+                Powerful web security scanning for URLs, emails, files and passwords. No required signup for quick testing, with full historical tracking for signed-in users.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Button onClick={() => switchToScanning()} className="px-6 py-2.5">
+                  Start Scanning
+                </Button>
               </div>
-              <div className="rounded-xl bg-card/70 p-6 border border-border">
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-card/70 p-4 border border-border hover:border-primary/50 shadow-[0_0_12px_hsl(150_100%_45%_/_0.15)] hover:shadow-[0_0_16px_hsl(150_100%_45%_/_0.25)] transition-all duration-300 hover:scale-105 cursor-default">
+                Secure Live URL Checks
+              </div>
+              <div className="rounded-xl bg-card/70 p-4 border border-border hover:border-primary/50 shadow-[0_0_12px_hsl(150_100%_45%_/_0.15)] hover:shadow-[0_0_16px_hsl(150_100%_45%_/_0.25)] transition-all duration-300 hover:scale-105 cursor-default">
+                Email Breach Discovery
+              </div>
+              <div className="rounded-xl bg-card/70 p-4 border border-border hover:border-primary/50 shadow-[0_0_12px_hsl(150_100%_45%_/_0.15)] hover:shadow-[0_0_16px_hsl(150_100%_45%_/_0.25)] transition-all duration-300 hover:scale-105 cursor-default">
+                File Malware Analysis
+              </div>
+              <div className="rounded-xl bg-card/70 p-4 border border-border hover:border-primary/50 shadow-[0_0_12px_hsl(150_100%_45%_/_0.15)] hover:shadow-[0_0_16px_hsl(150_100%_45%_/_0.25)] transition-all duration-300 hover:scale-105 cursor-default">
+                Password Strength AI
+              </div>
+            </div>
+          </section>
+
+          {/* About Section */}
+          <section id="about" className="space-y-10 scroll-mt-[120px] transition-all duration-300">
+            <div className="space-y-6">
+              <h2 className="text-2xl font-heading font-bold">About APGS</h2>
+              <div className="grid lg:grid-cols-2 gap-8 items-center">
                 <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                    <span className="text-sm">Safe URLs verified instantly</span>
+                  <p className="text-muted-foreground text-base leading-relaxed">
+                    APGS is a powerful, unified security scanning platform designed to protect you from modern threats. Our advanced phishing detection system analyzes URLs in real-time to identify malicious links that could compromise your security. Using machine learning algorithms and comprehensive threat databases, we check for suspicious patterns, domain reputation, and known phishing indicators.
+                  </p>
+                  <p className="text-muted-foreground text-base leading-relaxed">
+                    Whether you're clicking a link in an email, checking file safety, validating passwords, or verifying suspicious URLs, our tool provides instant results with detailed explanations of potential risks and security recommendations. No required signup for quick testing, with full historical tracking for signed-in users.
+                  </p>
+                  <div className="flex flex-wrap gap-3 pt-2">
+                    <div className="flex items-center gap-2 text-sm text-primary">
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Real-time Analysis</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-primary">
+                      <Zap className="w-4 h-4" />
+                      <span>Instant Results</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-primary">
+                      <Lock className="w-4 h-4" />
+                      <span>Privacy Focused</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                    <span className="text-sm">Malicious links blocked</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                    <span className="text-sm">Suspicious sites flagged</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                    <span className="text-sm">Detailed security reports</span>
+                </div>
+                <div className="rounded-xl bg-card/70 p-6 border border-border">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                      <span className="text-sm">Safe URLs verified instantly</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                      <span className="text-sm">Malicious links blocked</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                      <span className="text-sm">Suspicious sites flagged</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                      <span className="text-sm">Detailed security reports</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="space-y-6 pt-4 border-t border-border">
-            <h3 className="text-xl font-heading font-bold">Features</h3>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {featureCards.map((card, i) => {
-                const Icon = card.icon;
-                const loading = featureLoading === card.sectionId;
-                return (
-                  <article
-                    key={i}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleFeatureCardClick(card.sectionId)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        handleFeatureCardClick(card.sectionId);
-                      }
-                    }}
-                    className={`rounded-xl border p-4 bg-card/75 cursor-pointer transition-all duration-200 ${activeSection === card.sectionId ? "border-primary shadow-[0_0_18px_hsl(150_100%_45%_/_0.35)] scale-105" : "border-border hover:shadow-[0_0_18px_hsl(150_100%_45%_/_0.2)] hover:scale-105"}`}
-                  >
-                    <div className="flex items-center gap-2 text-primary mb-2">
-                      <Icon className="w-5 h-5" />
-                      <h3 className="text-sm font-semibold">{card.title}</h3>
-                      {loading && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
-                    </div>
-                    <p className="text-sm text-muted-foreground">{card.text}</p>
-                  </article>
-                );
-              })}
+            {/* Feature Cards */}
+            <div className="space-y-6 pt-4 border-t border-border">
+              <h3 className="text-xl font-heading font-bold">Features</h3>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {featureCards.map((card, i) => {
+                  const Icon = card.icon;
+                  const loading = featureLoading === card.sectionId;
+                  return (
+                    <article
+                      key={`feature-${card.sectionId}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleFeatureCardClick(card.sectionId)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          handleFeatureCardClick(card.sectionId);
+                        }
+                      }}
+                      className={`rounded-xl border p-4 bg-card/75 cursor-pointer transition-all duration-200 ${
+                        activeSection === card.sectionId
+                          ? "border-primary shadow-[0_0_18px_hsl(150_100%_45%_/_0.35)] scale-105"
+                          : "border-border hover:shadow-[0_0_18px_hsl(150_100%_45%_/_0.2)] hover:scale-105"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 text-primary mb-2">
+                        <Icon className="w-5 h-5" />
+                        <h3 className="text-sm font-semibold">{card.title}</h3>
+                        {loading && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{card.text}</p>
+                    </article>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section id="faq" className="space-y-6">
-          <h2 className="text-2xl font-heading font-bold">Frequently Asked Questions</h2>
-          <div className="space-y-3">
-            <FaqItem
-              question="How does the phishing link checker work?"
-              answer="Our tool analyzes URLs using multiple security layers: domain reputation checking, pattern recognition for suspicious URLs, SSL certificate validation, and cross-referencing with known threat databases. It provides instant results with detailed explanations."
-            />
-            <FaqItem
-              question="How to identify URL phishing?"
-              answer="Look for suspicious elements like misspelled domains, unusual URL structures, requests for personal information, urgent language, or links from untrusted sources. Our scanner automatically detects these patterns and more."
-            />
-            <FaqItem
-              question="What is a safe URL?"
-              answer="Safe URLs typically have HTTPS encryption, legitimate domain names, and come from trusted sources. They don't request sensitive information unexpectedly and don't contain suspicious characters or redirects."
-            />
-            <FaqItem
-              question="What is a suspicious URL?"
-              answer="Suspicious URLs may use URL shortening to hide the real destination, contain random characters, mimic legitimate sites with slight variations, or lead to unexpected redirects. Always verify before clicking."
-            />
-          </div>
-        </section>
-
-        <section id="contact" className="rounded-xl border border-border p-6 bg-card/75 space-y-4">
-          <h2 className="text-2xl font-heading font-bold">Contact</h2>
-          <div className="flex flex-col sm:flex-row gap-4 text-muted-foreground text-sm">
-            <div className="flex items-center gap-2">
-              <Mail className="w-4 h-4 text-primary" />
-              <span>gyana.tcr20@gmail.com</span>
+          {/* FAQ Section */}
+          <section id="faq" className="space-y-6 transition-all duration-300">
+            <h2 className="text-2xl font-heading font-bold">Frequently Asked Questions</h2>
+            <div className="space-y-3">
+              <FaqItem
+                question="How does the phishing link checker work?"
+                answer="Our tool analyzes URLs using multiple security layers: domain reputation checking, pattern recognition for suspicious URLs, SSL certificate validation, and cross-referencing with known threat databases. It provides instant results with detailed explanations."
+              />
+              <FaqItem
+                question="How to identify URL phishing?"
+                answer="Look for suspicious elements like misspelled domains, unusual URL structures, requests for personal information, urgent language, or links from untrusted sources. Our scanner automatically detects these patterns and more."
+              />
+              <FaqItem
+                question="What is a safe URL?"
+                answer="Safe URLs typically have HTTPS encryption, legitimate domain names, and come from trusted sources. They don't request sensitive information unexpectedly and don't contain suspicious characters or redirects."
+              />
+              <FaqItem
+                question="What is a suspicious URL?"
+                answer="Suspicious URLs may use URL shortening to hide the real destination, contain random characters, mimic legitimate sites with slight variations, or lead to unexpected redirects. Always verify before clicking."
+              />
             </div>
-            <div className="flex items-center gap-2">
-              <Phone className="w-4 h-4 text-primary" />
-              <span>+91 7008584414</span>
-            </div>
-          </div>
-          <form onSubmit={handleContactSubmit} className="space-y-3">
-            <input
-              type="text"
-              placeholder="Name"
-              value={contact.name}
-              onChange={(e) => setContact((s) => ({ ...s, name: e.target.value }))}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
-              required
-            />
-            <input
-              type="email"
-              placeholder="Email"
-              value={contact.email}
-              onChange={(e) => setContact((s) => ({ ...s, email: e.target.value }))}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
-              required
-            />
-            <textarea
-              placeholder="Message"
-              value={contact.message}
-              onChange={(e) => setContact((s) => ({ ...s, message: e.target.value }))}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
-              rows={4}
-              required
-            />
-            <Button type="submit" className="w-full rounded-lg py-2.5">
-              {sent ? "Message sent" : "Send Message"}
-            </Button>
-          </form>
-        </section>
-      </main>
+          </section>
 
+          {/* Contact Section */}
+          <section id="contact" className="rounded-xl border border-border p-6 bg-card/75 space-y-4 scroll-mt-[120px] transition-all duration-300">
+            <h2 className="text-2xl font-heading font-bold">Contact</h2>
+            <div className="flex flex-col sm:flex-row gap-4 text-muted-foreground text-sm">
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-primary" />
+                <span>gyana.tcr20@gmail.com</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Phone className="w-4 h-4 text-primary" />
+                <span>+91 7008584414</span>
+              </div>
+            </div>
+            <form onSubmit={handleContactSubmit} className="space-y-3">
+              <input
+                type="text"
+                placeholder="Name"
+                value={contact.name}
+                onChange={(e) => setContact((s) => ({ ...s, name: e.target.value }))}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+                required
+              />
+              <input
+                type="email"
+                placeholder="Email"
+                value={contact.email}
+                onChange={(e) => setContact((s) => ({ ...s, email: e.target.value }))}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+                required
+              />
+              <textarea
+                placeholder="Message"
+                value={contact.message}
+                onChange={(e) => setContact((s) => ({ ...s, message: e.target.value }))}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+                rows={4}
+                required
+              />
+              <Button type="submit" className="w-full rounded-lg py-2.5">
+                {sent ? "Message sent" : "Send Message"}
+              </Button>
+            </form>
+          </section>
+        </main>
+      </div>
+
+      {/* ========== SCANNING VIEW SECTION ========== */}
+      <div
+        className={`transition-all duration-300 ${
+          currentView === "scanning" ? "block opacity-100" : "hidden opacity-0"
+        }`}
+      >
+        {currentView === "scanning" && console.log("[DEBUG] Rendering scanning view, scanActiveTab is:", scanActiveTab)}
+        <main className="max-w-6xl mx-auto px-4 py-10 space-y-8">
+          {/* Login CTA - Only show when not authenticated */}
+          {!isAuthenticated && (
+            <section className="bg-gradient-to-r from-primary/20 to-primary/10 rounded-xl border border-primary/40 p-6 shadow-lg transition-all duration-300">
+              <div className="flex items-center justify-between gap-4 flex-col sm:flex-row">
+                <div>
+                  <h2 className="text-xl font-heading font-bold text-primary mb-1">Save Your Scan History</h2>
+                  <p className="text-muted-foreground text-sm">Sign in to automatically save all scan results and track security threats over time.</p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <Button onClick={() => navigate("/login")} className="gap-2 hover:shadow-[0_0_16px_hsl(150_100%_45%/0.3)] transition-shadow">
+                    <LogIn className="w-4 h-4" />
+                    <span>Login</span>
+                  </Button>
+                  <Button onClick={() => navigate("/login?view=signup")} variant="outline" className="gap-2 border-border hover:bg-card/70 transition">
+                    <span>Sign Up</span>
+                  </Button>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Scanning Hub Title */}
+          <section className="bg-card/70 rounded-xl border border-border p-6 shadow-lg transition-all duration-300">
+            <h1 className="text-3xl font-heading font-bold mb-2">Scanning Hub</h1>
+            <p className="text-muted-foreground">
+              Access all scanning modules in one place. {isAuthenticated ? "Your scan history is automatically saved." : "Guest mode works without login. Sign in to save history and view results."}
+            </p>
+          </section>
+
+          {/* Tab Selection */}
+          <section className="border border-border rounded-xl bg-card/70 p-4 transition-all duration-300">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                { id: "url", label: "URL Scan", icon: Globe },
+                { id: "email", label: "Email Check", icon: Mail },
+                { id: "file", label: "File Analysis", icon: FileText },
+                { id: "password", label: "Password Check", icon: Lock },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setScanActiveTab(tab.id as "url" | "email" | "file" | "password")}
+                  className={`py-2 px-3 rounded-lg border transition-all duration-200 ${
+                    scanActiveTab === tab.id
+                      ? "border-primary text-primary bg-primary/10 shadow-[0_0_8px_hsl(150_100%_45%_/_0.2)]"
+                      : "border-border text-muted-foreground hover:border-primary/70"
+                  }`}
+                >
+                  <div className="flex items-center justify-center gap-2 text-sm font-medium">
+                    <tab.icon className="w-4 h-4" />
+                    {tab.label}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {/* Scanner Content - ALL RENDERED, TOGGLED BY CSS */}
+          <section className="space-y-4 transition-all duration-300">
+            {scanActiveTab === "url" && (
+              <UrlScanner
+                onScanComplete={refreshHistory}
+                isAuthenticated={!!isAuthenticated}
+                userName={userName}
+                scanData={urlScanData}
+                setScanData={setUrlScanData}
+              />
+            )}
+            {scanActiveTab === "email" && (
+              <EmailBreachChecker
+                onScanComplete={refreshHistory}
+                isAuthenticated={!!isAuthenticated}
+                userName={userName}
+                scanData={emailScanData}
+                setScanData={setEmailScanData}
+              />
+            )}
+            {scanActiveTab === "file" && (
+              <FileScanner
+                onScanComplete={refreshHistory}
+                isAuthenticated={!!isAuthenticated}
+                userName={userName}
+                scanData={fileScanData}
+                setScanData={setFileScanData}
+              />
+            )}
+            {scanActiveTab === "password" && (
+              <PasswordChecker
+                onScanComplete={refreshHistory}
+                isAuthenticated={!!isAuthenticated}
+                userName={userName}
+                scanData={passwordScanData}
+                setScanData={setPasswordScanData}
+              />
+            )}
+          </section>
+
+          {/* Activity History */}
+          {isAuthenticated ? (
+            <ActivityHistory history={historyList} />
+          ) : (
+            <div className="rounded-xl border border-border p-4 bg-card/60 text-sm text-muted-foreground">
+              Log in to save activity and review history. Guest scans are still available but are not stored.
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* ========== BACK TO TOP BUTTON ========== */}
       {showBackToTop && (
         <button
           onClick={scrollToTop}
