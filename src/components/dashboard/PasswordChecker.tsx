@@ -1,32 +1,61 @@
 import { useState } from "react";
-import { Lock, Loader2, Eye, EyeOff } from "lucide-react";
+import { Lock, Loader2, Eye, EyeOff, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { analyzePassword, type PasswordResult } from "@/lib/mockData";
+import { apiScans } from "@/lib/api";
+import RiskAnalysisReport from "@/components/RiskAnalysisReport";
 
 interface PasswordCheckerProps {
   onScanComplete: () => void;
   isAuthenticated?: boolean;
+  userName?: string;
+  scanData: { input: string; result: any };
+  setScanData: (data: { input: string; result: any }) => void;
 }
 
-const PasswordChecker = ({ onScanComplete, isAuthenticated = false }: PasswordCheckerProps) => {
-  const [password, setPassword] = useState("");
+const PasswordChecker = ({ onScanComplete, isAuthenticated = false, userName, scanData, setScanData }: PasswordCheckerProps) => {
+  const [password, setPassword] = useState(scanData.input);
   const [show, setShow] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [result, setResult] = useState<PasswordResult | null>(null);
+  const [result, setResult] = useState<PasswordResult | null>(scanData.result);
+
+  const handleReset = () => {
+    setPassword("");
+    setResult(null);
+    setScanData({ input: "", result: null });
+    toast.success("Password check cleared");
+  };
 
   const handleCheck = (e: React.FormEvent) => {
     e.preventDefault();
     if (!password.trim()) { toast.error("Enter a password to check"); return; }
     setChecking(true);
     setResult(null);
-    setTimeout(() => {
+    setTimeout(async () => {
       const res = analyzePassword(password);
       setResult(res);
+      setScanData({ input: password, result: res });
       setChecking(false);
       onScanComplete();
+      
+      // Save to history if authenticated
+      if (isAuthenticated) {
+        try {
+          await apiScans.saveScan({
+            type: "password",
+            target: "password",
+            status: res.strength === "strong" ? "safe" : res.strength === "medium" ? "safe" : "breached"
+          });
+          toast.success("✅ Result saved to history");
+        } catch (err) {
+          console.error("Failed to save scan:", err);
+        }
+      } else {
+        toast.info("📝 Guest scan (not saved - login to save history)");
+      }
     }, 1500);
   };
 
@@ -56,27 +85,46 @@ const PasswordChecker = ({ onScanComplete, isAuthenticated = false }: PasswordCh
             {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
         </div>
-        <Button type="submit" disabled={checking} className="font-heading shrink-0 hover:shadow-[0_0_16px_hsl(150_100%_45%/0.3)] transition-shadow">
-          {checking ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Checking...</> : "Check Password"}
-        </Button>
+        <div className="flex gap-2">
+          <Button type="submit" disabled={checking} className="font-heading shrink-0 hover:shadow-[0_0_16px_hsl(150_100%_45%/0.3)] transition-shadow">
+            {checking ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Checking...</> : "Check Password"}
+          </Button>
+          {(password || result) && (
+            <Button type="button" onClick={handleReset} variant="outline" disabled={checking} className="font-heading shrink-0 border-border hover:bg-card/70 transition gap-2">
+              <RotateCcw className="w-4 h-4" />
+              <span className="hidden sm:inline">Reset</span>
+            </Button>
+          )}
+        </div>
       </form>
 
       {result && (
-        <div className="mt-4 space-y-3 animate-fade-in-up">
-          <div className="flex items-center justify-between">
-            <span className={`font-heading font-semibold uppercase ${strengthColor}`}>{result.strength}</span>
-            <span className="font-mono text-sm text-muted-foreground">{result.score}/100</span>
-          </div>
-          <Progress value={result.score} className={`h-2 ${progressColor}`} />
-          {result.breached && (
-            <p className="text-destructive text-sm font-mono">⚠️ This password has appeared in known data breaches</p>
-          )}
+        <div className="mt-6 space-y-4">
+          <RiskAnalysisReport
+            data={{
+              scanType: "password",
+              status: result.strength === "strong" ? "safe" : result.strength === "medium" ? "suspicious" : "dangerous",
+              score: result.score,
+              details: result.breached 
+                ? "Password found in known breaches"
+                : "Password appears to be secure",
+              threats: result.breached ? ["Found in data breach"] : [],
+              timestamp: new Date().toISOString(),
+              userName: userName,
+              targetItem: "Password"
+            }}
+          />
+
+          {/* Additional Password Suggestions */}
           {result.suggestions.length > 0 && (
-            <ul className="space-y-1">
-              {result.suggestions.map((s, i) => (
-                <li key={i} className="text-muted-foreground text-sm">• {s}</li>
-              ))}
-            </ul>
+            <div className="mt-4 p-4 rounded-lg border border-primary/30 bg-primary/5">
+              <p className="font-heading font-semibold text-primary text-sm mb-2">Improvement Suggestions:</p>
+              <ul className="space-y-1">
+                {result.suggestions.map((s, i) => (
+                  <li key={i} className="text-muted-foreground text-sm">• {s}</li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       )}

@@ -1,30 +1,60 @@
 import { useState } from "react";
-import { Mail, Loader2, ShieldCheck, ShieldAlert } from "lucide-react";
+import { Mail, Loader2, ShieldCheck, ShieldAlert, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { checkEmailBreach, type BreachResult } from "@/lib/mockData";
+import { apiScans } from "@/lib/api";
+import RiskAnalysisReport from "@/components/RiskAnalysisReport";
 
 interface EmailBreachCheckerProps {
   onScanComplete: () => void;
   isAuthenticated?: boolean;
+  userName?: string;
+  scanData: { input: string; result: any };
+  setScanData: (data: { input: string; result: any }) => void;
 }
 
-const EmailBreachChecker = ({ onScanComplete, isAuthenticated = false }: EmailBreachCheckerProps) => {
-  const [email, setEmail] = useState("");
+const EmailBreachChecker = ({ onScanComplete, isAuthenticated = false, userName, scanData, setScanData }: EmailBreachCheckerProps) => {
+  const [email, setEmail] = useState(scanData.input);
   const [checking, setChecking] = useState(false);
-  const [result, setResult] = useState<BreachResult | null>(null);
+  const [result, setResult] = useState<BreachResult | null>(scanData.result);
+
+  const handleReset = () => {
+    setEmail("");
+    setResult(null);
+    setScanData({ input: "", result: null });
+    toast.success("Email scan cleared");
+  };
 
   const handleCheck = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) { toast.error("Enter an email address"); return; }
     setChecking(true);
     setResult(null);
-    setTimeout(() => {
+    setTimeout(async () => {
       const res = checkEmailBreach(email);
       setResult(res);
+      setScanData({ input: email, result: res });
       setChecking(false);
       onScanComplete();
+      
+      // Save to history if authenticated
+      if (isAuthenticated) {
+        try {
+          await apiScans.saveScan({
+            type: "email",
+            target: email,
+            status: res.breached ? "breached" : "safe"
+          });
+          toast.success("✅ Result saved to history");
+        } catch (err) {
+          console.error("Failed to save scan:", err);
+        }
+      } else {
+        toast.info("📝 Guest scan (not saved - login to save history)");
+      }
+      
       if (res.breached) toast.error("⚠️ Email found in data breaches!");
       else toast.success("✅ No breaches found");
     }, 1800);
@@ -48,28 +78,47 @@ const EmailBreachChecker = ({ onScanComplete, isAuthenticated = false }: EmailBr
           onChange={(e) => setEmail(e.target.value)}
           className="flex-1 bg-muted border-border text-foreground placeholder:text-muted-foreground focus:shadow-[0_0_12px_hsl(150_100%_45%/0.2)]"
         />
-        <Button type="submit" disabled={checking} className="font-heading shrink-0 hover:shadow-[0_0_16px_hsl(150_100%_45%/0.3)] transition-shadow">
-          {checking ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Checking...</> : "Check Breach"}
-        </Button>
+        <div className="flex gap-2">
+          <Button type="submit" disabled={checking} className="font-heading shrink-0 hover:shadow-[0_0_16px_hsl(150_100%_45%/0.3)] transition-shadow">
+            {checking ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Checking...</> : "Check Breach"}
+          </Button>
+          {(email || result) && (
+            <Button type="button" onClick={handleReset} variant="outline" disabled={checking} className="font-heading shrink-0 border-border hover:bg-card/70 transition gap-2">
+              <RotateCcw className="w-4 h-4" />
+              <span className="hidden sm:inline">Reset</span>
+            </Button>
+          )}
+        </div>
       </form>
 
       {result && (
-        <div className={`mt-4 p-4 rounded-md border flex items-start gap-3 animate-fade-in-up ${
-          result.breached ? "bg-destructive/10 border-destructive/30" : "bg-primary/10 border-primary/30"
-        }`}>
-          {result.breached ? <ShieldAlert className="w-6 h-6 text-destructive shrink-0 mt-0.5" /> : <ShieldCheck className="w-6 h-6 text-primary shrink-0 mt-0.5" />}
-          <div className="flex-1">
-            <p className={`font-heading font-semibold ${result.breached ? "text-destructive" : "text-primary"}`}>
-              {result.breached ? `Found in ${result.count} breach${result.count > 1 ? "es" : ""}` : "No Breaches Found"}
-            </p>
-            {result.breached && result.sources.length > 0 && (
-              <ul className="mt-2 space-y-1">
+        <div className="mt-6 space-y-4">
+          <RiskAnalysisReport
+            data={{
+              scanType: "email",
+              status: result.breached ? "dangerous" : "safe",
+              score: result.breached ? 80 : 10,
+              details: result.breached 
+                ? `Email found in ${result.count} breach${result.count > 1 ? "es" : ""}`
+                : "Email not found in known breaches",
+              threats: result.breached ? result.sources : [],
+              timestamp: new Date().toISOString(),
+              userName: userName,
+              targetItem: email
+            }}
+          />
+
+          {/* Additional Breach Details */}
+          {result.breached && result.sources.length > 0 && (
+            <div className="mt-4 p-4 rounded-lg border border-destructive/30 bg-destructive/5">
+              <p className="font-heading font-semibold text-destructive text-sm mb-2">Compromised Sources:</p>
+              <ul className="space-y-1">
                 {result.sources.map((s, i) => (
                   <li key={i} className="text-muted-foreground text-sm font-mono">• {s}</li>
                 ))}
               </ul>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </section>

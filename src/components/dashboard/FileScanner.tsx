@@ -1,15 +1,19 @@
 import { useState, useCallback } from "react";
-import { Upload, FileUp, X, Loader2, CheckCircle, AlertTriangle, Shield, FileText, Download, AlertCircle, Check, Search } from "lucide-react";
+import { Upload, FileUp, X, Loader2, CheckCircle, AlertTriangle, Shield, FileText, Download, AlertCircle, Check, Search, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
 import { scanFile, type FileAnalysis } from "@/lib/mockData";
 import { downloadReport, type PDFReportData } from "@/lib/pdfReportGenerator";
+import { apiScans } from "@/lib/api";
+import RiskAnalysisReport from "@/components/RiskAnalysisReport";
 
 interface FileScannerProps {
   onScanComplete: () => void;
   isAuthenticated?: boolean;
   userName?: string;
+  scanData: { file: File | null; result: any };
+  setScanData: (data: { file: File | null; result: any }) => void;
 }
 
 const getScoreColor = (score: number) => {
@@ -18,11 +22,11 @@ const getScoreColor = (score: number) => {
   return { bar: "bg-destructive", text: "text-destructive", bg: "bg-destructive/10", label: "High Risk", description: "Threat detected" };
 };
 
-const FileScanner = ({ onScanComplete, isAuthenticated = false, userName }: FileScannerProps) => {
-  const [file, setFile] = useState<File | null>(null);
+const FileScanner = ({ onScanComplete, isAuthenticated = false, userName, scanData, setScanData }: FileScannerProps) => {
+  const [file, setFile] = useState<File | null>(scanData.file);
   const [scanning, setScanning] = useState(false);
   const [scanComplete, setScanComplete] = useState(false);
-  const [result, setResult] = useState<FileAnalysis | null>(null);
+  const [result, setResult] = useState<FileAnalysis | null>(scanData.result);
   const [scanProgress, setScanProgress] = useState(0);
   const [downloadingReport, setDownloadingReport] = useState(false);
 
@@ -44,6 +48,15 @@ const FileScanner = ({ onScanComplete, isAuthenticated = false, userName }: File
     });
   };
 
+  const handleReset = () => {
+    setFile(null);
+    setResult(null);
+    setScanProgress(0);
+    setScanComplete(false);
+    setScanData({ file: null, result: null });
+    showToast("File scan cleared", "info");
+  };
+
   const handleScan = () => {
     if (!file) return;
     setScanning(true);
@@ -51,10 +64,28 @@ const FileScanner = ({ onScanComplete, isAuthenticated = false, userName }: File
     setScanProgress(0);
     setResult(null);
 
-    const finalize = () => {
+    const finalize = async () => {
       try {
         const res = scanFile(file.name);
         setResult(res);
+        setScanData({ file, result: res });
+        
+        // Save to history if authenticated
+        if (isAuthenticated) {
+          try {
+            await apiScans.saveScan({
+              type: "file",
+              target: file.name,
+              status: res.status === "infected" ? "phishing" : "safe"
+            });
+            showToast("✅ Result saved to history", "success");
+          } catch (err) {
+            console.error("Failed to save scan:", err);
+          }
+        } else {
+          showToast("📝 Guest scan (not saved - login to save history)", "info");
+        }
+        
         if (res.status === "infected") showToast("⚠️ Threat detected in file!", "error");
         else showToast("✅ File appears safe", "success");
       } catch (err) {
@@ -138,9 +169,13 @@ const FileScanner = ({ onScanComplete, isAuthenticated = false, userName }: File
         )}
       </div>
       {file && (
-        <div className="mt-4 flex items-center gap-3">
+        <div className="mt-4 flex items-center gap-3 flex-wrap">
           <Button onClick={handleScan} disabled={scanning} className="font-heading hover:shadow-[0_0_16px_hsl(150_100%_45%/0.3)] transition-shadow">
             {scanning ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Scanning...</> : "Scan File"}
+          </Button>
+          <Button onClick={handleReset} disabled={scanning} variant="outline" className="font-heading border-border hover:bg-card/70 transition gap-2">
+            <RotateCcw className="w-4 h-4" />
+            <span className="hidden sm:inline">Reset</span>
           </Button>
         </div>
       )}
@@ -268,6 +303,22 @@ const FileScanner = ({ onScanComplete, isAuthenticated = false, userName }: File
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Modern Risk Analysis Report */}
+            <div className="mt-8">
+              <RiskAnalysisReport
+                data={{
+                  scanType: "file",
+                  status: result.status,
+                  score: result.score,
+                  details: result.reasons.map(r => r.label).join(", "),
+                  threats: result.reasons.filter(r => r.flagged).map(r => r.label),
+                  timestamp: new Date().toISOString(),
+                  userName: userName,
+                  targetItem: file?.name || "Unknown file"
+                }}
+              />
             </div>
 
             {/* Analysis Grid */}
