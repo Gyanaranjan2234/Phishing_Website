@@ -26,7 +26,7 @@ export function generateReport(analysis: UrlAnalysis) {
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(120, 160, 140);
-  doc.text("Authentication Protocol Gateway Secure", w / 2, 28, { align: "center" });
+  doc.text("Advanced Phishing Guard System", w / 2, 28, { align: "center" });
   
   // Report metadata
   const now = new Date();

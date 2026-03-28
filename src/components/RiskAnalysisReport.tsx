@@ -75,9 +75,9 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
     );
   }
 
-  // Determine risk level and colors based on score
+  // Determine risk level and colors based on score (REVERSED LOGIC: HIGH score = SAFE, LOW score = DANGEROUS)
   const getRiskInfo = (score: number) => {
-    if (score <= 30)
+    if (score >= 80)
       return {
         level: "SAFE",
         color: "emerald",
@@ -88,7 +88,7 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
         icon: CheckCircle,
         description: "This item appears safe and legitimate",
       };
-    if (score <= 70)
+    if (score >= 40)
       return {
         level: "WARNING",
         color: "amber",
@@ -145,9 +145,9 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
             </div>
             <div
               className={`px-5 py-3 rounded-full font-semibold text-sm flex items-center gap-2 shadow-lg ${
-                data.score <= 30
+                data.score >= 80
                   ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white"
-                  : data.score <= 70
+                  : data.score >= 40
                   ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white"
                   : "bg-gradient-to-r from-red-500 to-red-600 text-white"
               }`}
@@ -209,9 +209,9 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
                   <p className="text-xs text-slate-400 uppercase font-semibold tracking-wide">Risk Score</p>
                   <span
                     className={`text-3xl font-bold ${
-                      data.score <= 30
+                      data.score >= 80
                         ? "text-emerald-400"
-                        : data.score <= 70
+                        : data.score >= 40
                         ? "text-amber-400"
                         : "text-red-400"
                     }`}
@@ -223,9 +223,9 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
                 <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden border border-slate-600">
                   <div
                     className={`h-full transition-all duration-700 ease-out shadow-lg ${
-                      data.score <= 30
+                      data.score >= 80
                         ? "bg-gradient-to-r from-emerald-500 to-emerald-400"
-                        : data.score <= 70
+                        : data.score >= 40
                         ? "bg-gradient-to-r from-amber-500 to-amber-400"
                         : "bg-gradient-to-r from-red-500 to-red-400"
                     }`}
@@ -245,18 +245,18 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
                 <div className="flex items-center gap-3">
                   <div
                     className={`w-4 h-4 rounded-full shadow-lg ${
-                      data.score <= 30
+                      data.score >= 80
                         ? "bg-emerald-500"
-                        : data.score <= 70
+                        : data.score >= 40
                         ? "bg-amber-500"
                         : "bg-red-500"
                     }`}
                   />
                   <span className={`font-semibold text-lg ${riskInfo.textColor}`}>
-                    {data.status === "safe"
+                    {riskInfo.level === "SAFE"
                       ? "✓ Safe"
-                      : data.status === "suspicious"
-                      ? "⚠ Suspicious"
+                      : riskInfo.level === "WARNING"
+                      ? "⚠ Warning"
                       : "✕ Dangerous"}
                   </span>
                 </div>
@@ -362,9 +362,9 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
         {/* Final Verdict */}
         <div
           className={`rounded-xl p-7 space-y-4 border-2 shadow-lg ${
-            data.score <= 30
+            data.score >= 80
               ? "border-emerald-500/50 bg-gradient-to-r from-emerald-950/60 to-emerald-900/30"
-              : data.score <= 70
+              : data.score >= 40
               ? "border-amber-500/50 bg-gradient-to-r from-amber-950/60 to-amber-900/30"
               : "border-red-500/50 bg-gradient-to-r from-red-950/60 to-red-900/30"
           }`}
@@ -373,9 +373,9 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
           <div className="flex items-start gap-4">
             <RiskIcon
               className={`w-8 h-8 mt-1 shrink-0 ${
-                data.score <= 30
+                data.score >= 80
                   ? "text-emerald-400"
-                  : data.score <= 70
+                  : data.score >= 40
                   ? "text-amber-400"
                   : "text-red-400"
               }`}
@@ -383,23 +383,23 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
             <div className="space-y-3 flex-1">
               <p
                 className={`text-2xl font-bold ${
-                  data.score <= 30
+                  data.score >= 80
                     ? "text-emerald-300"
-                    : data.score <= 70
+                    : data.score >= 40
                     ? "text-amber-300"
                     : "text-red-300"
                 }`}
               >
-                {data.score <= 30
+                {data.score >= 80
                   ? "✓ Green Light - Safe to Proceed"
-                  : data.score <= 70
+                  : data.score >= 40
                   ? "⚠ Caution - Review Before Proceeding"
                   : "✕ Red Alert - Do Not Proceed"}
               </p>
               <p className="text-sm text-slate-300 leading-relaxed">
-                {data.score <= 30
+                {data.score >= 80
                   ? "This item has passed comprehensive security analysis and appears to be legitimate and safe to use. You can interact with it with confidence."
-                  : data.score <= 70
+                  : data.score >= 40
                   ? "This item shows some suspicious characteristics that warrant review. Analyze the details above before deciding whether to proceed with caution or avoid entirely."
                   : "This item has been identified as a potential security threat with critical indicators of malicious intent. We strongly recommend avoiding any interaction with this item."}
               </p>
@@ -417,7 +417,7 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
             Recommended Actions
           </p>
           <ul className="space-y-3 text-sm text-slate-200">
-            {data.score <= 30 && (
+            {data.score >= 80 && (
               <>
                 <li className="flex gap-3 p-2 rounded hover:bg-slate-800/30 transition-colors">
                   <CheckCircle className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
@@ -433,7 +433,7 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
                 </li>
               </>
             )}
-            {data.score > 30 && data.score <= 70 && (
+            {data.score >= 40 && data.score < 80 && (
               <>
                 <li className="flex gap-3 p-2 rounded hover:bg-slate-800/30 transition-colors">
                   <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
@@ -449,7 +449,7 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
                 </li>
               </>
             )}
-            {data.score > 70 && (
+            {data.score < 40 && (
               <>
                 <li className="flex gap-3 p-2 rounded hover:bg-slate-800/30 transition-colors">
                   <AlertOctagon className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />

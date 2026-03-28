@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { Mail, Loader2, ShieldCheck, ShieldAlert, RotateCcw } from "lucide-react";
+import { Mail, Loader2, ShieldCheck, ShieldAlert, RotateCcw, AlertTriangle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { checkEmailBreach, type BreachResult } from "@/lib/mockData";
 import { apiScans } from "@/lib/api";
-import RiskAnalysisReport from "@/components/RiskAnalysisReport";
 
 interface EmailBreachCheckerProps {
   onScanComplete: () => void;
@@ -93,20 +92,26 @@ const EmailBreachChecker = ({ onScanComplete, isAuthenticated = false, userName,
 
       {result && (
         <div className="mt-6 space-y-4">
-          <RiskAnalysisReport
-            data={{
-              scanType: "email",
-              status: result.breached ? "dangerous" : "safe",
-              score: result.breached ? 80 : 10,
-              details: result.breached 
-                ? `Email found in ${result.count} breach${result.count > 1 ? "es" : ""}`
-                : "Email not found in known breaches",
-              threats: result.breached ? result.sources : [],
-              timestamp: new Date().toISOString(),
-              userName: userName,
-              targetItem: email
-            }}
-          />
+          {/* Direct Results Display - No Report */}
+          <div className="p-4 rounded-lg border border-border bg-card/75">
+            <div className="flex items-start gap-3">
+              {result.breached ? (
+                <AlertTriangle className="w-5 h-5 text-destructive mt-0.5 flex-shrink-0" />
+              ) : (
+                <CheckCircle className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+              )}
+              <div className="flex-1">
+                <h3 className="font-semibold text-foreground mb-1">
+                  {result.breached ? "Email Found in Breaches" : "Email Not Breached"}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {result.breached 
+                    ? `This email was found in ${result.count} breach${result.count > 1 ? "es" : ""}`
+                    : "This email has not been found in known data breaches"}
+                </p>
+              </div>
+            </div>
+          </div>
 
           {/* Additional Breach Details */}
           {result.breached && result.sources.length > 0 && (

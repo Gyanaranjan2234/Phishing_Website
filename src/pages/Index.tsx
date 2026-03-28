@@ -56,6 +56,7 @@ const Index = () => {
   // ============= THEME & AUTHENTICATION =============
   const [theme, setTheme] = useState<"dark" | "light">(() => (localStorage.getItem("apgs-theme") === "light" ? "light" : "dark"));
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [userName, setUserName] = useState<string>("");
 
   // ============= VIEW MANAGEMENT =============
@@ -115,8 +116,11 @@ const Index = () => {
           setUserName("");
         }
       } catch (err) {
+        console.error("[Auth Error]", err);
         setIsAuthenticated(false);
         setUserName("");
+      } finally {
+        setAuthLoading(false);
       }
     };
     getSession();
@@ -152,6 +156,12 @@ const Index = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // ============= EFFECTS: RESET NAVBAR GLITCH WHEN RETURNING FROM PROFILE =============
+  // When component mounts (user navigates back from Profile), reset activeSection to "home"
+  useEffect(() => {
+    setActiveSection("home");
+  }, [setActiveSection]);
 
   // ============= HANDLERS =============
   const refreshStats = () => refetchStats();
@@ -231,7 +241,7 @@ const Index = () => {
       { icon: Globe, title: "URL Scanner", text: "Detect phishing and malicious links instantly.", sectionId: "url-scan" },
       { icon: Mail, title: "Email Checker", text: "Validate email safety and breach status.", sectionId: "email-scan" },
       { icon: FileText, title: "File Analysis", text: "Scan uploads for hidden malware signatures.", sectionId: "file-scan" },
-      { icon: Lock, title: "Password Verdict", text: "Analyze strength and breach history.", sectionId: "password-scan" },
+      { icon: Lock, title: "Password Strength Analyzer", text: "Analyze strength and breach history.", sectionId: "password-scan" },
     ],
     []
   );
@@ -245,26 +255,26 @@ const Index = () => {
         <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="text-2xl font-heading font-bold text-primary">APGS</span>
-            <span className="text-xs text-muted-foreground">Authentication Protocol Gateway Secure</span>
+            <span className="text-xs text-muted-foreground whitespace-nowrap">Advanced Phishing Guard System</span>
           </div>
 
           {/* NAVBAR: ALWAYS THE SAME STRUCTURE - NO DYNAMIC ADD/REMOVE */}
           <nav className="flex items-center gap-2 text-sm flex-wrap">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">{theme === "dark" ? "Dark" : "Light"}</span>
+              <span className="text-xs text-muted-foreground">{theme === "dark" ? "🌙" : "☀️"}</span>
               <Switch
                 checked={theme === "light"}
                 onCheckedChange={(checked) => setTheme(checked ? "light" : "dark")}
-                className="data-[state=checked]:bg-primary"
+                className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted/40 transition-colors duration-300"
               />
             </div>
 
             <button
               onClick={() => navTo("home")}
-              className={`px-3 py-1 rounded-lg border transition-all duration-200 ${
+              className={`px-3 py-1 rounded-lg border transition-all duration-300 ${
                 navActiveSection === "home"
-                  ? "border-primary text-primary shadow-[0_0_8px_hsl(150_100%_45%_/_0.3)]"
-                  : "border-border hover:bg-card/70"
+                  ? "border-primary text-primary shadow-[0_0_12px_hsl(150_100%_45%_/_0.4)]"
+                  : "border-border text-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-primary hover:shadow-[0_0_12px_hsl(150_100%_45%_/_0.2)]"
               }`}
             >
               Home
@@ -272,10 +282,10 @@ const Index = () => {
 
             <button
               onClick={() => navTo("about")}
-              className={`px-3 py-1 rounded-lg border transition-all duration-200 ${
+              className={`px-3 py-1 rounded-lg border transition-all duration-300 ${
                 navActiveSection === "about"
-                  ? "border-primary text-primary shadow-[0_0_8px_hsl(150_100%_45%_/_0.3)]"
-                  : "border-border hover:bg-card/70"
+                  ? "border-primary text-primary shadow-[0_0_12px_hsl(150_100%_45%_/_0.4)]"
+                  : "border-border text-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-primary hover:shadow-[0_0_12px_hsl(150_100%_45%_/_0.2)]"
               }`}
             >
               About
@@ -283,10 +293,10 @@ const Index = () => {
 
             <button
               onClick={() => navTo("contact")}
-              className={`px-3 py-1 rounded-lg border transition-all duration-200 ${
+              className={`px-3 py-1 rounded-lg border transition-all duration-300 ${
                 navActiveSection === "contact"
-                  ? "border-primary text-primary shadow-[0_0_8px_hsl(150_100%_45%_/_0.3)]"
-                  : "border-border hover:bg-card/70"
+                  ? "border-primary text-primary shadow-[0_0_12px_hsl(150_100%_45%_/_0.4)]"
+                  : "border-border text-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-primary hover:shadow-[0_0_12px_hsl(150_100%_45%_/_0.2)]"
               }`}
             >
               Contact
@@ -294,31 +304,16 @@ const Index = () => {
 
             <button
               onClick={() => switchToScanning()}
-              className={`px-3 py-1 rounded-lg border transition-all duration-200 ${
+              className={`px-3 py-1 rounded-lg border transition-all duration-300 ${
                 navActiveSection === "scanning"
-                  ? "border-primary text-primary shadow-[0_0_8px_hsl(150_100%_45%_/_0.3)]"
-                  : "border-border hover:bg-card/70"
+                  ? "border-primary text-primary shadow-[0_0_12px_hsl(150_100%_45%_/_0.4)]"
+                  : "border-border text-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-primary hover:shadow-[0_0_12px_hsl(150_100%_45%_/_0.2)]"
               }`}
             >
               Scanning
             </button>
 
-            {!isAuthenticated ? (
-              <>
-                <button
-                  onClick={() => navigate("/login")}
-                  className="px-3 py-1 rounded-lg border border-border hover:bg-card/70 transition"
-                >
-                  Login
-                </button>
-                <button
-                  onClick={() => navigate("/login?view=signup")}
-                  className="px-3 py-1 rounded-lg border border-border hover:bg-card/70 transition"
-                >
-                  Sign Up
-                </button>
-              </>
-            ) : (
+            {!authLoading && isAuthenticated && (
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex items-center gap-2 border border-border rounded-full px-3 py-1 bg-card/70 hover:bg-card/90 transition">
                   <User className="w-4 h-4 text-primary" />
@@ -334,6 +329,22 @@ const Index = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            )}
+            {!authLoading && !isAuthenticated && (
+              <>
+                <button
+                  onClick={() => navigate("/login")}
+                  className="px-3 py-1 rounded-lg border border-border text-foreground hover:bg-primary/30 hover:border-primary hover:text-primary transition-all duration-200 font-medium"
+                >
+                  Login
+                </button>
+                <button
+                  onClick={() => navigate("/login?view=signup")}
+                  className="px-3 py-1 rounded-lg border border-border text-foreground hover:bg-primary/30 hover:border-primary hover:text-primary transition-all duration-200 font-medium"
+                >
+                  Sign Up
+                </button>
+              </>
             )}
           </nav>
         </div>
@@ -353,16 +364,29 @@ const Index = () => {
           {/* Hero Section */}
           <section className="grid gap-8 lg:grid-cols-2 items-center transition-all duration-300">
             <div className="space-y-6">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-heading font-bold">
-                Authentication Protocol<br /> Gateway Secure
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-heading font-bold bg-gradient-to-r from-[#00ff88] via-[#00d4ff] to-[#3b82f6] bg-clip-text text-transparent drop-shadow-lg w-full" style={{
+                backgroundImage: 'linear-gradient(90deg, #00ff88, #00d4ff, #3b82f6)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                filter: 'drop-shadow(0 0 10px rgba(0, 255, 136, 0.2))',
+                wordSpacing: 'normal',
+                lineHeight: '1.2',
+                letterSpacing: '-0.02em'
+              }}>
+                Advanced Phishing Guard System
               </h1>
               <p className="text-muted-foreground text-base sm:text-lg">
-                Powerful web security scanning for URLs, emails, files and passwords. No required signup for quick testing, with full historical tracking for signed-in users.
+                Advanced Phishing Guard System is a powerful cybersecurity platform designed to detect phishing threats, analyze suspicious URLs, scan files, and check password security. It provides real-time protection and detailed insights to help users stay safe in the digital world.
               </p>
               <div className="flex flex-wrap gap-3">
-                <Button onClick={() => switchToScanning()} className="px-6 py-2.5">
+                <Button onClick={() => switchToScanning()} className="px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg transition-all duration-300 ease-in-out hover:scale-105 active:scale-98 hover:shadow-[0_0_20px_hsl(150_100%_45%_/_0.4)] hover:drop-shadow-[0_0_8px_hsl(150_100%_45%_/_0.3)] cursor-pointer">
                   Start Scanning
                 </Button>
+                {!authLoading && !isAuthenticated && (
+                  <Button onClick={() => navigate("/login")} variant="outline" className="px-6 py-2.5 border-primary text-primary hover:bg-primary/20 hover:text-primary hover:border-primary font-semibold rounded-lg transition-all duration-300 ease-in-out hover:scale-105 active:scale-98 hover:shadow-[0_0_20px_hsl(150_100%_45%_/_0.3)] cursor-pointer">
+                    Login
+                  </Button>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -376,7 +400,7 @@ const Index = () => {
                 File Malware Analysis
               </div>
               <div className="rounded-xl bg-card/70 p-4 border border-border hover:border-primary/50 shadow-[0_0_12px_hsl(150_100%_45%_/_0.15)] hover:shadow-[0_0_16px_hsl(150_100%_45%_/_0.25)] transition-all duration-300 hover:scale-105 cursor-default">
-                Password Strength AI
+                Password Strength Analyzer
               </div>
             </div>
           </section>
@@ -388,7 +412,7 @@ const Index = () => {
               <div className="grid lg:grid-cols-2 gap-8 items-center">
                 <div className="space-y-4">
                   <p className="text-muted-foreground text-base leading-relaxed">
-                    APGS is a powerful, unified security scanning platform designed to protect you from modern threats. Our advanced phishing detection system analyzes URLs in real-time to identify malicious links that could compromise your security. Using machine learning algorithms and comprehensive threat databases, we check for suspicious patterns, domain reputation, and known phishing indicators.
+                    Advanced Phishing Guard System (APGS) is a powerful, unified security scanning platform designed to protect you from modern threats. Our advanced phishing detection system analyzes URLs in real-time to identify malicious links that could compromise your security. Using machine learning algorithms and comprehensive threat databases, we check for suspicious patterns, domain reputation, and known phishing indicators.
                   </p>
                   <p className="text-muted-foreground text-base leading-relaxed">
                     Whether you're clicking a link in an email, checking file safety, validating passwords, or verifying suspicious URLs, our tool provides instant results with detailed explanations of potential risks and security recommendations. No required signup for quick testing, with full historical tracking for signed-in users.

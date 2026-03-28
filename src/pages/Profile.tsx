@@ -155,20 +155,51 @@ const Profile = () => {
   return (
     <div className="min-h-screen cyber-grid py-8">
       <div className="max-w-5xl mx-auto px-4 space-y-6">
-        <div className="bg-card border border-border rounded-2xl p-6 backdrop-blur-sm glass">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-14 h-14 rounded-full bg-primary/20 text-primary flex items-center justify-center">
-                <UserIcon className="w-7 h-7" />
+        {/* Enhanced Professional Profile Header */}
+        <div className="relative bg-gradient-to-br from-card via-card to-card/80 border border-border/50 rounded-2xl p-8 backdrop-blur-sm glass overflow-hidden">
+          {/* Decorative gradient background */}
+          <div className="absolute inset-0 opacity-5 bg-gradient-to-r from-primary via-transparent to-accent pointer-events-none rounded-2xl"></div>
+          
+          {/* Main header content */}
+          <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+            {/* Left Side: User Profile Info */}
+            <div className="flex items-center gap-6 flex-1">
+              {/* User Avatar Placeholder */}
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-muted via-muted/80 to-muted/60 flex items-center justify-center border border-border shadow-lg">
+                  <UserIcon className="w-8 h-8 text-muted-foreground" />
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-semibold text-foreground">{user.username || "Your Profile"}</h1>
-                <p className="text-sm text-muted-foreground">{user.email}</p>
+
+              {/* User Info Section */}
+              <div className="flex-1">
+                {/* User Name */}
+                <h1 className="text-3xl font-semibold text-foreground mb-1">
+                  {user.username || "Your Profile"}
+                </h1>
+
+                {/* User Email */}
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-primary/70" />
+                  <span className="text-sm text-muted-foreground">{user.email}</span>
+                </div>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => navigate("/")} className="text-xs">Return to Home</Button>
-              <Button variant="outline" onClick={handleLogout} className="text-xs flex items-center gap-2">
+
+            {/* Right Side: Action Buttons */}
+            <div className="flex gap-3 w-full lg:w-auto">
+              <Button 
+                variant="secondary" 
+                onClick={() => navigate("/")} 
+                className="flex-1 lg:flex-none text-sm font-medium transition-all duration-300 ease-in-out hover:scale-105 active:scale-98 hover:shadow-[0_0_16px_hsl(150_100%_45%_/_0.3)] hover:drop-shadow-[0_0_8px_hsl(150_100%_45%_/_0.2)] rounded-lg"
+              >
+                Return to Home
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleLogout} 
+                className="flex-1 lg:flex-none text-sm font-medium flex items-center justify-center gap-2 transition-all duration-300 ease-in-out hover:scale-105 active:scale-98 hover:bg-red-500/10 hover:shadow-[0_0_16px_hsl(0_72%_51%_/_0.3)] hover:drop-shadow-[0_0_8px_hsl(0_72%_51%_/_0.2)] rounded-lg border-border hover:border-destructive/50"
+              >
                 <LogOut className="w-4 h-4" /> Logout
               </Button>
             </div>

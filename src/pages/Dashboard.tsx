@@ -80,7 +80,7 @@ const Dashboard = () => {
             <Shield className="w-6 h-6 text-primary drop-shadow-[0_0_8px_hsl(150_100%_45%/0.5)]" />
             <div>
               <div className="font-heading font-bold text-primary text-lg">APGS</div>
-              <div className="hidden sm:block text-muted-foreground text-xs font-mono">Authentication Protocol Gateway Secure</div>
+              <div className="hidden sm:block text-muted-foreground text-xs font-mono whitespace-nowrap">Advanced Phishing Guard System</div>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">

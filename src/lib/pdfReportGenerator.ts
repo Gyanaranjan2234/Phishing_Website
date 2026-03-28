@@ -19,7 +19,7 @@ const createHeader = (doc: jsPDF, title: string) => {
   // Subtitle
   doc.setFontSize(10);
   doc.setTextColor(100, 100, 100);
-  doc.text('APGS - Authentication Protocol Gateway Secure', pageWidth / 2, 28, { align: 'center' });
+  doc.text('APGS - Advanced Phishing Guard System', pageWidth / 2, 28, { align: 'center' });
   
   // Timestamp
   doc.setFontSize(9);
