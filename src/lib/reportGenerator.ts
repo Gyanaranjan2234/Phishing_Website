@@ -58,14 +58,14 @@ export const generateRiskReport = (data: RiskReportData): string => {
   const report = `
 ╔════════════════════════════════════════════════════════════╗
 ║          APGS Risk Report (Security Assessment)            ║
-║     Authentication Protocol Gateway Secure                 ║
+║     Advanced Phishing Guard System                         ║
 ╚════════════════════════════════════════════════════════════╝
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📋 PROJECT INFORMATION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Project:     APGS - Authentication Protocol Gateway Secure
+Project:     APGS - Advanced Phishing Guard System
 Version:     1.0.0
 Scan Date:   ${timestamp}
 ${data.userName ? `Analyzed By:  ${data.userName}` : ""}

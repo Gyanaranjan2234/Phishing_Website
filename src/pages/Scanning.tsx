@@ -94,7 +94,7 @@ const Scanning = () => {
         <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="text-2xl font-heading font-bold text-primary">APGS</span>
-            <span className="text-xs text-muted-foreground">Authentication Protocol Gateway Secure</span>
+            <span className="text-xs text-muted-foreground whitespace-nowrap">Advanced Phishing Guard System</span>
           </div>
 
           <nav className="flex items-center gap-2 text-sm flex-wrap">

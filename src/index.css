@@ -168,6 +168,34 @@
   animation: float 6s ease-in-out infinite;
 }
 
+/* Enhanced Branding Glow Animation */
+@keyframes brand-glow-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 15px rgba(76, 217, 100, 0.4)) drop-shadow(0 0 30px rgba(76, 217, 100, 0.2));
+  }
+  50% {
+    filter: drop-shadow(0 0 25px rgba(76, 217, 100, 0.6)) drop-shadow(0 0 50px rgba(76, 217, 100, 0.3));
+  }
+}
+
+.brand-glow {
+  animation: brand-glow-pulse 4s ease-in-out infinite;
+}
+
+/* Shield Icon Glow */
+@keyframes shield-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(76, 217, 100, 0.4), inset 0 0 20px rgba(76, 217, 100, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(76, 217, 100, 0.6), inset 0 0 30px rgba(76, 217, 100, 0.2);
+  }
+}
+
+.shield-glow {
+  animation: shield-glow 3s ease-in-out infinite;
+}
+
 /* Input focus glow */
 .input-glow:focus {
   box-shadow: 0 0 0 2px hsl(150 100% 50% / 0.2), 0 0 20px hsl(150 100% 50% / 0.1);
@@ -177,6 +205,11 @@
 .btn-hover:hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 25px hsl(150 100% 50% / 0.3);
+}
+
+/* Active button scale effect */
+.active\:scale-98:active {
+  transform: scale(0.98);
 }
 
 .cyber-grid {
