@@ -23,10 +23,10 @@ const getScoreColor = (score: number) => {
 };
 
 const FileScanner = ({ onScanComplete, isAuthenticated = false, userName, scanData, setScanData }: FileScannerProps) => {
-  const [file, setFile] = useState<File | null>(scanData.file);
+  const [file, setFile] = useState<File | null>(scanData.file || null);
   const [scanning, setScanning] = useState(false);
   const [scanComplete, setScanComplete] = useState(false);
-  const [result, setResult] = useState<FileAnalysis | null>(scanData.result);
+  const [result, setResult] = useState<FileAnalysis | null>(scanData.result || null);
   const [scanProgress, setScanProgress] = useState(0);
   const [downloadingReport, setDownloadingReport] = useState(false);
 
@@ -110,14 +110,23 @@ const FileScanner = ({ onScanComplete, isAuthenticated = false, userName, scanDa
   const scoreInfo = result ? getScoreColor(result.score) : null;
 
   const handleGenerateReport = async () => {
-    if (!result) return;
+    // Use local result, fallback to scanData result from parent
+    const reportResult = result || scanData.result;
+    if (!reportResult) {
+      toast({
+        title: "❌ No Scan Result",
+        description: "Please scan a file first",
+        variant: "destructive"
+      });
+      return;
+    }
     
     setDownloadingReport(true);
     try {
       const reportData: PDFReportData = {
         scanType: "file",
-        target: result.fileName,
-        result: result,
+        target: (reportResult as any).fileName || fileName || scanData.input || "File Analysis",
+        result: reportResult,
         userName: userName
       };
 

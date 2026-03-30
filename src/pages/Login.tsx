@@ -236,7 +236,12 @@ const Login = () => {
           <button
             type="button"
             onClick={() => setShowLoginPassword(!showLoginPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            className={`absolute right-3 top-1/2 -translate-y-1/2 transition-all duration-200 ${
+              loginPassword.length > 0 
+                ? 'text-muted-foreground hover:text-foreground opacity-100 cursor-pointer' 
+                : 'text-muted-foreground opacity-40 pointer-events-none'
+            }`}
+            disabled={loginPassword.length === 0}
           >
             {showLoginPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
           </button>
@@ -322,7 +327,12 @@ const Login = () => {
           <button
             type="button"
             onClick={() => setShowSignupPassword(!showSignupPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            className={`absolute right-3 top-1/2 -translate-y-1/2 transition-all duration-200 ${
+              signupPassword.length > 0 
+                ? 'text-muted-foreground hover:text-foreground opacity-100 cursor-pointer' 
+                : 'text-muted-foreground opacity-40 pointer-events-none'
+            }`}
+            disabled={signupPassword.length === 0}
           >
             {showSignupPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
           </button>
@@ -344,7 +354,12 @@ const Login = () => {
           <button
             type="button"
             onClick={() => setShowSignupConfirmPassword(!showSignupConfirmPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            className={`absolute right-3 top-1/2 -translate-y-1/2 transition-all duration-200 ${
+              signupConfirmPassword.length > 0 
+                ? 'text-muted-foreground hover:text-foreground opacity-100 cursor-pointer' 
+                : 'text-muted-foreground opacity-40 pointer-events-none'
+            }`}
+            disabled={signupConfirmPassword.length === 0}
           >
             {showSignupConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
           </button>

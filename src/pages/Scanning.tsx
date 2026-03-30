@@ -179,9 +179,9 @@ const Scanning = () => {
 
         <section className="space-y-4 transition-all duration-300">
           {activeTab === "url" && <UrlScanner onScanComplete={refreshHistory} isAuthenticated={!!isAuthenticated} userName={userName} scanData={urlScanData} setScanData={setUrlScanData} />}
-          {activeTab === "email" && <EmailBreachChecker onScanComplete={refreshHistory} isAuthenticated={!!isAuthenticated} scanData={emailScanData} setScanData={setEmailScanData} />}
+          {activeTab === "email" && <EmailBreachChecker onScanComplete={refreshHistory} isAuthenticated={!!isAuthenticated} userName={userName} scanData={emailScanData} setScanData={setEmailScanData} />}
           {activeTab === "file" && <FileScanner onScanComplete={refreshHistory} isAuthenticated={!!isAuthenticated} userName={userName} scanData={fileScanData} setScanData={setFileScanData} />}
-          {activeTab === "password" && <PasswordChecker onScanComplete={refreshHistory} isAuthenticated={!!isAuthenticated} scanData={passwordScanData} setScanData={setPasswordScanData} />}
+          {activeTab === "password" && <PasswordChecker onScanComplete={refreshHistory} isAuthenticated={!!isAuthenticated} userName={userName} scanData={passwordScanData} setScanData={setPasswordScanData} />}
         </section>
 
         {isAuthenticated ? (

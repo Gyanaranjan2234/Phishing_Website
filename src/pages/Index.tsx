@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Globe, FileText, Mail, Lock, ShieldCheck, Zap, Phone, Loader2, User, ChevronDown, ArrowUp, LogIn } from "lucide-react";
+import { Globe, FileText, Mail, Lock, ShieldCheck, Shield, Zap, Phone, Loader2, User, ChevronDown, ArrowUp, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -71,6 +71,10 @@ const Index = () => {
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [contact, setContact] = useState({ name: "", email: "", message: "" });
   const [sent, setSent] = useState(false);
+  
+  // ============= STATS ANIMATION STATE =============
+  const [displayedScans24h, setDisplayedScans24h] = useState(0);
+  const [displayedActiveUsers, setDisplayedActiveUsers] = useState(0);
 
   // ============= SCAN STATE - PRESERVED ACROSS TAB SWITCHES =============
   const [urlScanData, setUrlScanData] = useState({ input: "", result: null as any });
@@ -147,6 +151,33 @@ const Index = () => {
     return () => cancelAnimationFrame(raf);
   }, [statsData]);
 
+  // ============= EFFECTS: COUNT-UP ANIMATION FOR STATS SECTION =============
+  useEffect(() => {
+    let scansRaf = 0, usersRaf = 0;
+    const start = Date.now();
+    const duration = 1500;
+    
+    const animateScans = () => {
+      const progress = Math.min(1, (Date.now() - start) / duration);
+      setDisplayedScans24h(Math.floor(progress * 1240));
+      if (progress < 1) scansRaf = requestAnimationFrame(animateScans);
+    };
+    
+    const animateUsers = () => {
+      const progress = Math.min(1, (Date.now() - start) / duration);
+      setDisplayedActiveUsers(Math.floor(progress * 8500));
+      if (progress < 1) usersRaf = requestAnimationFrame(animateUsers);
+    };
+    
+    scansRaf = requestAnimationFrame(animateScans);
+    usersRaf = requestAnimationFrame(animateUsers);
+    
+    return () => {
+      cancelAnimationFrame(scansRaf);
+      cancelAnimationFrame(usersRaf);
+    };
+  }, [currentView]);
+
   // ============= EFFECTS: BACK TO TOP =============
   useEffect(() => {
     const handleScroll = () => {
@@ -165,7 +196,10 @@ const Index = () => {
 
   // ============= HANDLERS =============
   const refreshStats = () => refetchStats();
-  const refreshHistory = () => refetchHistory();
+  const refreshHistory = () => {
+    refetchHistory();
+    refetchStats();
+  };
 
   const handleContactSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -241,7 +275,7 @@ const Index = () => {
       { icon: Globe, title: "URL Scanner", text: "Detect phishing and malicious links instantly.", sectionId: "url-scan" },
       { icon: Mail, title: "Email Checker", text: "Validate email safety and breach status.", sectionId: "email-scan" },
       { icon: FileText, title: "File Analysis", text: "Scan uploads for hidden malware signatures.", sectionId: "file-scan" },
-      { icon: Lock, title: "Password Strength Analyzer", text: "Analyze strength and breach history.", sectionId: "password-scan" },
+      { icon: Lock, title: "Password Checker", text: "Check password strength and detect possible data leaks.", sectionId: "password-scan" },
     ],
     []
   );
@@ -255,7 +289,9 @@ const Index = () => {
         <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="text-2xl font-heading font-bold text-primary">APGS</span>
-            <span className="text-xs text-muted-foreground whitespace-nowrap">Advanced Phishing Guard System</span>
+          <div className="Heading">
+            <span className="text-xs text-muted-foreground break-words" style={{display:"flex"}}>Advanced Phishing Guard System</span>
+          </div>
           </div>
 
           {/* NAVBAR: ALWAYS THE SAME STRUCTURE - NO DYNAMIC ADD/REMOVE */}
@@ -362,19 +398,24 @@ const Index = () => {
         {currentView === "home" && console.log("[DEBUG] Rendering home view")}
         <main id="home" className="max-w-6xl mx-auto px-4 py-10 space-y-16">
           {/* Hero Section */}
+          <div className="flex">
+              <h1
+  className="flex text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-heading font-bold bg-gradient-to-r from-[#00ff88] via-[#00d4ff] to-[#3b82f6] bg-clip-text text-transparent drop-shadow-lg break-words"
+  style={{
+    backgroundImage: 'linear-gradient(90deg, #00ff88, #00d4ff, #3b82f6)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    filter: 'drop-shadow(0 0 10px rgba(0, 255, 136, 0.2))',
+    lineHeight: '1.2',
+    letterSpacing: '-0.02em'
+  }}
+>
+  Advanced Phishing Guard System
+</h1></div>
+
           <section className="grid gap-8 lg:grid-cols-2 items-center transition-all duration-300">
-            <div className="space-y-6">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-heading font-bold bg-gradient-to-r from-[#00ff88] via-[#00d4ff] to-[#3b82f6] bg-clip-text text-transparent drop-shadow-lg w-full" style={{
-                backgroundImage: 'linear-gradient(90deg, #00ff88, #00d4ff, #3b82f6)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                filter: 'drop-shadow(0 0 10px rgba(0, 255, 136, 0.2))',
-                wordSpacing: 'normal',
-                lineHeight: '1.2',
-                letterSpacing: '-0.02em'
-              }}>
-                Advanced Phishing Guard System
-              </h1>
+                          
+            <div className=" space-y-6">
               <p className="text-muted-foreground text-base sm:text-lg">
                 Advanced Phishing Guard System is a powerful cybersecurity platform designed to detect phishing threats, analyze suspicious URLs, scan files, and check password security. It provides real-time protection and detailed insights to help users stay safe in the digital world.
               </p>
@@ -400,7 +441,7 @@ const Index = () => {
                 File Malware Analysis
               </div>
               <div className="rounded-xl bg-card/70 p-4 border border-border hover:border-primary/50 shadow-[0_0_12px_hsl(150_100%_45%_/_0.15)] hover:shadow-[0_0_16px_hsl(150_100%_45%_/_0.25)] transition-all duration-300 hover:scale-105 cursor-default">
-                Password Strength Analyzer
+                Password Leak Checker
               </div>
             </div>
           </section>
@@ -488,6 +529,54 @@ const Index = () => {
                     </article>
                   );
                 })}
+              </div>
+            </div>
+          </section>
+
+          {/* Stats Section */}
+          <section className="relative overflow-hidden rounded-xl border border-primary/30 bg-gradient-to-r from-blue-500/10 via-primary/5 to-cyan-500/10 p-10 backdrop-blur-sm transition-all duration-300">
+            {/* Decorative gradient background */}
+            <div className="absolute inset-0 opacity-30 bg-gradient-to-r from-blue-500/5 via-transparent to-cyan-500/5 pointer-events-none rounded-xl"></div>
+            
+            <div className="relative z-10 space-y-8">
+              <div className="text-center space-y-2">
+                <h2 className="text-2xl md:text-3xl font-heading font-bold text-foreground">Platform Statistics</h2>
+                <p className="text-muted-foreground text-sm md:text-base">Protecting users worldwide with real-time threat detection</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+                {/* Scans in Last 24 Hours */}
+                <div className="flex flex-col items-center justify-center space-y-3 group">
+                  <div className="text-4xl md:text-5xl font-heading font-bold text-primary transition-transform group-hover:scale-110">
+                    {displayedScans24h.toLocaleString()}
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <span className="text-2xl">🔍</span>
+                    <p className="text-sm md:text-base font-medium">Scans in Last 24 Hours</p>
+                  </div>
+                </div>
+                
+                {/* Active Users */}
+                <div className="flex flex-col items-center justify-center space-y-3 group">
+                  <div className="text-4xl md:text-5xl font-heading font-bold text-cyan-400 transition-transform group-hover:scale-110">
+                    {displayedActiveUsers.toLocaleString()}
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <span className="text-2xl">👥</span>
+                    <p className="text-sm md:text-base font-medium">Active Users</p>
+                  </div>
+                </div>
+                
+                {/* Protection 24/7 */}
+                <div className="flex flex-col items-center justify-center space-y-3 group">
+                  <div className="text-4xl md:text-5xl font-heading font-bold text-green-400 transition-transform group-hover:scale-110">
+                    24/7
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <span className="text-2xl">🛡️</span>
+                    <p className="text-sm md:text-base font-medium">Protection</p>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
@@ -590,12 +679,69 @@ const Index = () => {
             </section>
           )}
 
-          {/* Scanning Hub Title */}
-          <section className="bg-card/70 rounded-xl border border-border p-6 shadow-lg transition-all duration-300">
-            <h1 className="text-3xl font-heading font-bold mb-2">Scanning Hub</h1>
-            <p className="text-muted-foreground">
-              Access all scanning modules in one place. {isAuthenticated ? "Your scan history is automatically saved." : "Guest mode works without login. Sign in to save history and view results."}
-            </p>
+          {/* Scanning Hub - Stats Dashboard */}
+          <section className="space-y-4">
+            <div>
+              <h1 className="text-3xl font-heading font-bold mb-1">Scanning Hub</h1>
+              <p className="text-sm text-muted-foreground">
+                {isAuthenticated ? "Your scan history is automatically saved." : "Guest mode works without login. Sign in to save history and view results."}
+              </p>
+            </div>
+            
+            {/* Stats Dashboard Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Safe Scans Card */}
+              <div className="relative overflow-hidden rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-emerald-500/20 backdrop-blur-sm">
+                <div className="relative z-10 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xl">✔</span>
+                  </div>
+                  <div>
+                    <p className="text-3xl font-heading font-bold text-foreground">{stats.safe}</p>
+                    <p className="text-xs text-muted-foreground font-medium mt-1">Safe Scans</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Suspicious Card */}
+              <div className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-amber-500/20 backdrop-blur-sm">
+                <div className="relative z-10 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xl">⚠</span>
+                  </div>
+                  <div>
+                    <p className="text-3xl font-heading font-bold text-foreground">{Math.max(0, stats.totalScans - stats.safe - stats.threats)}</p>
+                    <p className="text-xs text-muted-foreground font-medium mt-1">Suspicious</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Threats Found Card */}
+              <div className="relative overflow-hidden rounded-xl border border-red-500/30 bg-red-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-red-500/20 backdrop-blur-sm">
+                <div className="relative z-10 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xl">❌</span>
+                  </div>
+                  <div>
+                    <p className="text-3xl font-heading font-bold text-foreground">{stats.threats}</p>
+                    <p className="text-xs text-muted-foreground font-medium mt-1">Threats Found</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Total Scans Card */}
+              <div className="relative overflow-hidden rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-cyan-500/20 backdrop-blur-sm">
+                <div className="relative z-10 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xl">📊</span>
+                  </div>
+                  <div>
+                    <p className="text-3xl font-heading font-bold text-foreground">{stats.totalScans}</p>
+                    <p className="text-xs text-muted-foreground font-medium mt-1">Total Scans</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </section>
 
           {/* Tab Selection */}
@@ -686,6 +832,55 @@ const Index = () => {
           <ArrowUp className="w-5 h-5" />
         </button>
       )}
+
+      {/* ========== FOOTER ========== */}
+      <footer className="border-t border-border mt-16 pt-12 pb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 md:gap-12 mb-8">
+          {/* Brand Section */}
+          <div className="md:col-span-2 space-y-3">
+            <div className="flex items-center gap-2">
+              <Shield className="w-6 h-6 text-primary" />
+              <h3 className="text-xl font-heading font-bold">APGS</h3>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Advanced Phishing Guard System - Your trusted cybersecurity platform providing real-time protection against cyber threats.
+            </p>
+          </div>
+          
+          {/* Platform Links */}
+          <div className="space-y-3">
+            <h4 className="font-heading font-semibold text-foreground">Platform</h4>
+            <nav className="space-y-2">
+              <a href="#about" className="text-sm text-muted-foreground hover:text-primary transition-colors block">
+                Features
+              </a>
+              <a href="#contact" className="text-sm text-muted-foreground hover:text-primary transition-colors block">
+                Contact
+              </a>
+            </nav>
+          </div>
+          
+          {/* Legal Links */}
+          <div className="space-y-3">
+            <h4 className="font-heading font-semibold text-foreground">Legal</h4>
+            <nav className="space-y-2">
+              <a href="#privacy" className="text-sm text-muted-foreground hover:text-primary transition-colors block">
+                Privacy Policy
+              </a>
+              <a href="#terms" className="text-sm text-muted-foreground hover:text-primary transition-colors block">
+                Terms of Service
+              </a>
+            </nav>
+          </div>
+        </div>
+        
+        {/* Copyright */}
+        <div className="border-t border-border/50 pt-8 text-center">
+          <p className="text-xs md:text-sm text-muted-foreground">
+            © 2026 Advanced Phishing Guard System. All rights reserved.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 };

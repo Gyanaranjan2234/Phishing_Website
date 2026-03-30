@@ -1,10 +1,10 @@
 import jsPDF from 'jspdf';
-import { UrlAnalysis, FileAnalysis } from './mockData';
+import { UrlAnalysis, FileAnalysis, PasswordResult, BreachResult } from './mockData';
 
 export interface PDFReportData {
-  scanType: 'url' | 'file';
+  scanType: 'url' | 'file' | 'password' | 'email';
   target: string;
-  result: UrlAnalysis | FileAnalysis;
+  result: UrlAnalysis | FileAnalysis | PasswordResult | BreachResult;
   userName?: string;
 }
 
@@ -19,7 +19,7 @@ const createHeader = (doc: jsPDF, title: string) => {
   // Subtitle
   doc.setFontSize(10);
   doc.setTextColor(100, 100, 100);
-  doc.text('APGS - Advanced Phishing Guard System', pageWidth / 2, 28, { align: 'center' });
+  doc.text('APGS -  Advanced Phishing Guard System', pageWidth / 2, 28, { align: 'center' });
   
   // Timestamp
   doc.setFontSize(9);
@@ -176,6 +176,38 @@ const getSolutionRecommendations = (scanType: string, status: string, severity: 
       recommendations.push('This file appears to be safe');
       recommendations.push('Standard security practices still apply');
     }
+  } else if (scanType === 'password') {
+    if (severity === 'HIGH') {
+      recommendations.push('❌ This password has been compromised in known data breaches');
+      recommendations.push('Change this password immediately on all accounts where it is used');
+      recommendations.push('Check if your account has been hacked at haveibeenpwned.com');
+      recommendations.push('Enable two-factor authentication on important accounts');
+      recommendations.push('Monitor your accounts for suspicious activity');
+    } else if (severity === 'MEDIUM') {
+      recommendations.push('⚠️ This password is weak and can be guessed easily');
+      recommendations.push('Use a combination of uppercase, lowercase, numbers, and symbols');
+      recommendations.push('Make your password at least 12 characters long');
+      recommendations.push('Avoid using dictionary words or personal information');
+      recommendations.push('Consider using a password manager for stronger passwords');
+    } else {
+      recommendations.push('✓ This is a strong password');
+      recommendations.push('Keep this password secure and never share it');
+      recommendations.push('Use different passwords for different accounts');
+    }
+  } else if (scanType === 'email') {
+    if (severity === 'HIGH') {
+      recommendations.push('⚠️ This email has been found in known data breaches');
+      recommendations.push('Immediately change the password for this email account');
+      recommendations.push('Check for unauthorized account access');
+      recommendations.push('Enable two-factor authentication if not already enabled');
+      recommendations.push('Check all connected accounts and services for security');
+      recommendations.push('Monitor this email account for suspicious activity');
+    } else {
+      recommendations.push('✓ This email has not been found in known data breaches');
+      recommendations.push('Continue to use strong, unique passwords');
+      recommendations.push('Enable two-factor authentication for added security');
+      recommendations.push('Regularly review account activity and connected apps');
+    }
   }
   
   return recommendations;
@@ -192,9 +224,17 @@ export const downloadReport = (data: PDFReportData): void => {
     
     let y = 50;
     
+    // Determine scan type labels
+    const scanTypeLabels: Record<string, string> = {
+      url: 'URL Phishing Detection',
+      file: 'File Malware Analysis',
+      password: 'Password Security Check',
+      email: 'Email Breach Detection'
+    };
+    
     // Overview section
     const overviewContent = [
-      `Scan Type: ${data.scanType === 'url' ? 'URL Phishing Detection' : 'File Malware Analysis'}`,
+      `Scan Type: ${scanTypeLabels[data.scanType]}`,
       `Target: ${data.target}`,
       ...(data.userName ? [`Analyzed By: ${data.userName}`] : []),
     ];
@@ -205,13 +245,21 @@ export const downloadReport = (data: PDFReportData): void => {
     const riskContent = [
       `Status: ${result.status ? result.status.toUpperCase() : 'UNKNOWN'}`,
       ...(result.score !== undefined ? [`Risk Score: ${result.score}/100`] : []),
+      ...(result.strength !== undefined ? [`Strength: ${result.strength.toUpperCase()}`] : []),
+      ...(result.breached !== undefined ? [`Breached: ${result.breached ? 'YES - COMPROMISED' : 'NO - SAFE'}`] : []),
     ];
     y = createSection(doc, '📊 Risk Assessment', y, riskContent);
     
     // Severity Level
-    const severity = result.score !== undefined 
-      ? (result.score <= 30 ? 'LOW' : result.score <= 70 ? 'MEDIUM' : 'HIGH')
-      : 'UNKNOWN';
+    let severity = 'UNKNOWN';
+    if (result.score !== undefined) {
+      severity = result.score <= 30 ? 'LOW' : result.score <= 70 ? 'MEDIUM' : 'HIGH';
+    } else if (data.scanType === 'password' && result.strength) {
+      const strengthMap: Record<string, string> = { weak: 'HIGH', medium: 'MEDIUM', strong: 'LOW' };
+      severity = strengthMap[result.strength] || 'MEDIUM';
+    } else if (data.scanType === 'email' && result.breached !== undefined) {
+      severity = result.breached ? 'HIGH' : 'LOW';
+    }
     
     const severityContent = [
       `Severity Level: ${severity}`,
@@ -221,16 +269,49 @@ export const downloadReport = (data: PDFReportData): void => {
     ];
     y = createSection(doc, '⚠️ Severity', y, severityContent);
     
-    // Analysis Details
+    // Analysis Details - Comprehensive for all types
     const analysisContent: string[] = [];
+    
     if (data.scanType === 'url' && 'reasons' in result) {
       (result as UrlAnalysis).reasons.forEach((reason) => {
-        analysisContent.push(`• ${reason.label}: ${reason.value}`);
+        analysisContent.push(`• ${reason.label}: ${reason.value} ${reason.flagged ? '[⚠️ FLAGGED]' : ''}`);
       });
-    } else if (data.scanType === 'file' && 'threats' in result) {
-      (result as FileAnalysis).threats?.forEach((threat) => {
-        analysisContent.push(`• ${threat}`);
+    } else if (data.scanType === 'file' && 'reasons' in result) {
+      (result as FileAnalysis).reasons.forEach((reason) => {
+        analysisContent.push(`• ${reason.label}: ${reason.value} ${reason.flagged ? '[⚠️ FLAGGED]' : ''}`);
       });
+      // Add threats if any
+      if ((result as FileAnalysis).threats?.length) {
+        analysisContent.push('\n🚨 Detected Threats:');
+        (result as FileAnalysis).threats.forEach((threat) => {
+          analysisContent.push(`  • ${threat}`);
+        });
+      }
+    } else if (data.scanType === 'password' && 'suggestions' in result) {
+      const pwResult = result as PasswordResult;
+      analysisContent.push(`Password Strength: ${pwResult.strength.toUpperCase()}`);
+      analysisContent.push(`Score: ${pwResult.score}/100`);
+      if (pwResult.breached) {
+        analysisContent.push('⚠️ WARNING: This password has been found in known data breaches!');
+      }
+      if (pwResult.suggestions?.length) {
+        analysisContent.push('\n💡 Improvement Suggestions:');
+        pwResult.suggestions.forEach((suggestion) => {
+          analysisContent.push(`  • ${suggestion}`);
+        });
+      }
+    } else if (data.scanType === 'email' && 'breached' in result) {
+      const emailResult = result as BreachResult;
+      analysisContent.push(`Email Status: ${emailResult.breached ? 'COMPROMISED' : 'SAFE'}`);
+      if (emailResult.breached) {
+        analysisContent.push(`Found in ${emailResult.count} data breaches`);
+        if (emailResult.sources?.length) {
+          analysisContent.push('\n📋 Breach Sources:');
+          emailResult.sources.forEach((source) => {
+            analysisContent.push(`  • ${source}`);
+          });
+        }
+      }
     }
     
     if (analysisContent.length > 0) {
@@ -238,7 +319,7 @@ export const downloadReport = (data: PDFReportData): void => {
     }
     
     // Recommendations
-    const recommendations = getSolutionRecommendations(data.scanType, result.status, severity);
+    const recommendations = getSolutionRecommendations(data.scanType, result.status || result.strength, severity);
     y = createSection(doc, '💡 Recommendations', y, recommendations);
     
     // Footer with page numbers

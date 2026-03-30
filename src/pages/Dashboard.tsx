@@ -96,9 +96,9 @@ const Dashboard = () => {
             <button onClick={() => navigate("/scanning")} className="px-3 py-1 rounded-lg border border-border hover:bg-card/70 transition">
               Scanning
             </button>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">{theme === "dark" ? "Dark" : "Light"}</span>
-              <Switch checked={theme === "light"} onCheckedChange={(checked) => setTheme(checked ? "light" : "dark")} className="data-[state=checked]:bg-primary" />
+            <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg border border-border/30 bg-card/40 transition-all duration-200">
+              <span className="text-xs text-muted-foreground font-medium">{theme === "dark" ? "Dark" : "Light"}</span>
+              <Switch checked={theme === "light"} onCheckedChange={(checked) => setTheme(checked ? "light" : "dark")} className="" />
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger className="flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-card/80 hover:bg-card/90 transition">

@@ -146,10 +146,44 @@ export function checkEmailBreach(email: string): BreachResult {
   return result;
 }
 
+// Common passwords found in known data breaches
+const KNOWN_BREACHED_PASSWORDS = [
+  "password", "123456", "12345678", "qwerty", "abc123", "monkey", "1234567", "letmein",
+  "trustno1", "dragon", "baseball", "111111", "iloveyou", "master", "sunshine", "ashley",
+  "bailey", "shadow", "123123", "654321", "superman", "qazwsx", "michael", "football",
+  "admin123", "password123", "123456789", "password1", "admin", "login", "welcome"
+];
+
+// Common password patterns found in breaches
+const BREACH_PATTERNS = [
+  /^(password|pass|pwd).*/i,
+  /^(admin|administrator).*/i,
+  /^(login|signin).*/i,
+  /^123456.*$/,
+  /^qwerty.*/i,
+  /^(letmein|letmein123).*/i,
+];
+
+export function checkPasswordBreach(password: string): { breached: boolean; count: number } {
+  // Check against known breached passwords
+  const isExactMatch = KNOWN_BREACHED_PASSWORDS.some(p => p.toLowerCase() === password.toLowerCase());
+  
+  // Check against common breach patterns
+  const matchesPattern = BREACH_PATTERNS.some(pattern => pattern.test(password));
+  
+  const breached = isExactMatch || matchesPattern;
+  
+  // Simulate breach count for demonstration
+  const breachCount = breached ? Math.floor(Math.random() * 50) + 5 : 0;
+  
+  return { breached, count: breachCount };
+}
+
 export function analyzePassword(password: string): PasswordResult {
   let score = 0;
   const suggestions: string[] = [];
 
+  // Strength analysis
   if (password.length >= 8) score += 20; else suggestions.push("Use at least 8 characters");
   if (password.length >= 12) score += 10;
   if (/[A-Z]/.test(password)) score += 20; else suggestions.push("Add uppercase letters");
@@ -157,14 +191,19 @@ export function analyzePassword(password: string): PasswordResult {
   if (/[0-9]/.test(password)) score += 20; else suggestions.push("Add numbers");
   if (/[^A-Za-z0-9]/.test(password)) score += 20; else suggestions.push("Add special characters");
 
-  const commonPasswords = ["password", "123456", "qwerty", "admin", "letmein"];
-  const breached = commonPasswords.some((p) => password.toLowerCase().includes(p));
-  if (breached) { score = Math.min(score, 20); suggestions.push("This password appears in known breaches"); }
+  // Check for breach
+  const breachData = checkPasswordBreach(password);
+  const breached = breachData.breached;
+  
+  if (breached) {
+    score = Math.min(score, 20);
+    suggestions.unshift("This password appears in known data breaches and should never be used");
+  }
 
   const strength: PasswordResult["strength"] = score >= 70 ? "strong" : score >= 40 ? "medium" : "weak";
   const result = { strength, score, breached, suggestions };
 
-  addToHistory({ type: "password", target: "••••••••", status: strength }, result);
+  addToHistory({ type: "password", target: "••••••••", status: breached ? "breached" : strength }, result);
   return result;
 }
 

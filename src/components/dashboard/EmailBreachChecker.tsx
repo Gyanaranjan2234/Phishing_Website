@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Mail, Loader2, ShieldCheck, ShieldAlert, RotateCcw, AlertTriangle, CheckCircle } from "lucide-react";
+import { Mail, Loader2, ShieldCheck, ShieldAlert, RotateCcw, AlertTriangle, CheckCircle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { checkEmailBreach, type BreachResult } from "@/lib/mockData";
+import { downloadReport, type PDFReportData } from "@/lib/pdfReportGenerator";
 import { apiScans } from "@/lib/api";
 
 interface EmailBreachCheckerProps {
@@ -15,15 +16,46 @@ interface EmailBreachCheckerProps {
 }
 
 const EmailBreachChecker = ({ onScanComplete, isAuthenticated = false, userName, scanData, setScanData }: EmailBreachCheckerProps) => {
-  const [email, setEmail] = useState(scanData.input);
+  const [email, setEmail] = useState(scanData.input || "");
   const [checking, setChecking] = useState(false);
-  const [result, setResult] = useState<BreachResult | null>(scanData.result);
+  const [downloading, setDownloading] = useState(false);
+  const [result, setResult] = useState<BreachResult | null>(scanData.result || null);
 
   const handleReset = () => {
     setEmail("");
     setResult(null);
     setScanData({ input: "", result: null });
     toast.success("Email scan cleared");
+  };
+
+  const handleGenerateReport = async () => {
+    // Use local result, fallback to scanData result from parent
+    const reportResult = result || scanData.result;
+    if (!reportResult) {
+      toast.error("No scan result available. Please check an email first.");
+      return;
+    }
+    
+    setDownloading(true);
+    try {
+      const reportData: PDFReportData = {
+        scanType: "email",
+        target: email || scanData.input || "Email Analysis",
+        result: reportResult,
+        userName: userName
+      };
+
+      downloadReport(reportData);
+      toast.success("✅ Report Downloaded", {
+        description: "Email breach report has been saved to your device"
+      });
+    } catch (error) {
+      toast.error("❌ Error", {
+        description: "Failed to generate report"
+      });
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const handleCheck = (e: React.FormEvent) => {
@@ -124,6 +156,21 @@ const EmailBreachChecker = ({ onScanComplete, isAuthenticated = false, userName,
               </ul>
             </div>
           )}
+
+          {/* Download Report Button */}
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleGenerateReport} 
+              disabled={downloading}
+              className="flex-1 gap-2 hover:shadow-[0_0_16px_hsl(150_100%_45%/0.3)] transition-shadow"
+            >
+              {downloading ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
+              ) : (
+                <><Download className="w-4 h-4" /> Download Report</>
+              )}
+            </Button>
+          </div>
         </div>
       )}
     </section>

@@ -31,9 +31,9 @@ const reasonIcons: Record<string, React.ReactNode> = {
 };
 
 const UrlScanner = ({ onScanComplete, isAuthenticated = false, userName, scanData, setScanData }: UrlScannerProps) => {
-  const [url, setUrl] = useState(scanData.input);
+  const [url, setUrl] = useState(scanData.input || "");
   const [scanning, setScanning] = useState(false);
-  const [result, setResult] = useState<UrlAnalysis | null>(scanData.result);
+  const [result, setResult] = useState<UrlAnalysis | null>(scanData.result || null);
   const [downloadingReport, setDownloadingReport] = useState(false);
 
   const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
@@ -86,14 +86,23 @@ const UrlScanner = ({ onScanComplete, isAuthenticated = false, userName, scanDat
   const scoreInfo = result ? getScoreColor(result.score) : null;
 
   const handleGenerateReport = async () => {
-    if (!result) return;
+    // Use local result, fallback to scanData result from parent
+    const reportResult = result || scanData.result;
+    if (!reportResult) {
+      toast({
+        title: "❌ No Scan Result",
+        description: "Please scan a URL first",
+        variant: "destructive"
+      });
+      return;
+    }
     
     setDownloadingReport(true);
     try {
       const reportData: PDFReportData = {
         scanType: "url",
-        target: result.url,
-        result: result,
+        target: (reportResult as any).url || url || scanData.input || "URL Analysis",
+        result: reportResult,
         userName: userName
       };
 
