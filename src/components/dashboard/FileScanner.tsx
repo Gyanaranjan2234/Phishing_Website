@@ -3,10 +3,16 @@ import { Upload, FileUp, X, Loader2, CheckCircle, AlertTriangle, Shield, FileTex
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
-import { scanFile, type FileAnalysis } from "@/lib/mockData";
-import { downloadReport, type PDFReportData } from "@/lib/pdfReportGenerator";
+//import { scanFile, type FileAnalysis } from "@/lib/mockData";
+import type { FileAnalysis, RiskReportData, PDFReportData } from "@/lib/interfaces";
+//import { downloadReport, type PDFReportData } from "@/lib/pdfReportGenerator";
+import { scanFile } from "@/lib/fileUtils";
 import { apiScans } from "@/lib/api";
 import RiskAnalysisReport from "@/components/RiskAnalysisReport";
+import { generateFileReport } from "@/lib/generateReport";
+import { generateRiskReport } from "@/lib/reportGenerator";
+import { generatePDFReport } from "@/lib/pdfReportGenerator";
+
 
 interface FileScannerProps {
   onScanComplete: () => void;
@@ -108,44 +114,48 @@ const FileScanner = ({ onScanComplete, isAuthenticated = false, userName, scanDa
   };
 
   const scoreInfo = result ? getScoreColor(result.score) : null;
-
   const handleGenerateReport = async () => {
-    // Use local result, fallback to scanData result from parent
     const reportResult = result || scanData.result;
     if (!reportResult) {
-      toast({
-        title: "❌ No Scan Result",
-        description: "Please scan a file first",
-        variant: "destructive"
-      });
+      toast({ title: "❌ No Scan Result", description: "Please scan a file first", variant: "destructive" });
       return;
     }
-    
+
     setDownloadingReport(true);
     try {
-      const reportData: PDFReportData = {
-        scanType: "file",
-        target: (reportResult as any).fileName || fileName || scanData.input || "File Analysis",
-        result: reportResult,
-        userName: userName
-      };
+      const fileData = reportResult as FileAnalysis;
 
-      downloadReport(reportData);
-      toast({
-        title: "✅ Report Downloaded",
-        description: "Risk report has been saved to your device"
+      // Step 1 — structure file data
+      const fileReport = generateFileReport(fileData);
+
+      // Step 2 — prepare report content
+      const reportContent = generateRiskReport({
+        scanType: "file",
+        result: {
+          status: fileData.status === "infected" ? "dangerous" : "safe",
+          score: fileData.score,
+          details: fileData.reasons.map(r => r.label).join(", "),
+          threats: fileData.threats
+        },
+        userName: userName,
+        timestamp: new Date()
       });
+
+      // Step 3 — generate & download PDF
+      generatePDFReport({
+        scanType: "file",
+        target: fileData.fileName,
+        result: fileData,
+        userName: userName
+      });
+
+      toast({ title: "✅ Report Downloaded", description: "PDF saved to your device" });
     } catch (error) {
-      toast({
-        title: "❌ Error",
-        description: "Failed to generate report",
-        variant: "destructive"
-      });
+      toast({ title: "❌ Error", description: "Failed to generate report", variant: "destructive" });
     } finally {
       setDownloadingReport(false);
     }
   };
-
   return (
     <section className="bg-card border border-border rounded-lg p-6 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
       <h2 className="font-heading font-semibold text-foreground mb-4 flex items-center gap-2">

@@ -1,5 +1,5 @@
 import jsPDF from "jspdf";
-import type { UrlAnalysis, FileAnalysis } from "./mockData";
+import type { UrlAnalysis, FileAnalysis } from "./interfaces";
 
 export function generateReport(analysis: UrlAnalysis) {
   const doc = new jsPDF();
