@@ -1,5 +1,7 @@
-export type ScanStatus = "safe" | "phishing";
+export type ScanStatus = "safe" | "phishing" | "safe"| "suspicious" | "dangerous" ;
+    //status: "safe" | "suspicious" | "dangerous";
 
+// 
 export interface ScanReason {
     label: string;
     value: string;
