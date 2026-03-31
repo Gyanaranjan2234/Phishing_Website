@@ -1,4 +1,4 @@
-import { UrlAnalysis } from "./mockData";
+import { UrlAnalysis } from "./interfaces";
 
 export interface RiskReportData {
   scanType: "url" | "email" | "file" | "password";
