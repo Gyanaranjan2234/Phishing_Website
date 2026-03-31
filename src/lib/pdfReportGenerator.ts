@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import { UrlAnalysis, FileAnalysis, PasswordResult, BreachResult } from './mockData';
+import { UrlAnalysis, FileAnalysis, PasswordResult, BreachResult } from './interfaces';
 
 export interface PDFReportData {
   scanType: 'url' | 'file' | 'password' | 'email';
