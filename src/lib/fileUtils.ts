@@ -1,5 +1,5 @@
 
-import type { FileAnalysis } from "./interfaces";
+import type { FileAnalysis, ScanStatus, UrlAnalysis } from "./interfaces";
 interface HistoryItem {
   type: string;
   target: string;
@@ -122,4 +122,125 @@ function addToHistory(item: HistoryItem, analysisResult?: FileAnalysis) {
   } catch (err) {
     console.error("Failed to save scan to history:", err);
   }
+}
+
+// for the url section 
+export function analyzeUrl(url: string): UrlAnalysis {
+  const reasons: UrlAnalysis["reasons"] = [];
+  let riskPoints = 0; // Track risk points for more nuanced scoring
+
+  // 1. URL Length Analysis
+  const urlLength = url.length;
+  let lengthFlagged = false;
+  let lengthValue = `${urlLength} characters`;
+  if (urlLength > 100) {
+    riskPoints += 20;
+    lengthFlagged = true;
+    lengthValue += " (very long - HIGH RISK)";
+  } else if (urlLength > 75) {
+    riskPoints += 10;
+    lengthFlagged = true;
+    lengthValue += " (long - suspicious)";
+  } else {
+    lengthValue += " (normal)";
+  }
+  reasons.push({
+    label: "URL Length",
+    value: lengthValue,
+    flagged: lengthFlagged,
+  });
+
+  // 2. Suspicious Keywords Detection
+  const suspiciousKeywords = [
+    "login",
+    "verify",
+    "confirm",
+    "update",
+    "secure",
+    "account",
+    "urgent",
+    "click-here",
+    "free",
+    "prize",
+    "claim",
+    "reset",
+    "validate",
+    "check",
+    "action",
+  ];
+  const foundKeywords = suspiciousKeywords.filter((k) =>
+    url.toLowerCase().includes(k),
+  );
+  const keywordValue =
+    foundKeywords.length > 0 ? foundKeywords.join(", ") : "None found";
+  const keywordFlagged = foundKeywords.length > 0;
+  if (keywordFlagged) {
+    riskPoints += foundKeywords.length * 8;
+  }
+  reasons.push({
+    label: "Suspicious Keywords",
+    value: keywordValue,
+    flagged: keywordFlagged,
+  });
+
+  // 3. Special Characters Analysis
+  const hasAt = url.includes("@");
+  const dashCount = (url.match(/-/g) || []).length;
+  const dotCount = (url.match(/\./g) || []).length;
+  const specialCharsWarning: string[] = [];
+
+  if (hasAt) {
+    riskPoints += 25;
+    specialCharsWarning.push("@ symbol");
+  }
+  if (dashCount > 3) {
+    riskPoints += 15;
+    specialCharsWarning.push("multiple dashes");
+  }
+  if (dotCount > 3) {
+    riskPoints += 10;
+    specialCharsWarning.push("multiple dots");
+  }
+
+  const specialValue =
+    specialCharsWarning.length > 0
+      ? specialCharsWarning.join(", ")
+      : "Normal characters";
+  const specialFlagged = specialCharsWarning.length > 0;
+  reasons.push({
+    label: "Special Characters",
+    value: specialValue,
+    flagged: specialFlagged,
+  });
+
+  // 4. HTTPS/SSL Protocol Check
+  const hasHttps = url.startsWith("https://");
+  if (!hasHttps) {
+    riskPoints += 15;
+  }
+  const protocolValue = hasHttps
+    ? "HTTPS (SSL secure)"
+    : "HTTP (no encryption)";
+  reasons.push({
+    label: "Protocol (HTTPS)",
+    value: protocolValue,
+    flagged: !hasHttps,
+  });
+
+  // Calculate final risk score (0-100, where 0 is safest)
+  // Risk points start at 0 (safe), cap at 100 (dangerous)
+  let score = Math.min(100, riskPoints);
+
+  // Boost score slightly if no issues were found
+  if (riskPoints === 0) {
+    score = 15; // Slight baseline for additional scrutiny
+  }
+
+  // Determine status based on risk points
+  const isPhishing = riskPoints >= 35;
+  const status: ScanStatus = isPhishing ? "phishing" : "safe";
+  const result = { status, url, reasons, score };
+  addToHistory({ type: "url", target: url, status }, result);
+
+  return result;
 }
