@@ -1,4 +1,4 @@
-export type ScanStatus = "safe" | "phishing" | "safe"| "suspicious" | "dangerous" ;
+//export type ScanStatus = "safe" | "phishing" | "safe"| "suspicious" | "dangerous" ;
     //status: "safe" | "suspicious" | "dangerous";
 
 // 
@@ -59,4 +59,31 @@ export interface PDFReportData {
   target: string;
   result: UrlAnalysis | FileAnalysis | PasswordResult | BreachResult;
   userName?: string;
+}
+
+// upadte after the change
+export interface VTAnalysisStats {
+  malicious: number;
+  suspicious: number;
+  harmless: number;
+  undetected: number;
+  timeout: number;
+}
+
+export interface VTVendorResult {
+  engine_name: string;
+  category: string;
+  result: string | null;
+}
+
+export type ScanStatus = "safe" | "phishing" | "suspicious";
+
+export interface UrlAnalysis {
+  url: string;
+  status: ScanStatus;
+  score: number;                          // 0–100 mapped from VT stats
+  reasons: { label: string; value: string; flagged: boolean }[];
+  vtStats: VTAnalysisStats;               // raw VT stats
+  vtVendors: Record<string, VTVendorResult>; // raw vendor results
+  analysisId: string;
 }
