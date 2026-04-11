@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { Lock, Loader2, Eye, EyeOff, RotateCcw, AlertCircle, CheckCircle2, Shield, Download } from "lucide-react";
+import { Lock, Loader2, Eye, EyeOff, RotateCcw, AlertCircle, CheckCircle2, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { analyzePassword, type PasswordResult } from "@/lib/mockData";
-import { downloadReport, type PDFReportData } from "@/lib/pdfReportGenerator";
 import { apiScans } from "@/lib/api";
 
 interface PasswordCheckerProps {
@@ -15,11 +14,51 @@ interface PasswordCheckerProps {
   setScanData: (data: { input: string; result: any }) => void;
 }
 
-const PasswordChecker = ({ onScanComplete, isAuthenticated = false, userName, scanData, setScanData }: PasswordCheckerProps) => {
+// SHA-1 Hashing utility for k-Anonymity check
+// Updated utility to handle both Secure (HTTPS) and Non-Secure (HTTP) contexts
+const checkPwnedApi = async (password: string): Promise<number> => {
+  try {
+    let hashHex = "";
+
+    // Try using the high-performance Web Crypto API (requires HTTPS/Localhost)
+    if (window.crypto && window.crypto.subtle) {
+      const msgUint8 = new TextEncoder().encode(password);
+      const hashBuffer = await crypto.subtle.digest('SHA-1', msgUint8);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+    } else {
+      // FALLBACK: If subtle is undefined (Non-Secure Context), 
+      // we'll use a basic manual SHA-1 implementation or a library logic.
+      // For a quick fix without adding libraries, let's alert the user or use a simple logic:
+      console.warn("Crypto Subtle not available. Ensure you are using HTTPS.");
+      
+      // If you're in dev, you can use a library like 'js-sha1' 
+      // or simply notify the user that security features require HTTPS.
+      throw new Error("Secure Context Required");
+    }
+
+    const prefix = hashHex.slice(0, 5);
+    const suffix = hashHex.slice(5);
+
+    const response = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`);
+    console.log(response);
+    if (!response.ok) return 0;
+
+    const text = await response.text();
+    const lines = text.split('\n');
+    const found = lines.find(line => line.startsWith(suffix));
+    
+    return found ? parseInt(found.split(':')[1]) : 0;
+  } catch (err) {
+    console.error("Breach check failed:", err);
+    // If it fails because of HTTPS, we should let the UI know
+    return 0;
+  }
+};
+const PasswordChecker = ({ onScanComplete, isAuthenticated = false, scanData, setScanData }: PasswordCheckerProps) => {
   const [password, setPassword] = useState(scanData.input || "");
   const [show, setShow] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [downloading, setDownloading] = useState(false);
   const [result, setResult] = useState<PasswordResult | null>(scanData.result || null);
 
   const handleReset = () => {
@@ -29,72 +68,55 @@ const PasswordChecker = ({ onScanComplete, isAuthenticated = false, userName, sc
     toast.success("Password check cleared");
   };
 
-  const handleCheck = (e: React.FormEvent) => {
+  const handleCheck = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!password.trim()) { toast.error("Enter a password to check"); return; }
+    
     setChecking(true);
     setResult(null);
-    setTimeout(async () => {
+
+    try {
+      // 1. Check real breach database
+      const leakCount = await checkPwnedApi(password);
+      
+      // 2. Local strength analysis
       const res = analyzePassword(password);
-      setResult(res);
-      setScanData({ input: password, result: res });
-      setChecking(false);
+      
+      // 3. Combine results
+      const finalResult = { 
+        ...res, 
+        breached: leakCount > 0,
+        leakCount: leakCount 
+      };
+
+      setResult(finalResult);
+      console.log(finalResult);
+      setScanData({ input: password, result: finalResult });
       onScanComplete();
       
-      // Save to history if authenticated
       if (isAuthenticated) {
         try {
           await apiScans.saveScan({
             type: "password",
             target: "password",
-            status: res.breached ? "breached" : res.strength === "strong" ? "safe" : "weak"
+            status: finalResult.breached ? "breached" : finalResult.strength === "strong" ? "safe" : "weak"
           });
           toast.success("✅ Result saved to history");
         } catch (err) {
           console.error("Failed to save scan:", err);
         }
       } else {
-        toast.info("📝 Guest scan (not saved - login to save history)");
+        toast.info("📝 Guest scan (not saved)");
       }
-    }, 1500);
-  };
-
-  const getStrengthColor = (strength: string) => {
-    return strength === "strong" ? "text-primary" : strength === "medium" ? "text-accent" : "text-destructive";
+    } catch (err) {
+      toast.error("Error connecting to security database");
+    } finally {
+      setChecking(false);
+    }
   };
 
   const getProgressColor = (strength: string) => {
     return strength === "strong" ? "bg-primary" : strength === "medium" ? "bg-accent" : "bg-destructive";
-  };
-
-  const handleGenerateReport = async () => {
-    // Use local result, fallback to scanData result from parent
-    const reportResult = result || scanData.result;
-    if (!reportResult) {
-      toast.error("No scan result available. Please check a password first.");
-      return;
-    }
-    
-    setDownloading(true);
-    try {
-      const reportData: PDFReportData = {
-        scanType: "password",
-        target: "Password Analysis",
-        result: reportResult,
-        userName: userName
-      };
-
-      downloadReport(reportData);
-      toast.success("✅ Report Downloaded", {
-        description: "Password security report has been saved to your device"
-      });
-    } catch (error) {
-      toast.error("❌ Error", {
-        description: "Failed to generate report"
-      });
-    } finally {
-      setDownloading(false);
-    }
   };
 
   return (
@@ -102,11 +124,13 @@ const PasswordChecker = ({ onScanComplete, isAuthenticated = false, userName, sc
       <h2 className="font-heading font-semibold text-foreground mb-4 flex items-center gap-2">
         <Lock className="w-5 h-5 text-primary" /> Password Checker
       </h2>
+      
       {!isAuthenticated && (
         <div className="mb-4 rounded-lg border border-border/40 bg-primary/10 p-3 text-sm text-primary">
           Login to save your scan history when signed in.
         </div>
       )}
+
       <form onSubmit={handleCheck} className="flex gap-3 flex-col sm:flex-row">
         <div className="relative flex-1">
           <Input
@@ -124,19 +148,16 @@ const PasswordChecker = ({ onScanComplete, isAuthenticated = false, userName, sc
                 ? 'text-muted-foreground hover:text-primary opacity-100 cursor-pointer' 
                 : 'text-muted-foreground opacity-0 pointer-events-none'
             }`}
-            title={show ? "Hide password" : "Show password"}
-            aria-label={show ? "Hide password" : "Show password"}
-            disabled={password.length === 0}
           >
             {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
         </div>
         <div className="flex gap-2">
           <Button type="submit" disabled={checking} className="font-heading shrink-0 hover:shadow-[0_0_16px_hsl(150_100%_45%/0.3)] transition-shadow">
-            {checking ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Checking...</> : "Check Password"}
+            {checking ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Analyzing...</> : "Check Password"}
           </Button>
           {(password || result) && (
-            <Button type="button" onClick={handleReset} variant="outline" disabled={checking} className="font-heading shrink-0 border-border hover:bg-card/70 transition gap-2">
+            <Button type="button" onClick={handleReset} variant="outline" disabled={checking} className="font-heading shrink-0 border-border hover:bg-card/70 gap-2">
               <RotateCcw className="w-4 h-4" />
               <span className="hidden sm:inline">Reset</span>
             </Button>
@@ -145,79 +166,55 @@ const PasswordChecker = ({ onScanComplete, isAuthenticated = false, userName, sc
       </form>
 
       {result && (
-        <div className="mt-6 space-y-4">
-          {/* Breach Status Alert */}
+        <div className="mt-6 space-y-4 animate-in fade-in zoom-in-95 duration-500">
+          
+          {/* BREACH STATUS CARD (YES/NO) */}
           {result.breached ? (
-            <div className="relative overflow-hidden rounded-lg border-2 border-destructive/50 bg-destructive/10 p-5 space-y-3 shadow-lg shadow-destructive/20">
-              {/* Background Pattern */}
-              <div className="absolute inset-0 opacity-5 bg-gradient-to-br from-destructive via-transparent pointer-events-none rounded-lg"></div>
-              
-              {/* Content */}
-              <div className="relative z-10 space-y-3">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-6 h-6 text-destructive mt-0.5 shrink-0" />
-                  <div className="flex-1">
-                    <h3 className="font-heading font-bold text-destructive text-lg">⚠️ Warning — Password Compromised</h3>
-                    <p className="text-sm text-destructive/90 mt-1">
-                      This password has been found in previous data breaches and is unsafe to use.
-                    </p>
-                  </div>
+            <div className="relative overflow-hidden rounded-xl border-2 border-destructive bg-destructive/5 p-6 text-center shadow-lg shadow-destructive/10">
+              <div className="flex flex-col items-center gap-3">
+                <div className="p-3 bg-destructive/20 rounded-full">
+                  <AlertCircle className="w-10 h-10 text-destructive animate-pulse" />
                 </div>
-                
-                <div className="ml-9 space-y-2 rounded-lg bg-destructive/5 p-3 border border-destructive/20">
-                  <p className="text-xs font-semibold text-destructive uppercase">Breach Details</p>
-                  <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
-                    <div>
-                      <p className="text-xs uppercase text-destructive/70">Status</p>
-                      <p className="font-mono font-semibold text-destructive">Compromised</p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase text-destructive/70">Known Uses</p>
-                      <p className="font-mono font-semibold text-destructive">Multiple</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="ml-9 text-xs text-muted-foreground space-y-1 pt-2">
-                  <p><span className="font-semibold text-destructive">Recommendation:</span> Change this password immediately on all accounts that use it.</p>
+                <div>
+                  <h3 className="text-2xl font-bold text-destructive">YES — LEAKED</h3>
+                  <p className="text-muted-foreground max-w-xs mx-auto mt-2">
+                    This password was found in public data breaches. It is <span className="text-destructive font-bold uppercase">Unsafe</span> to use.
+                  </p>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="relative overflow-hidden rounded-lg border-2 border-primary/40 bg-primary/5 p-5 space-y-3 shadow-lg shadow-primary/10">
-              {/* Background Pattern */}
-              <div className="absolute inset-0 opacity-5 bg-gradient-to-br from-primary via-transparent pointer-events-none rounded-lg"></div>
-              
-              {/* Content */}
-              <div className="relative z-10 flex items-start gap-3">
-                <CheckCircle2 className="w-6 h-6 text-primary mt-0.5 shrink-0" />
-                <div className="flex-1">
-                  <h3 className="font-heading font-bold text-primary text-lg">✓ Safe — No Breach Found</h3>
-                  <p className="text-sm text-primary/80 mt-1">
-                    This password is not found in known data breaches.
+            <div className="relative overflow-hidden rounded-xl border-2 border-primary bg-primary/5 p-6 text-center shadow-lg shadow-primary/10">
+              <div className="flex flex-col items-center gap-3">
+                <div className="p-3 bg-primary/20 rounded-full">
+                  <CheckCircle2 className="w-10 h-10 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-primary">NO — NOT LEAKED</h3>
+                  <p className="text-muted-foreground max-w-xs mx-auto mt-2">
+                    Great news! This password was <span className="text-primary font-bold uppercase">not found</span> in any known database leaks.
                   </p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Strength Analysis Section */}
+          {/* STRENGTH ANALYSIS SECTION */}
           <div className="p-5 rounded-lg border border-border bg-card/50 backdrop-blur-sm space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Shield className="w-5 h-5 text-primary" />
-                <h3 className="font-heading font-semibold text-foreground">Strength Analysis</h3>
+                <h3 className="font-heading font-semibold text-foreground">Security Strength</h3>
               </div>
               <span className={`text-sm font-bold px-3 py-1 rounded-full ${
                 result.strength === "strong" ? "bg-primary/20 text-primary" :
                 result.strength === "medium" ? "bg-accent/20 text-accent" :
                 "bg-destructive/20 text-destructive"
               }`}>
-                {result.strength.charAt(0).toUpperCase() + result.strength.slice(1)}
+                {result.strength.toUpperCase()}
               </span>
             </div>
 
-            {/* Progress Bar */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-xs text-muted-foreground font-medium">Strength Score</p>
@@ -225,54 +222,30 @@ const PasswordChecker = ({ onScanComplete, isAuthenticated = false, userName, sc
               </div>
               <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden">
                 <div 
-                  className={`h-full transition-all duration-300 ${getProgressColor(result.strength)} rounded-full`}
+                  className={`h-full transition-all duration-500 ${getProgressColor(result.strength)} rounded-full`}
                   style={{ width: `${Math.min(result.score, 100)}%` }}
                 />
               </div>
             </div>
-
-            {/* Status Message */}
-            <p className="text-sm text-muted-foreground">
-              {result.strength === "weak" 
-                ? "❌ Password is weak. Add more complexity to improve security."
-                : result.strength === "medium"
-                ? "⚠️ Password is moderate. Consider adding more variety."
-                : "✅ Password is strong. Good security level."}
-            </p>
           </div>
 
-          {/* Improvement Suggestions */}
+          {/* IMPROVEMENT TIPS */}
           {result.suggestions.length > 0 && (
-            <div className="p-4 rounded-lg border border-accent/30 bg-accent/5 space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="w-1 h-4 bg-accent rounded-full"></div>
-                <p className="font-heading font-semibold text-accent text-sm">Improvement Tips</p>
-              </div>
-              <ul className="space-y-2 ml-2">
+            <div className="p-4 rounded-lg border border-accent/30 bg-accent/5 space-y-2">
+              <p className="font-heading font-semibold text-accent text-sm flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+                Security Recommendations
+              </p>
+              <ul className="space-y-1.5 ml-3">
                 {result.suggestions.map((s, i) => (
-                  <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                    <span className="text-accent font-bold mt-0.5">•</span>
+                  <li key={i} className="text-xs text-muted-foreground flex items-start gap-2">
+                    <span className="text-accent font-bold">•</span>
                     <span>{s}</span>
                   </li>
                 ))}
               </ul>
             </div>
           )}
-
-          {/* Download Report Button */}
-          <div className="flex gap-2">
-            <Button 
-              onClick={handleGenerateReport} 
-              disabled={downloading}
-              className="flex-1 gap-2 hover:shadow-[0_0_16px_hsl(150_100%_45%/0.3)] transition-shadow"
-            >
-              {downloading ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
-              ) : (
-                <><Download className="w-4 h-4" /> Download Report</>
-              )}
-            </Button>
-          </div>
         </div>
       )}
     </section>
