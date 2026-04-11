@@ -1,10 +1,8 @@
 import { useState } from "react";
-import { Mail, Loader2, ShieldCheck, ShieldAlert, RotateCcw, AlertTriangle, CheckCircle, Download } from "lucide-react";
+import { Mail, Loader2, RotateCcw, AlertTriangle, CheckCircle, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { checkEmailBreach, type BreachResult } from "@/lib/mockData";
-import { downloadReport, type PDFReportData } from "@/lib/pdfReportGenerator";
 import { apiScans } from "@/lib/api";
 
 interface EmailBreachCheckerProps {
@@ -15,11 +13,10 @@ interface EmailBreachCheckerProps {
   setScanData: (data: { input: string; result: any }) => void;
 }
 
-const EmailBreachChecker = ({ onScanComplete, isAuthenticated = false, userName, scanData, setScanData }: EmailBreachCheckerProps) => {
+const EmailBreachChecker = ({ onScanComplete, isAuthenticated = false, scanData, setScanData }: EmailBreachCheckerProps) => {
   const [email, setEmail] = useState(scanData.input || "");
   const [checking, setChecking] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-  const [result, setResult] = useState<BreachResult | null>(scanData.result || null);
+  const [result, setResult] = useState<any | null>(scanData.result || null);
 
   const handleReset = () => {
     setEmail("");
@@ -28,67 +25,60 @@ const EmailBreachChecker = ({ onScanComplete, isAuthenticated = false, userName,
     toast.success("Email scan cleared");
   };
 
-  const handleGenerateReport = async () => {
-    // Use local result, fallback to scanData result from parent
-    const reportResult = result || scanData.result;
-    if (!reportResult) {
-      toast.error("No scan result available. Please check an email first.");
-      return;
-    }
-    
-    setDownloading(true);
-    try {
-      const reportData: PDFReportData = {
-        scanType: "email",
-        target: email || scanData.input || "Email Analysis",
-        result: reportResult,
-        userName: userName
-      };
-
-      downloadReport(reportData);
-      toast.success("✅ Report Downloaded", {
-        description: "Email breach report has been saved to your device"
-      });
-    } catch (error) {
-      toast.error("❌ Error", {
-        description: "Failed to generate report"
-      });
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  const handleCheck = (e: React.FormEvent) => {
+  const handleCheck = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) { toast.error("Enter an email address"); return; }
+    
     setChecking(true);
     setResult(null);
-    setTimeout(async () => {
-      const res = checkEmailBreach(email);
-      setResult(res);
-      setScanData({ input: email, result: res });
-      setChecking(false);
-      onScanComplete();
+
+    try {
+      // 1. Call XposedOrNot API
+      const response = await fetch(`https://api.xposedornot.com/v1/check-email/${email.trim()}`);
+      const data = await response.json();
+
+      // XposedOrNot returns 404 or an empty response if no breaches found
+      // Based on your JSON: { "breaches": [ ["Source"] ], "status": "success" }
+      const isBreached = data && data.breaches && data.breaches.length > 0;
       
-      // Save to history if authenticated
+      const finalResult = {
+        breached: isBreached,
+        sources: isBreached ? data.breaches.flat() : [],
+        count: isBreached ? data.breaches.length : 0,
+        email: email
+      };
+
+      setResult(finalResult);
+      setScanData({ input: email, result: finalResult });
+      onScanComplete();
+
+      // 2. Save to history if authenticated
       if (isAuthenticated) {
         try {
           await apiScans.saveScan({
             type: "email",
             target: email,
-            status: res.breached ? "breached" : "safe"
+            status: isBreached ? "breached" : "safe"
           });
           toast.success("✅ Result saved to history");
         } catch (err) {
           console.error("Failed to save scan:", err);
         }
-      } else {
-        toast.info("📝 Guest scan (not saved - login to save history)");
       }
-      
-      if (res.breached) toast.error("⚠️ Email found in data breaches!");
-      else toast.success("✅ No breaches found");
-    }, 1800);
+
+      if (isBreached) toast.error("⚠️ Security Alert: Email Found in Breaches");
+      else toast.success("✅ Your email is safe!");
+
+    } catch (err) {
+      // If the API returns 404, it usually means No Breaches Found
+      const safeResult = { breached: false, sources: [], count: 0, email: email };
+      setResult(safeResult);
+      setScanData({ input: email, result: safeResult });
+      onScanComplete();
+      toast.success("✅ No breaches found");
+    } finally {
+      setChecking(false);
+    }
   };
 
   return (
@@ -96,11 +86,13 @@ const EmailBreachChecker = ({ onScanComplete, isAuthenticated = false, userName,
       <h2 className="font-heading font-semibold text-foreground mb-4 flex items-center gap-2">
         <Mail className="w-5 h-5 text-primary" /> Email Breach Checker
       </h2>
+
       {!isAuthenticated && (
         <div className="mb-4 rounded-lg border border-border/40 bg-primary/10 p-3 text-sm text-primary">
           Login to save your scan history when signed in.
         </div>
       )}
+
       <form onSubmit={handleCheck} className="flex gap-3 flex-col sm:flex-row">
         <Input
           type="email"
@@ -111,7 +103,7 @@ const EmailBreachChecker = ({ onScanComplete, isAuthenticated = false, userName,
         />
         <div className="flex gap-2">
           <Button type="submit" disabled={checking} className="font-heading shrink-0 hover:shadow-[0_0_16px_hsl(150_100%_45%/0.3)] transition-shadow">
-            {checking ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Checking...</> : "Check Breach"}
+            {checking ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Checking...</> : "Check Email"}
           </Button>
           {(email || result) && (
             <Button type="button" onClick={handleReset} variant="outline" disabled={checking} className="font-heading shrink-0 border-border hover:bg-card/70 transition gap-2">
@@ -123,54 +115,58 @@ const EmailBreachChecker = ({ onScanComplete, isAuthenticated = false, userName,
       </form>
 
       {result && (
-        <div className="mt-6 space-y-4">
-          {/* Direct Results Display - No Report */}
-          <div className="p-4 rounded-lg border border-border bg-card/75">
-            <div className="flex items-start gap-3">
-              {result.breached ? (
-                <AlertTriangle className="w-5 h-5 text-destructive mt-0.5 flex-shrink-0" />
-              ) : (
-                <CheckCircle className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-              )}
-              <div className="flex-1">
-                <h3 className="font-semibold text-foreground mb-1">
-                  {result.breached ? "Email Found in Breaches" : "Email Not Breached"}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {result.breached 
-                    ? `This email was found in ${result.count} breach${result.count > 1 ? "es" : ""}`
-                    : "This email has not been found in known data breaches"}
-                </p>
+        <div className="mt-6 space-y-4 animate-in fade-in zoom-in-95 duration-500">
+          
+          {/* BREACH STATUS CARD (YES/NO) */}
+          {result.breached ? (
+            <div className="relative overflow-hidden rounded-xl border-2 border-destructive bg-destructive/5 p-6 text-center shadow-lg shadow-destructive/10">
+              <div className="flex flex-col items-center gap-3">
+                <div className="p-3 bg-destructive/20 rounded-full">
+                  <ShieldAlert className="w-10 h-10 text-destructive animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-destructive uppercase">Yes — Compromised</h3>
+                  <p className="text-muted-foreground max-w-xs mx-auto mt-2">
+                    This email was found in <span className="text-destructive font-bold">{result.count}</span> known data breach.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-
-          {/* Additional Breach Details */}
-          {result.breached && result.sources.length > 0 && (
-            <div className="mt-4 p-4 rounded-lg border border-destructive/30 bg-destructive/5">
-              <p className="font-heading font-semibold text-destructive text-sm mb-2">Compromised Sources:</p>
-              <ul className="space-y-1">
-                {result.sources.map((s, i) => (
-                  <li key={i} className="text-muted-foreground text-sm font-mono">• {s}</li>
-                ))}
-              </ul>
+          ) : (
+            <div className="relative overflow-hidden rounded-xl border-2 border-primary bg-primary/5 p-6 text-center shadow-lg shadow-primary/10">
+              <div className="flex flex-col items-center gap-3">
+                <div className="p-3 bg-primary/20 rounded-full">
+                  <CheckCircle className="w-10 h-10 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-primary uppercase">No — Safe</h3>
+                  <p className="text-muted-foreground max-w-xs mx-auto mt-2">
+                    We didn't find this email in any major public data breaches.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* Download Report Button */}
-          <div className="flex gap-2">
-            <Button 
-              onClick={handleGenerateReport} 
-              disabled={downloading}
-              className="flex-1 gap-2 hover:shadow-[0_0_16px_hsl(150_100%_45%/0.3)] transition-shadow"
-            >
-              {downloading ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
-              ) : (
-                <><Download className="w-4 h-4" /> Download Report</>
-              )}
-            </Button>
-          </div>
+          {/* SOURCE DETAILS */}
+          {result.breached && result.sources.length > 0 && (
+            <div className="p-5 rounded-lg border border-border bg-card/50 backdrop-blur-sm space-y-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
+                <h3 className="font-heading font-semibold text-foreground">Leaked Sources</h3>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {result.sources.map((s: string, i: number) => (
+                  <span key={i} className="px-3 py-1 bg-destructive/10 border border-destructive/20 text-destructive text-xs font-mono rounded-md">
+                    {s}
+                  </span>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground pt-2">
+                Recommendation: Change your password if you use the same one across these services.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </section>
