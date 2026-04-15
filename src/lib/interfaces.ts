@@ -8,6 +8,14 @@ export interface ScanReason {
     flagged: boolean;
 }
 
+// export interface FileAnalysis {
+//     fileName: string;
+//     fileSize: string;
+//     status: "safe" | "infected" | "suspicious";
+//     score: number;
+//     threats: string[];
+//     reasons: ScanReason[];
+// }
 export interface FileAnalysis {
     fileName: string;
     fileSize: string;
@@ -15,6 +23,14 @@ export interface FileAnalysis {
     score: number;
     threats: string[];
     reasons: ScanReason[];
+    // Add these to match the URL scanner's level of detail
+    vtStats?: {
+        malicious: number;
+        suspicious: number;
+        harmless: number;
+        undetected: number;
+    };
+    sha256?: string; 
 }
 export interface UrlAnalysis {
     status: ScanStatus;

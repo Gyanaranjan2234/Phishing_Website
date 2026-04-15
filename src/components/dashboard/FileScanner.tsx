@@ -12,6 +12,9 @@ import RiskAnalysisReport from "@/components/RiskAnalysisReport";
 import { generateFileReport } from "@/lib/generateReport";
 import { generateRiskReport } from "@/lib/reportGenerator";
 import { generatePDFReport } from "@/lib/pdfReportGenerator";
+import { vtApi } from "@/lib/api-vt";
+import { transformVTToUI } from "@/lib/vtMapper";
+import { VTAnalysisResponse } from "@/lib/vt-interfaces";
 
 
 interface FileScannerProps {
@@ -42,11 +45,20 @@ const FileScanner = ({ onScanComplete, isAuthenticated = false, userName, scanDa
     if (f) { setFile(f); setResult(null); }
   }, []);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (f) { setFile(f); setResult(null); }
-  };
+const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const f = e.target.files?.[0];
+  if (f) { 
+    // 1. Update local state for UI display
+    setFile(f); 
+    
+    // 2. Clear old results
+    setResult(null); 
+    setScanComplete(false);
 
+    // 3. Update the shared state so the API logic has access to the actual File object
+    setScanData({ file: f, result: null }); 
+  }
+};
   const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
     toast({
       title: message,
@@ -62,57 +74,61 @@ const FileScanner = ({ onScanComplete, isAuthenticated = false, userName, scanDa
     setScanData({ file: null, result: null });
     showToast("File scan cleared", "info");
   };
+const handleScan = async () => {
+  if (!file) {
+    showToast("Please select a file first", "error");
+    return;
+  }
+  
+  setScanning(true);
+  setScanProgress(10);
 
-  const handleScan = () => {
-    if (!file) return;
-    setScanning(true);
-    setScanComplete(false);
-    setScanProgress(0);
-    setResult(null);
+  try {
+    // 1. Upload file
+    const analysisId = await vtApi.uploadAndScan(file);
+    setScanProgress(40);
 
-    const finalize = async () => {
-      try {
-        const res = scanFile(file.name);
-        setResult(res);
-        setScanData({ file, result: res });
-        
-        // Save to history if authenticated
-        if (isAuthenticated) {
-          try {
-            await apiScans.saveScan({
-              type: "file",
-              target: file.name,
-              status: res.status === "infected" ? "phishing" : "safe"
-            });
-            showToast("✅ Result saved to history", "success");
-          } catch (err) {
-            console.error("Failed to save scan:", err);
-          }
-        } else {
-          showToast("📝 Guest scan (not saved - login to save history)", "info");
-        }
-        
-        if (res.status === "infected") showToast("⚠️ Threat detected in file!", "error");
-        else showToast("✅ File appears safe", "success");
-      } catch (err) {
-        console.error("Error during scanFile:", err);
-        showToast("❗ File scan failed, try again.", "error");
-      } finally {
-        setScanning(false);
-        setScanComplete(true);
-        onScanComplete();
+    // 2. Poll for completion (VT analysis is async)
+    let rawResult: VTAnalysisResponse;
+    let isCompleted = false;
+    let retryCount = 0;
+
+    while (!isCompleted && retryCount < 10) {
+      rawResult = await vtApi.getAnalysisResults(analysisId);
+      if (rawResult.data.attributes.status === "completed") {
+        isCompleted = true;
+        break;
       }
-    };
+      retryCount++;
+      setScanProgress(40 + (retryCount * 5));
+      await new Promise(r => setTimeout(r, 2000)); // Wait 2 seconds
+    }
 
-    setTimeout(() => setScanProgress(25), 350);
-    setTimeout(() => setScanProgress(60), 700);
-    setTimeout(() => setScanProgress(85), 1150);
-    setTimeout(() => {
-      setScanProgress(100);
-      finalize();
-    }, 1600);
-  };
+    // 3. Map to UI Interface
+    // @ts-ignore - ensuring we have the result after loop
+    const formattedResult = transformVTToUI(rawResult, file.name);
+    
+    // Calculate readable file size
+    formattedResult.fileSize = (file.size / 1024).toFixed(2) + " KB";
 
+    // 4. Update States
+    setResult(formattedResult);
+    setScanData({ file, result: formattedResult });
+    setScanProgress(100);
+
+    // Success Feedback
+    if (formattedResult.status === "infected") showToast("Threat detected!", "error");
+    else showToast("Scan completed successfully", "success");
+
+  } catch (err) {
+    console.error("Scanning failed:", err);
+    showToast("Analysis failed. Try a smaller file.", "error");
+  } finally {
+    setScanning(false);
+    setScanComplete(true);
+    onScanComplete();
+  }
+};
   const scoreInfo = result ? getScoreColor(result.score) : null;
   const handleGenerateReport = async () => {
     const reportResult = result || scanData.result;
@@ -125,7 +141,7 @@ const FileScanner = ({ onScanComplete, isAuthenticated = false, userName, scanDa
     try {
       const fileData = reportResult as FileAnalysis;
 
-      // Step 1 — structure file data
+      //Step 1 — structure file data
       const fileReport = generateFileReport(fileData);
 
       // Step 2 — prepare report content
@@ -141,7 +157,7 @@ const FileScanner = ({ onScanComplete, isAuthenticated = false, userName, scanDa
         timestamp: new Date()
       });
 
-      // Step 3 — generate & download PDF
+     // Step 3 — generate & download PDF
       generatePDFReport({
         scanType: "file",
         target: fileData.fileName,
