@@ -78,7 +78,7 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     showToast("File scan cleared", "info");
   };
 const handleScan = async () => {
-  if (!scanData.file) {
+  if (!file) {
     showToast("Please select a file first", "error");
     return;
   }
@@ -91,7 +91,7 @@ const handleScan = async () => {
     console.log("File object:", file);
     console.log("scan Data" , scanData);
     // giving the file from scan data 
-    const analysisId = await vtApi.uploadAndScan(scanData.file!);
+    const analysisId = await vtApi.uploadAndScan(file!);
     setScanProgress(40);
 
     // 2. Poll for completion (VT analysis is async)

@@ -1,5 +1,17 @@
 import type { UrlAnalysis, FileAnalysis } from "./interfaces";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
+// Centralized Theme (Matches URL Report Branding)
+const THEME = {
+  dark: [15, 23, 30] as [number, number, number],
+  neonGreen: [0, 230, 118] as [number, number, number],
+  dangerRed: [239, 68, 68] as [number, number, number],
+  warningYellow: [234, 179, 8] as [number, number, number],
+  safeGreen: [0, 200, 83] as [number, number, number],
+  slateGray: [60, 60, 60] as [number, number, number],
+};
+// This file contains the main function to generate a PDF report based on the analysis results.
 export async function generateReport(analysis: UrlAnalysis): Promise<void> {
   const { default: jsPDF } = await import("jspdf");
   const doc = new jsPDF();
