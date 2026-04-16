@@ -15,6 +15,7 @@ export const vtApi = {
       method: "POST",
       headers: {
         "accept": "application/json",
+//"content-type":"multipart/form-data", // Let the browser set this with the correct boundary
         "x-apikey": API_KEY!,
       },
       body: formData,
@@ -26,6 +27,7 @@ export const vtApi = {
     }
 
     const json = await response.json();
+
     return json.data.id; // This is the analysisId
   },
 

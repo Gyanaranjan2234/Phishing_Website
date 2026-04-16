@@ -229,7 +229,7 @@ export async function generateReport(analysis: UrlAnalysis): Promise<void> {
   doc.save(`APGS_Security_Report_${Date.now()}.pdf`);
 }
 
-export async function generateFileReport(analysis: FileAnalysis): Promise<void> {
+export async function generateFileReport(analysis: FileAnalysis, userName: string): Promise<void> {
   const { default: jsPDF } = await import("jspdf");
   const doc = new jsPDF();
   const w = doc.internal.pageSize.getWidth();

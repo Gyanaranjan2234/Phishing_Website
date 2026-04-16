@@ -15,8 +15,9 @@ import { generatePDFReport } from "@/lib/pdfReportGenerator";
 import { vtApi } from "@/lib/api-vt";
 import { transformVTToUI } from "@/lib/vtMapper";
 import { VTAnalysisResponse } from "@/lib/vt-interfaces";
-
-
+//import {generatePDFReport} from "@/lib/pdfReportGenerator";
+//import { generateFilePdfReport} from "@lib/filepdfReport"
+//import { generateFilePdfReport } from "@/lib/filepdfReport";
 interface FileScannerProps {
   onScanComplete: () => void;
   isAuthenticated?: boolean;
@@ -54,9 +55,11 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     // 2. Clear old results
     setResult(null); 
     setScanComplete(false);
-
+    console.log(f);
     // 3. Update the shared state so the API logic has access to the actual File object
     setScanData({ file: f, result: null }); 
+    console.log("scan Data" , scanData);
+    console.log("file state", file);
   }
 };
   const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
@@ -75,7 +78,7 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     showToast("File scan cleared", "info");
   };
 const handleScan = async () => {
-  if (!file) {
+  if (!scanData.file) {
     showToast("Please select a file first", "error");
     return;
   }
@@ -85,7 +88,10 @@ const handleScan = async () => {
 
   try {
     // 1. Upload file
-    const analysisId = await vtApi.uploadAndScan(file);
+    console.log("File object:", file);
+    console.log("scan Data" , scanData);
+    // giving the file from scan data 
+    const analysisId = await vtApi.uploadAndScan(scanData.file!);
     setScanProgress(40);
 
     // 2. Poll for completion (VT analysis is async)
@@ -129,49 +135,38 @@ const handleScan = async () => {
     onScanComplete();
   }
 };
+const handleGenerateReport = async () => {
+  // Priority: Use local 'result' (the actual VT mapped data)
+  const reportResult =  scanData || result;
+
+  if (!reportResult) {
+    showToast("❌ No Scan Result Found. Please scan the file again.", "error");
+    return;
+  }
+
+  setDownloadingReport(true);
+  try {
+    // Ensure we are treating this strictly as FileAnalysis
+    const fileData = reportResult as FileAnalysis;
+
+    // Use the specific file generator we discussed
+    // This ensures 'infected' status flows into the PDF
+    await generatePDFReport({
+      scanType: "file",
+      target: fileData.fileName,
+      result: fileData,
+      userName: userName,
+    } );  
+
+    showToast("✅ Security Report Downloaded", "success");
+  } catch (error) {
+    console.error("PDF Generation Error:", error);
+    showToast("❌ Failed to generate PDF report", "error");
+  } finally {
+    setDownloadingReport(false);
+  }
+};
   const scoreInfo = result ? getScoreColor(result.score) : null;
-  const handleGenerateReport = async () => {
-    const reportResult = result || scanData.result;
-    if (!reportResult) {
-      toast({ title: "❌ No Scan Result", description: "Please scan a file first", variant: "destructive" });
-      return;
-    }
-
-    setDownloadingReport(true);
-    try {
-      const fileData = reportResult as FileAnalysis;
-
-      //Step 1 — structure file data
-      const fileReport = generateFileReport(fileData);
-
-      // Step 2 — prepare report content
-      const reportContent = generateRiskReport({
-        scanType: "file",
-        result: {
-          status: fileData.status === "infected" ? "dangerous" : "safe",
-          score: fileData.score,
-          details: fileData.reasons.map(r => r.label).join(", "),
-          threats: fileData.threats
-        },
-        userName: userName,
-        timestamp: new Date()
-      });
-
-     // Step 3 — generate & download PDF
-      generatePDFReport({
-        scanType: "file",
-        target: fileData.fileName,
-        result: fileData,
-        userName: userName
-      });
-
-      toast({ title: "✅ Report Downloaded", description: "PDF saved to your device" });
-    } catch (error) {
-      toast({ title: "❌ Error", description: "Failed to generate report", variant: "destructive" });
-    } finally {
-      setDownloadingReport(false);
-    }
-  };
   return (
     <section className="bg-card border border-border rounded-lg p-6 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
       <h2 className="font-heading font-semibold text-foreground mb-4 flex items-center gap-2">
