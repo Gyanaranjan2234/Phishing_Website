@@ -15,6 +15,7 @@ import { generatePDFReport } from "@/lib/pdfReportGenerator";
 import { vtApi } from "@/lib/api-vt";
 import { transformVTToUI } from "@/lib/vtMapper";
 import { VTAnalysisResponse } from "@/lib/vt-interfaces";
+import { calculateFinalVerdict, calculateAdjustedScore, type RiskFlags } from "@/lib/riskDecisionLogic";
 //import {generatePDFReport} from "@/lib/pdfReportGenerator";
 //import { generateFilePdfReport} from "@lib/filepdfReport"
 //import { generateFilePdfReport } from "@/lib/filepdfReport";
@@ -26,10 +27,19 @@ interface FileScannerProps {
   setScanData: (data: { file: File | null; result: any }) => void;
 }
 
-const getScoreColor = (score: number) => {
-  if (score <= 30) return { bar: "bg-primary", text: "text-primary", bg: "bg-primary/10", label: "Safe", description: "Low risk file" };
-  if (score <= 70) return { bar: "bg-accent", text: "text-accent", bg: "bg-accent/10", label: "Suspicious", description: "Medium risk file" };
-  return { bar: "bg-destructive", text: "text-destructive", bg: "bg-destructive/10", label: "High Risk", description: "Threat detected" };
+// Updated: Uses unified decision logic with flag priority
+// Ensures threats are never downplayed as "Safe"
+const getVerdictInfo = (score: number, flags?: RiskFlags) => {
+  const verdict = calculateFinalVerdict(score, flags || {});
+  const adjustedScore = calculateAdjustedScore(score, flags || {});
+
+  if (verdict === "safe") {
+    return { bar: "bg-primary", text: "text-primary", bg: "bg-primary/10", label: "✓ Safe", description: "Low Risk File", adjustedScore };
+  } else if (verdict === "warning") {
+    return { bar: "bg-accent", text: "text-accent", bg: "bg-accent/10", label: "⚠ Warning", description: "Medium Risk File", adjustedScore };
+  } else {
+    return { bar: "bg-destructive", text: "text-destructive", bg: "bg-destructive/10", label: "✕ Dangerous", description: "High Risk File", adjustedScore };
+  }
 };
 
 const FileScanner = ({ onScanComplete, isAuthenticated = false, userName, scanData, setScanData }: FileScannerProps) => {
@@ -166,7 +176,7 @@ const handleGenerateReport = async () => {
     setDownloadingReport(false);
   }
 };
-  const scoreInfo = result ? getScoreColor(result.score) : null;
+  const scoreInfo = result ? getVerdictInfo(result.score, result.flags) : null;
   return (
     <section className="bg-card border border-border rounded-lg p-6 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
       <h2 className="font-heading font-semibold text-foreground mb-4 flex items-center gap-2">
@@ -309,14 +319,14 @@ const handleGenerateReport = async () => {
                           result.status === 'infected' ? '#ff4d4d' : '#ffcc00'
                         }
                         strokeWidth="8"
-                        strokeDasharray={`${(result.score / 100) * 251.2} 251.2`}
+                        strokeDasharray={`${(scoreInfo.adjustedScore / 100) * 251.2} 251.2`}
                         strokeLinecap="round"
                         fill="none"
                         className="transition-all duration-1000 ease-out"
                       />
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-lg font-bold text-slate-100">{result.score}%</span>
+                      <span className="text-lg font-bold text-slate-100">{scoreInfo.adjustedScore}%</span>
                     </div>
                   </div>
                   <div className="flex-1">
@@ -326,7 +336,7 @@ const handleGenerateReport = async () => {
                           result.status === 'safe' ? 'bg-[#00ff9c]' :
                           result.status === 'infected' ? 'bg-[#ff4d4d]' : 'bg-[#ffcc00]'
                         }`}
-                        style={{ width: `${result.score}%` }}
+                        style={{ width: `${scoreInfo.adjustedScore}%` }}
                       />
                     </div>
                     <p className="text-xs text-[#9ca3af] mt-1">Security Score</p>
@@ -340,7 +350,7 @@ const handleGenerateReport = async () => {
               <RiskAnalysisReport
                 data={{
                   scanType: "file",
-                  status: result.status,
+                  status: result.status === 'infected' ? 'dangerous' : result.status,
                   score: result.score,
                   details: result.reasons.map(r => r.label).join(", "),
                   threats: result.reasons.filter(r => r.flagged).map(r => r.label),

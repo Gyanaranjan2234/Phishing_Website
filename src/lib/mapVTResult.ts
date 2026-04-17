@@ -26,11 +26,14 @@ export function mapVTToUrlAnalysis(
     : "safe";
 
   // Extract critical flags for unified decision logic
+  // If malicious > 0 → Dangerous
+  // Else if suspicious > 0 → Warning (never show as Safe)
+  // Else → Safe
   const flags = {
-    phishingDetected: stats.malicious >= 3,
-    malwareDetected: stats.malicious >= 1,
-    blacklisted: false, // Can be set via API if needed
-    suspicious: stats.suspicious >= 2,
+    malwareDetected: stats.malicious > 0,  // Any malicious vendor = dangerous
+    phishingDetected: stats.malicious >= 3,  // 3+ malicious = phishing threat
+    blacklisted: false,  // Can be set via API if needed
+    suspicious: stats.suspicious > 0,  // Any suspicious vendor = warning
   };
 
   const flaggedVendors = Object.values(results).filter(

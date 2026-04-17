@@ -53,6 +53,14 @@ const Index = () => {
   const navigate = useNavigate();
   const mountTimeRef = useRef<number>(Date.now());
 
+  // ============= SCROLL RESTORATION SETUP =============
+  // Disable browser's automatic scroll restoration to take full control
+  useEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+  }, []);
+
   // ============= THEME & AUTHENTICATION =============
   const [theme, setTheme] = useState<"dark" | "light">(() => (localStorage.getItem("apgs-theme") === "light" ? "light" : "dark"));
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -62,7 +70,15 @@ const Index = () => {
   // ============= VIEW MANAGEMENT =============
   // Single source of truth for current view - NO ROUTING
   // "home" | "scanning" - determines which section is visible via CSS
-  const [currentView, setCurrentView] = useState<"home" | "scanning">("home");
+  // Initialize from localStorage if available, otherwise default to "home"
+  const [currentView, setCurrentView] = useState<"home" | "scanning">(() => {
+    try {
+      const savedView = localStorage.getItem("apgs-lastView");
+      return (savedView === "scanning" || savedView === "home") ? savedView : "home";
+    } catch {
+      return "home";
+    }
+  });
   const [scanActiveTab, setScanActiveTab] = useState<"url" | "email" | "file" | "password">("url");
 
   // ============= HOME PAGE STATE =============
@@ -100,6 +116,31 @@ const Index = () => {
     queryKey: ['stats'],
     queryFn: apiScans.getStats,
   });
+
+  // ============= EFFECTS: SAVE CURRENT VIEW TO LOCALSTORAGE =============
+  // Whenever currentView changes, save it to localStorage for persistence on refresh
+  useEffect(() => {
+    try {
+      localStorage.setItem("apgs-lastView", currentView);
+    } catch (err) {
+      console.warn("[ScrollRestore] Failed to save view to localStorage:", err);
+    }
+  }, [currentView]);
+
+  // ============= EFFECTS: SCROLL TO SCANNING ON MOUNT IF NEEDED =============
+  // On initial mount, if currentView is "scanning", scroll to top of scanning section
+  useEffect(() => {
+    // Only run once on mount - check if we restored from localStorage
+    const timeSinceMountMs = Date.now() - mountTimeRef.current;
+    
+    // If this effect runs very soon after mount (< 100ms) and view is scanning, scroll to top
+    if (timeSinceMountMs < 100 && currentView === "scanning") {
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, behavior: "auto" });
+      });
+    }
+  }, []); // Empty dependency - runs once on mount
 
   // ============= EFFECTS: THEME =============
   useEffect(() => {
@@ -219,7 +260,7 @@ const Index = () => {
 
   const navTo = (anchor: string) => {
     // Always switch to home view, then scroll
-    setCurrentView("home");
+    setCurrentView("home"); // This will trigger localStorage save via useEffect
     setTimeout(() => {
       scrollToSection(anchor);
     }, 100);
@@ -231,7 +272,7 @@ const Index = () => {
       setScanActiveTab(tabName);
       console.log("[DEBUG] Switching to scanning with tab:", tabName);
     }
-    setCurrentView("scanning");
+    setCurrentView("scanning"); // This will trigger localStorage save via useEffect
     console.log("[DEBUG] Set currentView to scanning");
     // Scroll to top of scanning section
     setTimeout(() => {

@@ -10,6 +10,7 @@ import RiskAnalysisReport from "@/components/RiskAnalysisReport";
 import { generatePDFReport } from "@/lib/pdfReportGenerator";
 import { scanUrlWithVT } from "@/lib/virustotal";
 import { mapVTToUrlAnalysis } from "@/lib/mapVTResult";
+import { calculateFinalVerdict, calculateAdjustedScore, type RiskFlags } from "@/lib/riskDecisionLogic";
 
 interface UrlScannerProps {
   onScanComplete: () => void;
@@ -19,10 +20,40 @@ interface UrlScannerProps {
   setScanData: (data: { input: string; result: any }) => void;
 }
 
-const getScoreColor = (score: number) => {
-  if (score <= 30) return { bar: "bg-[#00ff9c]", text: "text-[#00ff9c]", bg: "bg-[#00ff9c]/10", label: "Safe", description: "Low risk URL" };
-  if (score <= 70) return { bar: "bg-[#ffcc00]", text: "text-[#ffcc00]", bg: "bg-[#ffcc00]/10", label: "Suspicious", description: "Medium risk URL" };
-  return { bar: "bg-[#ff4d4d]", text: "text-[#ff4d4d]", bg: "bg-[#ff4d4d]/10", label: "High Risk", description: "Phishing threat detected" };
+// Updated: Uses unified decision logic with flag priority
+// Ensures threats are never downplayed as "Safe"
+const getVerdictInfo = (score: number, flags?: RiskFlags) => {
+  const verdict = calculateFinalVerdict(score, flags || {});
+  const adjustedScore = calculateAdjustedScore(score, flags || {});
+
+  if (verdict === "safe") {
+    return { 
+      bar: "bg-[#00ff9c]", 
+      text: "text-[#00ff9c]", 
+      bg: "bg-[#00ff9c]/10", 
+      label: "✓ Safe", 
+      description: "Low Risk URL",
+      adjustedScore
+    };
+  } else if (verdict === "warning") {
+    return { 
+      bar: "bg-[#ffcc00]", 
+      text: "text-[#ffcc00]", 
+      bg: "bg-[#ffcc00]/10", 
+      label: "⚠ Warning", 
+      description: "Medium Risk URL",
+      adjustedScore
+    };
+  } else {
+    return { 
+      bar: "bg-[#ff4d4d]", 
+      text: "text-[#ff4d4d]", 
+      bg: "bg-[#ff4d4d]/10", 
+      label: "✕ Dangerous", 
+      description: "High Risk URL",
+      adjustedScore
+    };
+  }
 };
 
 const UrlScanner = ({ onScanComplete, isAuthenticated = false, userName, scanData, setScanData }: UrlScannerProps) => {
@@ -89,7 +120,7 @@ const handleAnalyze = async (e: React.FormEvent) => {
   }
 };
 
-  const scoreInfo = result ? getScoreColor(result.score) : null;
+  const scoreInfo = result ? getVerdictInfo(result.score, result.flags) : null;
 
   const handleGenerateReport = async () => {
     const reportResult = result || scanData.result;
@@ -192,7 +223,7 @@ const handleAnalyze = async (e: React.FormEvent) => {
               <div>
                 <p className="text-xs font-heading text-muted-foreground uppercase tracking-wide">Risk Score</p>
                 <p className={`font-heading font-bold text-3xl ${scoreInfo.text} drop-shadow-[0_0_8px_currentColor/0.3]`}>
-                  {result.score}
+                  {scoreInfo.adjustedScore}
                 </p>
               </div>
               <div className="text-right">
@@ -204,7 +235,7 @@ const handleAnalyze = async (e: React.FormEvent) => {
               <div className="relative h-4 w-full overflow-hidden rounded-full bg-secondary/50 border border-border">
                 <div
                   className={`h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_12px_currentColor/0.5] ${scoreInfo.bar}`}
-                  style={{ width: `${result.score}%` }}
+                  style={{ width: `${scoreInfo.adjustedScore}%` }}
                 />
               </div>
               <div className="flex justify-between text-xs text-muted-foreground font-mono">

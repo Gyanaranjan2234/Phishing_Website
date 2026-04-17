@@ -16,11 +16,14 @@ export const transformVTToUI = (vtRaw: VTAnalysisResponse, fileName: string): Fi
   else if (stats.malicious > 0 || stats.suspicious > 0) status = "suspicious";
 
   // Extract critical flags for unified decision logic
+  // If malicious > 0 → Dangerous
+  // Else if suspicious > 0 → Warning (never show as Safe)
+  // Else → Safe
   const flags = {
-    malwareDetected: stats.malicious >= 3,
-    phishingDetected: stats.malicious >= 1,
+    malwareDetected: stats.malicious > 0,  // Any malicious vendor = dangerous
+    phishingDetected: stats.malicious >= 3,  // 3+ malicious = phishing threat
     blacklisted: false,
-    suspicious: stats.suspicious > 0,
+    suspicious: stats.suspicious > 0,  // Any suspicious vendor = warning
   };
 
   // CHANGE: Map ALL vendors instead of just 8 to allow for the scrollable list

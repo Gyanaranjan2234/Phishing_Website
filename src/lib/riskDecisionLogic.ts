@@ -23,17 +23,27 @@ export type SeverityLevel = "LOW" | "MEDIUM" | "HIGH";
 /**
  * Calculate final verdict based on critical flags and score
  * Critical flags ALWAYS override score-based logic
+ * 
+ * Priority:
+ * 1. If malicious/phishing/blacklist detected → DANGEROUS
+ * 2. Else if suspicious detected → WARNING
+ * 3. Else use score thresholds → SAFE/WARNING/DANGEROUS
  */
 export function calculateFinalVerdict(
   score: number,
   flags: RiskFlags
 ): FinalVerdict {
-  // Priority 1: Critical flags override everything
-  if (flags.phishingDetected || flags.malwareDetected || flags.blacklisted) {
+  // Priority 1: Malicious/Phishing/Blacklist = DANGEROUS
+  if (flags.malwareDetected || flags.phishingDetected || flags.blacklisted) {
     return "dangerous";
   }
 
-  // Priority 2: Score-based thresholds
+  // Priority 2: Suspicious detections = WARNING (never show as Safe)
+  if (flags.suspicious) {
+    return "warning";
+  }
+
+  // Priority 3: Score-based thresholds
   if (score <= 30) return "safe";
   if (score <= 70) return "warning";
   return "dangerous";
@@ -41,7 +51,7 @@ export function calculateFinalVerdict(
 
 /**
  * Calculate adjusted score based on detected threats
- * Phishing +70, Malware +80, Blacklist +90 (capped at 100)
+ * Blacklist +90, Malware +80, Phishing +70, Suspicious +40 (capped at 100)
  */
 export function calculateAdjustedScore(
   baseScore: number,
@@ -49,17 +59,25 @@ export function calculateAdjustedScore(
 ): number {
   let adjustedScore = baseScore;
 
+  // Threat severity hierarchy
   if (flags.blacklisted) {
     adjustedScore = Math.min(adjustedScore + 90, 100);
   } else if (flags.malwareDetected) {
     adjustedScore = Math.min(adjustedScore + 80, 100);
   } else if (flags.phishingDetected) {
     adjustedScore = Math.min(adjustedScore + 70, 100);
+  } else if (flags.suspicious) {
+    adjustedScore = Math.min(adjustedScore + 40, 100);
   }
 
-  // Ensure dangerous flags always show high risk score
-  if (flags.phishingDetected || flags.malwareDetected || flags.blacklisted) {
+  // Ensure dangerous flags always show high risk score (minimum 75)
+  if (flags.malwareDetected || flags.phishingDetected || flags.blacklisted) {
     return Math.max(adjustedScore, 75);
+  }
+
+  // Ensure suspicious shows medium risk (minimum 40)
+  if (flags.suspicious) {
+    return Math.max(adjustedScore, 40);
   }
 
   return adjustedScore;
@@ -84,9 +102,9 @@ export function verdictToSeverity(verdict: FinalVerdict): SeverityLevel {
  */
 export function getVerdictDescription(verdict: FinalVerdict): string {
   const descriptions: Record<FinalVerdict, string> = {
-    safe: "This URL appears safe and legitimate based on VirusTotal analysis",
-    warning: "This URL shows suspicious characteristics — review before proceeding",
-    dangerous: "Critical security threats detected — do not proceed",
+    safe: "No threats detected. This URL appears safe and legitimate.",
+    warning: "Some vendors flagged this URL as suspicious. Proceed with caution and verify before proceeding.",
+    dangerous: "Malicious activity detected. Do not proceed. This URL poses a security threat.",
   };
   return descriptions[verdict];
 }
