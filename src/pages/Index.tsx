@@ -324,9 +324,11 @@ const Index = () => {
   const historyList = historyData?.history || [];
 
   return (
-    <div className="min-h-screen cyber-grid text-foreground bg-background" style={{ scrollBehavior: 'smooth' }}>
-      {/* ========== NAVBAR: ALWAYS VISIBLE, STRUCTURE CONSTANT ========== */}
-      <header className="sticky top-0 z-50 border-b border-border bg-card/90 backdrop-blur-lg transition-all duration-200">
+    <div className="flex flex-col min-h-screen bg-background">
+      {/* ========== MAIN CONTENT WRAPPER ========== */}
+      <div className="cyber-grid text-foreground flex-1">
+        {/* ========== NAVBAR: ALWAYS VISIBLE, STRUCTURE CONSTANT ========== */}
+        <header className="sticky top-0 z-50 border-b border-border bg-card/90 backdrop-blur-lg transition-all duration-200">
         <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="text-2xl font-heading font-bold text-primary">APGS</span>
@@ -437,7 +439,7 @@ const Index = () => {
         }`}
       >
         {currentView === "home" && console.log("[DEBUG] Rendering home view")}
-        <main id="home" className="max-w-6xl mx-auto px-4 py-10 space-y-16">
+        <main id="home" className="max-w-6xl mx-auto px-4 py-10 space-y-16 scroll-mt-[120px]">
           {/* Hero Section */}
           <div className="flex">
               <h1
@@ -575,7 +577,7 @@ const Index = () => {
           </section>
 
           {/* Stats Section */}
-          <section className="relative overflow-hidden rounded-xl border border-primary/30 bg-gradient-to-r from-blue-500/10 via-primary/5 to-cyan-500/10 p-10 backdrop-blur-sm transition-all duration-300">
+          <section id="stats" className="relative overflow-hidden rounded-xl border border-primary/30 bg-gradient-to-r from-blue-500/10 via-primary/5 to-cyan-500/10 p-10 backdrop-blur-sm transition-all duration-300 scroll-mt-[120px]">
             {/* Decorative gradient background */}
             <div className="absolute inset-0 opacity-30 bg-gradient-to-r from-blue-500/5 via-transparent to-cyan-500/5 pointer-events-none rounded-xl"></div>
             
@@ -623,7 +625,7 @@ const Index = () => {
           </section>
 
           {/* FAQ Section */}
-          <section id="faq" className="space-y-6 transition-all duration-300">
+          <section id="faq" className="space-y-6 transition-all duration-300 scroll-mt-[120px]">
             <h2 className="text-2xl font-heading font-bold">Frequently Asked Questions</h2>
             <div className="space-y-3">
               <FaqItem
@@ -862,6 +864,7 @@ const Index = () => {
           )}
         </main>
       </div>
+      </div>
 
       {/* ========== BACK TO TOP BUTTON ========== */}
       {showBackToTop && (
@@ -874,52 +877,55 @@ const Index = () => {
         </button>
       )}
 
-      {/* ========== FOOTER ========== */}
-      <footer className="border-t border-border mt-16 pt-12 pb-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 md:gap-12 mb-8">
-          {/* Brand Section */}
-          <div className="md:col-span-2 space-y-3">
-            <div className="flex items-center gap-2">
-              <Shield className="w-6 h-6 text-primary" />
-              <h3 className="text-xl font-heading font-bold">APGS</h3>
+      {/* ========== FOOTER (FULL WIDTH) ========== */}
+      <footer className="w-full bg-card/50 mt-16">
+        <div className="max-w-6xl mx-auto px-4 py-10 border-t border-border">
+          {/* Footer Links Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 mb-8">
+            {/* Brand Section */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Shield className="w-6 h-6 text-primary" />
+                <h3 className="text-lg font-heading font-bold">APGS</h3>
+              </div>
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                Advanced Phishing Guard System - Your trusted cybersecurity platform providing real-time protection against cyber threats.
+              </p>
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Advanced Phishing Guard System - Your trusted cybersecurity platform providing real-time protection against cyber threats.
+            
+            {/* Platform Links */}
+            <div className="space-y-3">
+              <h4 className="font-heading font-semibold text-foreground text-sm">Platform</h4>
+              <nav className="space-y-2">
+                <a href="#about" className="text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors block">
+                  Features
+                </a>
+                <a href="#contact" className="text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors block">
+                  Contact
+                </a>
+              </nav>
+            </div>
+            
+            {/* Legal Links */}
+            <div className="space-y-3">
+              <h4 className="font-heading font-semibold text-foreground text-sm">Legal</h4>
+              <nav className="space-y-2">
+                <a href="#privacy" className="text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors block">
+                  Privacy Policy
+                </a>
+                <a href="#terms" className="text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors block">
+                  Terms of Service
+                </a>
+              </nav>
+            </div>
+          </div>
+          
+          {/* Copyright */}
+          <div className="border-t border-border/50 pt-6 text-center">
+            <p className="text-xs text-muted-foreground">
+              © 2026 Advanced Phishing Guard System. All rights reserved.
             </p>
           </div>
-          
-          {/* Platform Links */}
-          <div className="space-y-3">
-            <h4 className="font-heading font-semibold text-foreground">Platform</h4>
-            <nav className="space-y-2">
-              <a href="#about" className="text-sm text-muted-foreground hover:text-primary transition-colors block">
-                Features
-              </a>
-              <a href="#contact" className="text-sm text-muted-foreground hover:text-primary transition-colors block">
-                Contact
-              </a>
-            </nav>
-          </div>
-          
-          {/* Legal Links */}
-          <div className="space-y-3">
-            <h4 className="font-heading font-semibold text-foreground">Legal</h4>
-            <nav className="space-y-2">
-              <a href="#privacy" className="text-sm text-muted-foreground hover:text-primary transition-colors block">
-                Privacy Policy
-              </a>
-              <a href="#terms" className="text-sm text-muted-foreground hover:text-primary transition-colors block">
-                Terms of Service
-              </a>
-            </nav>
-          </div>
-        </div>
-        
-        {/* Copyright */}
-        <div className="border-t border-border/50 pt-8 text-center">
-          <p className="text-xs md:text-sm text-muted-foreground">
-            © 2026 Advanced Phishing Guard System. All rights reserved.
-          </p>
         </div>
       </footer>
     </div>
