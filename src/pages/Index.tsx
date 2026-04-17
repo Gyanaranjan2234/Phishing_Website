@@ -653,7 +653,7 @@ const Index = () => {
             <div className="flex flex-col sm:flex-row gap-4 text-muted-foreground text-sm">
               <div className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-primary" />
-                <span>gyana.tcr20@gmail.com</span>
+                <span>support.apgs@gmail.com</span>
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-primary" />
@@ -910,10 +910,10 @@ const Index = () => {
             <div className="space-y-3">
               <h4 className="font-heading font-semibold text-foreground text-sm">Legal</h4>
               <nav className="space-y-2">
-                <a href="#privacy" className="text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors block">
+                <a href="/privacy-policy" className="text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors block">
                   Privacy Policy
                 </a>
-                <a href="#terms" className="text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors block">
+                <a href="/terms-of-service" className="text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors block">
                   Terms of Service
                 </a>
               </nav>

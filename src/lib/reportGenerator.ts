@@ -132,7 +132,7 @@ ${riskLevel === "HIGH" ? "  6. Contact your security team immediately for critic
 📞 SUPPORT & CONTACT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  Email: gyana.tcr20@gmail.com
+  Email: support.apgs@gmail.com
   Phone: +91 7008584414
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
