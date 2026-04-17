@@ -76,9 +76,16 @@ const Dashboard = () => {
     <div className="min-h-screen cyber-grid">
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Shield className="w-6 h-6 text-primary drop-shadow-[0_0_8px_hsl(150_100%_45%/0.5)]" />
-            <div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <img 
+              src="/apgs-logo.png" 
+              alt="APGS Logo" 
+              width="40" 
+              height="40"
+              className="h-10 w-10 object-contain flex-shrink-0 transition-all duration-300 hover:drop-shadow-lg" 
+              style={{ filter: 'drop-shadow(0 0 6px rgba(0, 255, 156, 0.2))' }}
+            />
+            <div className="flex flex-col">
               <div className="font-heading font-bold text-primary text-lg">APGS</div>
               <div className="hidden sm:block text-muted-foreground text-xs font-mono whitespace-nowrap">Advanced Phishing Guard System</div>
             </div>

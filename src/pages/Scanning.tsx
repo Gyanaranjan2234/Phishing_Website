@@ -93,8 +93,20 @@ const Scanning = () => {
       <header className="sticky top-0 z-30 border-b border-border bg-card/90 backdrop-blur-lg transition-all duration-300">
         <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="text-2xl font-heading font-bold text-primary">APGS</span>
-            <span className="text-xs text-muted-foreground whitespace-nowrap">Advanced Phishing Guard System</span>
+            <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity flex-shrink-0">
+              <img 
+                src="/apgs-logo.png" 
+                alt="APGS Logo" 
+                width="40" 
+                height="40"
+                className="h-10 w-10 object-contain flex-shrink-0 transition-all duration-300 hover:drop-shadow-lg" 
+                style={{ filter: 'drop-shadow(0 0 6px rgba(0, 255, 156, 0.2))' }}
+              />
+              <div className="flex flex-col">
+                <div className="text-lg md:text-xl font-heading font-bold text-primary">APGS</div>
+                <div className="text-xs text-muted-foreground whitespace-nowrap">Advanced Phishing Guard System</div>
+              </div>
+            </a>
           </div>
 
           <nav className="flex items-center gap-2 text-sm flex-wrap">

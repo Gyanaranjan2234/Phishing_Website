@@ -442,13 +442,13 @@ const Login = () => {
       <div className="w-full max-w-md animate-fade-in-up">
         {/* Logo */}
         <div className="text-center mb-6 animate-float">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-primary/10 rounded-2xl mb-3">
-            <Shield className="w-7 h-7 text-primary" />
+          <div className="flex flex-col items-center gap-2">
+            <img src="/apgs-logo.png" alt="APGS Logo" className="h-10 w-auto" />
+            <h1 className="text-xl font-bold text-foreground mb-1">APGS</h1>
+            <p className="text-muted-foreground text-sm leading-tight">
+              Advanced Phishing Guard System
+            </p>
           </div>
-          <h1 className="text-xl font-bold text-foreground mb-1">APGS</h1>
-          <p className="text-muted-foreground text-sm leading-tight">
-            Authentication Protocol<br />Gateway Secure
-          </p>
         </div>
 
         {/* Auth Card */}

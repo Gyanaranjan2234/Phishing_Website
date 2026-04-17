@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Globe, FileText, Mail, Lock, ShieldCheck, Shield, Zap, Phone, Loader2, User, ChevronDown, ArrowUp, LogIn } from "lucide-react";
+import { Globe, FileText, Mail, Lock, ShieldCheck, Zap, Phone, Loader2, User, ChevronDown, ArrowUp, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -331,10 +331,20 @@ const Index = () => {
         <header className="sticky top-0 z-50 border-b border-border bg-card/90 backdrop-blur-lg transition-all duration-200">
         <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="text-2xl font-heading font-bold text-primary">APGS</span>
-          <div className="Heading">
-            <span className="text-xs text-muted-foreground break-words" style={{display:"flex"}}>Advanced Phishing Guard System</span>
-          </div>
+            <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity flex-shrink-0">
+              <img 
+                src="/apgs-logo.png" 
+                alt="APGS Logo" 
+                width="40" 
+                height="40"
+                className="h-10 w-10 object-contain flex-shrink-0 transition-all duration-300 hover:drop-shadow-lg" 
+                style={{ filter: 'drop-shadow(0 0 6px rgba(0, 255, 156, 0.2))' }}
+              />
+              <div className="flex flex-col">
+                <div className="text-lg md:text-xl font-heading font-bold text-primary">APGS</div>
+                <div className="text-xs text-muted-foreground whitespace-nowrap">Advanced Phishing Guard System</div>
+              </div>
+            </a>
           </div>
 
           {/* NAVBAR: ALWAYS THE SAME STRUCTURE - NO DYNAMIC ADD/REMOVE */}
@@ -441,9 +451,9 @@ const Index = () => {
         {currentView === "home" && console.log("[DEBUG] Rendering home view")}
         <main id="home" className="max-w-6xl mx-auto px-4 py-10 space-y-16 scroll-mt-[120px]">
           {/* Hero Section */}
-          <div className="flex">
+          <div className="w-full">
               <h1
-  className="flex text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-heading font-bold bg-gradient-to-r from-[#00ff88] via-[#00d4ff] to-[#3b82f6] bg-clip-text text-transparent drop-shadow-lg break-words"
+  className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-heading font-bold bg-gradient-to-r from-[#00ff88] via-[#00d4ff] to-[#3b82f6] bg-clip-text text-transparent drop-shadow-lg break-words max-w-full"
   style={{
     backgroundImage: 'linear-gradient(90deg, #00ff88, #00d4ff, #3b82f6)',
     WebkitBackgroundClip: 'text',
@@ -884,8 +894,8 @@ const Index = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 mb-8">
             {/* Brand Section */}
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Shield className="w-6 h-6 text-primary" />
+              <div className="flex items-center gap-3">
+                <img src="/apgs-logo.png" alt="APGS Logo" className="h-8 w-auto object-contain" />
                 <h3 className="text-lg font-heading font-bold">APGS</h3>
               </div>
               <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">

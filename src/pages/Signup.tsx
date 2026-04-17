@@ -51,9 +51,10 @@ const Signup = () => {
         Back
       </Button>
       <div className="w-full max-w-md animate-fade-in-up">
-        <div className="flex items-center justify-center gap-3 mb-8">
-          <Shield className="w-10 h-10 text-primary" />
+        <div className="flex flex-col items-center gap-2 mb-8">
+          <img src="/apgs-logo.png" alt="APGS Logo" className="h-10 w-auto" />
           <h1 className="text-3xl font-heading font-bold text-primary">APGS</h1>
+          <p className="text-muted-foreground text-sm">Advanced Phishing Guard System</p>
         </div>
         <div className="bg-card border border-border rounded-lg p-8">
           <h2 className="text-xl font-heading font-semibold text-foreground mb-1">Create Account</h2>

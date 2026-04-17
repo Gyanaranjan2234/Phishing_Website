@@ -6,9 +6,19 @@ const PrivacyPolicy = () => {
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-card/90 backdrop-blur-lg">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2">
-            <span className="text-2xl font-heading font-bold text-primary">APGS</span>
-            <span className="text-xs text-muted-foreground">Advanced Phishing Guard System</span>
+          <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity flex-shrink-0">
+            <img 
+              src="/apgs-logo.png" 
+              alt="APGS Logo" 
+              width="40" 
+              height="40"
+              className="h-10 w-10 object-contain flex-shrink-0 transition-all duration-300 hover:drop-shadow-lg" 
+              style={{ filter: 'drop-shadow(0 0 6px rgba(0, 255, 156, 0.2))' }}
+            />
+            <div className="flex flex-col">
+              <div className="text-lg font-heading font-bold text-primary">APGS</div>
+              <div className="text-xs text-muted-foreground">Advanced Phishing Guard System</div>
+            </div>
           </a>
           <a href="/" className="text-sm text-primary hover:text-primary/90 transition-colors">
             Back to Home
@@ -21,7 +31,7 @@ const PrivacyPolicy = () => {
         {/* Title Section */}
         <section className="space-y-4 text-center border-b border-border pb-8">
           <div className="flex items-center justify-center gap-3">
-            <Shield className="w-8 h-8 text-primary" />
+            <img src="/apgs-logo.png" alt="APGS Logo" className="h-8 w-auto object-contain" />
             <h1 className="text-4xl md:text-5xl font-heading font-bold">Privacy Policy</h1>
           </div>
           <p className="text-muted-foreground text-lg">
