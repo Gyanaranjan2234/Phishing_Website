@@ -251,6 +251,7 @@ const handleAnalyze = async (e: React.FormEvent) => {
                 timestamp: new Date().toISOString(),
                 userName: userName,
                 targetItem: result.url,
+                flags: result.flags,
               }}
             />
           </div>

@@ -15,6 +15,14 @@ export const transformVTToUI = (vtRaw: VTAnalysisResponse, fileName: string): Fi
   if (stats.malicious >= 3) status = "infected";
   else if (stats.malicious > 0 || stats.suspicious > 0) status = "suspicious";
 
+  // Extract critical flags for unified decision logic
+  const flags = {
+    malwareDetected: stats.malicious >= 3,
+    phishingDetected: stats.malicious >= 1,
+    blacklisted: false,
+    suspicious: stats.suspicious > 0,
+  };
+
   // CHANGE: Map ALL vendors instead of just 8 to allow for the scrollable list
   const reasons: ScanReason[] = Object.entries(results)
     .filter(([_, data]) => data.category !== "type-unsupported")
@@ -36,6 +44,7 @@ export const transformVTToUI = (vtRaw: VTAnalysisResponse, fileName: string): Fi
     score: status === "infected" ? Math.max(score, 80) : score, // Boost score for danger visibility
     threats: threats.length > 0 ? threats : ["No specific threat signatures"],
     reasons,
+    flags,
     // NEW: Pass stats to the frontend
     vtStats: {
       malicious: stats.malicious,

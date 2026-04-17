@@ -346,7 +346,8 @@ const handleGenerateReport = async () => {
                   threats: result.reasons.filter(r => r.flagged).map(r => r.label),
                   timestamp: new Date().toISOString(),
                   userName: userName,
-                  targetItem: file?.name || "Unknown file"
+                  targetItem: file?.name || "Unknown file",
+                  flags: result.flags,
                 }}
               />
             </div>

@@ -13,6 +13,14 @@ import {
   Eye,
   Activity,
 } from "lucide-react";
+import {
+  calculateFinalVerdict,
+  calculateAdjustedScore,
+  getVerdictDescription,
+  getVerdictTitle,
+  type RiskFlags,
+  type FinalVerdict,
+} from "@/lib/riskDecisionLogic";
 
 export interface RiskAnalysisData {
   scanType: "url" | "email" | "file" | "password";
@@ -24,6 +32,8 @@ export interface RiskAnalysisData {
   userName?: string;
   targetItem?: string;
   analysisItems?: string[];
+  // Critical flags for final decision
+  flags?: RiskFlags;
 }
 
 const sanitizeString = (value: unknown): string => {
@@ -43,14 +53,19 @@ const validateData = (data: RiskAnalysisData): RiskAnalysisData => {
     userName:      sanitizeString(data.userName) || "Guest User",
     targetItem:    sanitizeString(data.targetItem) || "Not specified",
     analysisItems: Array.isArray(data.analysisItems) ? data.analysisItems.map(sanitizeString).filter(Boolean) : [],
+    flags:         data.flags || {},
   };
 };
 
-// Score logic: LOW score = SAFE, HIGH score = DANGEROUS (matches VT data)
-// 0–30 = Safe, 31–70 = Warning, 71–100 = Dangerous
-const getRiskInfo = (score: number) => {
-  if (score <= 30)
-    return {
+// Updated: Uses unified decision logic with critical flags
+// Ensures only ONE verdict is shown consistently
+const getRiskInfo = (score: number, flags?: RiskFlags) => {
+  // Calculate final verdict using unified logic
+  const verdict = calculateFinalVerdict(score, flags || {});
+  const adjustedScore = calculateAdjustedScore(score, flags || {});
+
+  const verdictConfig = {
+    safe: {
       level:       "SAFE",
       textColor:   "text-emerald-400",
       dotColor:    "bg-emerald-500",
@@ -59,10 +74,8 @@ const getRiskInfo = (score: number) => {
       cardBorder:  "border-emerald-500/50",
       cardBg:      "from-emerald-950/60 to-emerald-900/30",
       icon:        CheckCircle,
-      description: "This URL appears safe and legitimate based on VirusTotal analysis",
-    };
-  if (score <= 70)
-    return {
+    },
+    warning: {
       level:       "WARNING",
       textColor:   "text-amber-400",
       dotColor:    "bg-amber-500",
@@ -71,18 +84,25 @@ const getRiskInfo = (score: number) => {
       cardBorder:  "border-amber-500/50",
       cardBg:      "from-amber-950/60 to-amber-900/30",
       icon:        AlertTriangle,
-      description: "This URL shows suspicious characteristics — review before proceeding",
-    };
+    },
+    dangerous: {
+      level:       "DANGEROUS",
+      textColor:   "text-red-400",
+      dotColor:    "bg-red-500",
+      barColor:    "bg-gradient-to-r from-red-500 to-red-400",
+      badgeBg:     "bg-gradient-to-r from-red-500 to-red-600",
+      cardBorder:  "border-red-500/50",
+      cardBg:      "from-red-950/60 to-red-900/30",
+      icon:        AlertCircle,
+    },
+  };
+
+  const config = verdictConfig[verdict];
   return {
-    level:       "DANGEROUS",
-    textColor:   "text-red-400",
-    dotColor:    "bg-red-500",
-    barColor:    "bg-gradient-to-r from-red-500 to-red-400",
-    badgeBg:     "bg-gradient-to-r from-red-500 to-red-600",
-    cardBorder:  "border-red-500/50",
-    cardBg:      "from-red-950/60 to-red-900/30",
-    icon:        AlertCircle,
-    description: "Critical security threats detected — do not proceed",
+    verdict,
+    adjustedScore,
+    ...config,
+    description: getVerdictDescription(verdict),
   };
 };
 
@@ -107,16 +127,12 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
     );
   }
 
-  const riskInfo  = getRiskInfo(data.score);
+  const riskInfo  = getRiskInfo(data.score, data.flags);
   const RiskIcon  = riskInfo.icon;
   const formatTime = (date?: string) => date ? new Date(date).toLocaleString() : new Date().toLocaleString();
 
-  const verdictText =
-    data.score <= 30
-      ? "This item has passed comprehensive VirusTotal security analysis across 90+ vendors and appears to be legitimate and safe to use."
-      : data.score <= 70
-      ? "This item shows some suspicious characteristics across security vendors. Review the threat details above before deciding whether to proceed."
-      : "This item has been flagged as a potential security threat by multiple VirusTotal vendors. We strongly recommend avoiding any interaction.";
+  // Use unified decision logic for consistent verdict
+  const verdictText = riskInfo.description;
 
   return (
     <div className="w-full space-y-6 animate-fade-in">
@@ -180,12 +196,12 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
               <div>
                 <div className="flex justify-between items-center mb-3">
                   <p className="text-xs text-slate-400 uppercase font-semibold tracking-wide">Risk Score</p>
-                  <span className={`text-3xl font-bold ${riskInfo.textColor}`}>{data.score}</span>
+                  <span className={`text-3xl font-bold ${riskInfo.textColor}`}>{riskInfo.adjustedScore}</span>
                 </div>
                 <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden border border-slate-600">
                   <div
                     className={`h-full transition-all duration-700 ease-out shadow-lg ${riskInfo.barColor}`}
-                    style={{ width: `${data.score}%` }}
+                    style={{ width: `${riskInfo.adjustedScore}%` }}
                   />
                 </div>
                 <div className="flex justify-between text-xs text-slate-400 mt-2 font-medium">
@@ -200,7 +216,7 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
                 <div className="flex items-center gap-3">
                   <div className={`w-4 h-4 rounded-full shadow-lg ${riskInfo.dotColor}`} />
                   <span className={`font-semibold text-lg ${riskInfo.textColor}`}>
-                    {data.score <= 30 ? "✓ Safe" : data.score <= 70 ? "⚠ Warning" : "✕ Dangerous"}
+                    {riskInfo.verdict === "safe" ? "✓ Safe" : riskInfo.verdict === "warning" ? "⚠ Warning" : "✕ Dangerous"}
                   </span>
                 </div>
               </div>
@@ -278,11 +294,7 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
             <RiskIcon className={`w-8 h-8 mt-1 shrink-0 ${riskInfo.textColor}`} />
             <div className="space-y-3 flex-1">
               <p className={`text-2xl font-bold ${riskInfo.textColor}`}>
-                {data.score <= 30
-                  ? "✓ Green Light — Safe to Proceed"
-                  : data.score <= 70
-                  ? "⚠ Caution — Review Before Proceeding"
-                  : "✕ Red Alert — Do Not Proceed"}
+                {getVerdictTitle(riskInfo.verdict)}
               </p>
               <p className="text-sm text-slate-300 leading-relaxed">{verdictText}</p>
             </div>
@@ -296,7 +308,7 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
             Recommended Actions
           </p>
           <ul className="space-y-3 text-sm text-slate-200">
-            {data.score <= 30 && (
+            {riskInfo.verdict === "safe" && (
               <>
                 <li className="flex gap-3 p-2 rounded hover:bg-slate-800/30 transition-colors">
                   <CheckCircle className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
@@ -312,7 +324,7 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
                 </li>
               </>
             )}
-            {data.score > 30 && data.score <= 70 && (
+            {riskInfo.verdict === "warning" && (
               <>
                 <li className="flex gap-3 p-2 rounded hover:bg-slate-800/30 transition-colors">
                   <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
@@ -328,7 +340,7 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
                 </li>
               </>
             )}
-            {data.score > 70 && (
+            {riskInfo.verdict === "dangerous" && (
               <>
                 <li className="flex gap-3 p-2 rounded hover:bg-slate-800/30 transition-colors">
                   <AlertOctagon className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />

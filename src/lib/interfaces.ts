@@ -30,7 +30,13 @@ export interface FileAnalysis {
         harmless: number;
         undetected: number;
     };
-    sha256?: string; 
+    sha256?: string;
+    flags?: {                               // critical flags for unified decision logic
+      malwareDetected?: boolean;
+      phishingDetected?: boolean;
+      blacklisted?: boolean;
+      suspicious?: boolean;
+    };
 }
 export interface UrlAnalysis {
     status: ScanStatus;
@@ -102,4 +108,10 @@ export interface UrlAnalysis {
   vtStats: VTAnalysisStats;               // raw VT stats
   vtVendors: Record<string, VTVendorResult>; // raw vendor results
   analysisId: string;
+  flags?: {                               // critical flags for unified decision logic
+    phishingDetected?: boolean;
+    malwareDetected?: boolean;
+    blacklisted?: boolean;
+    suspicious?: boolean;
+  };
 }

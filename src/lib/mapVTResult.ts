@@ -25,6 +25,14 @@ export function mapVTToUrlAnalysis(
     : stats.malicious >= 1 || stats.suspicious >= 2 ? "suspicious"
     : "safe";
 
+  // Extract critical flags for unified decision logic
+  const flags = {
+    phishingDetected: stats.malicious >= 3,
+    malwareDetected: stats.malicious >= 1,
+    blacklisted: false, // Can be set via API if needed
+    suspicious: stats.suspicious >= 2,
+  };
+
   const flaggedVendors = Object.values(results).filter(
     (v) => v.category === "malicious" || v.category === "suspicious"
   );
@@ -57,5 +65,5 @@ export function mapVTToUrlAnalysis(
     })),
   ];
 
-  return { url, status, score, reasons, vtStats: stats, vtVendors: results, analysisId };
+  return { url, status, score, reasons, vtStats: stats, vtVendors: results, analysisId, flags };
 }
