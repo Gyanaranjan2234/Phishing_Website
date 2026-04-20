@@ -7,7 +7,8 @@ import { toast } from "@/hooks/use-toast";
 import type { FileAnalysis, RiskReportData, PDFReportData } from "@/lib/interfaces";
 //import { downloadReport, type PDFReportData } from "@/lib/pdfReportGenerator";
 import { scanFile } from "@/lib/fileUtils";
-import { apiScans } from "@/lib/api";
+import { apiScans } from "@/lib/api-backend";  // UPDATED: Use backend API
+import { handleScanAttempt } from "@/lib/guestAccess";  // ADDED: Guest access control
 import RiskAnalysisReport from "@/components/RiskAnalysisReport";
 import { generateFileReport } from "@/lib/generateReport";
 import { generateRiskReport } from "@/lib/reportGenerator";
@@ -91,6 +92,19 @@ const handleScan = async () => {
   if (!file) {
     showToast("Please select a file first", "error");
     return;
+  }
+
+  // GUEST ACCESS CHECK: Verify scan limit before proceeding
+  const scanAccess = handleScanAttempt();
+  if (!scanAccess.success) {
+    // Guest limit reached - block scan and show message
+    showToast(scanAccess.message, "error");
+    return;
+  }
+
+  // Show guest scan info (only for guests)
+  if (!isAuthenticated) {
+    showToast(`📝 ${scanAccess.message}`, "info");
   }
   
   setScanning(true);

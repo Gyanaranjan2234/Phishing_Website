@@ -1,0 +1,25 @@
+# FastAPI - Modern web framework for building APIs
+fastapi==0.115.6
+
+# Uvicorn - ASGI server to run FastAPI
+uvicorn==0.34.0
+
+# SQLAlchemy - Database ORM
+sqlalchemy==2.0.36
+
+# Pydantic - Data validation (v2 with pre-built wheels)
+pydantic==2.10.4
+pydantic-core==2.27.2
+email-validator==2.2.0
+
+# Bcrypt - Password hashing
+bcrypt==4.2.1
+
+# Python-Jose - JWT token generation
+python-jose[cryptography]==3.3.0
+
+# Passlib - Password utilities
+passlib==1.7.4
+
+# CORS middleware
+python-multipart==0.0.20

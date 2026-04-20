@@ -10,10 +10,8 @@ const mockUsers: any = {
   }
 };
 
-const mockScans = [
-  { id: '1', type: 'url', target: 'example.com', status: 'safe', timestamp: new Date(Date.now() - 86400000) },
-  { id: '2', type: 'email', target: 'test@example.com', status: 'safe', timestamp: new Date(Date.now() - 172800000) },
-];
+// No default mock scans - start with empty array to prevent fake data display
+const mockScans: any[] = [];
 
 export const apiAuth = {
   register: async (data: any) => {

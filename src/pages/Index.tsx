@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
-import { apiAuth, apiScans } from "@/lib/api";
+import { apiAuth, apiScans } from "@/lib/api-backend";  // FIXED: Using real backend
 import { useScrollActiveSection } from "@/hooks/use-scroll-active-section";
 import UrlScanner from "@/components/dashboard/UrlScanner";
 import EmailBreachChecker from "@/components/dashboard/EmailBreachChecker";
@@ -66,6 +66,7 @@ const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [userName, setUserName] = useState<string>("");
+  const [userId, setUserId] = useState<number | null>(null);
 
   // ============= VIEW MANAGEMENT =============
   // Single source of truth for current view - NO ROUTING
@@ -107,15 +108,20 @@ const Index = () => {
 
   // ============= HISTORY DATA =============
   const { data: historyData, refetch: refetchHistory } = useQuery({
-    queryKey: ['history'],
-    queryFn: apiScans.getHistory,
-    enabled: !!isAuthenticated,
+    queryKey: ['history', userId],
+    queryFn: () => userId ? apiScans.getHistory(userId) : Promise.resolve({ history: [] }),
+    enabled: !!isAuthenticated && !!userId,
   });
 
+  const historyList = historyData?.history || [];
+
+  // Removed API Stats call as per request to calculate dynamically from history
+  /*
   const { data: statsData, refetch: refetchStats } = useQuery({
     queryKey: ['stats'],
     queryFn: apiScans.getStats,
   });
+  */
 
   // ============= EFFECTS: SAVE CURRENT VIEW TO LOCALSTORAGE =============
   // Whenever currentView changes, save it to localStorage for persistence on refresh
@@ -157,13 +163,16 @@ const Index = () => {
         setIsAuthenticated(!!session?.user);
         if (session?.user) {
           setUserName(session.user.username || session.user.email || "");
+          setUserId(Number(session.user.id));
         } else {
           setUserName("");
+          setUserId(null);
         }
       } catch (err) {
         console.error("[Auth Error]", err);
         setIsAuthenticated(false);
         setUserName("");
+        setUserId(null);
       } finally {
         setAuthLoading(false);
       }
@@ -171,26 +180,29 @@ const Index = () => {
     getSession();
   }, []);
 
-  // ============= EFFECTS: STATS ANIMATION =============
+  // 2. Calculate Stats Dynamically: After fetching history
   useEffect(() => {
-    if (!statsData?.stats) return;
-    const target = statsData.stats;
-    let raf = 0;
-    const start = Date.now();
-    const duration = 1000;
-    const animate = () => {
-      const progress = Math.min(1, (Date.now() - start) / duration);
-      setStats({
-        totalScans: Math.floor(progress * (target.totalScans || 0)),
-        threats: Math.floor(progress * (target.threats || 0)),
-        safe: Math.floor(progress * (target.safe || 0)),
-        activeUsers: Math.floor(progress * (target.activeUsers || 0)),
-      });
-      if (progress < 1) raf = requestAnimationFrame(animate);
-    };
-    raf = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(raf);
-  }, [statsData]);
+    if (!historyList) return;
+    
+    console.log("history:", historyList); // 8. Debugging
+    
+    // Dynamic calculation mapping status fields
+    const safe = historyList.filter((item: any) => item.status === "safe" || item.status === "strong").length;
+    const threats = historyList.filter((item: any) => item.status === "phishing" || item.status === "breached").length;
+    const suspicious = historyList.filter((item: any) => item.status === "weak" || item.status === "medium").length;
+    const total = historyList.length;
+
+    // 4. Update State
+    setStats(prev => ({
+      ...prev,
+      safe,
+      threats,
+      totalScans: total,
+      // activeUsers is not part of history, keeping as is or mock
+    }));
+
+    console.log("stats:", { safe, suspicious, threats, total }); // 8. Debugging
+  }, [historyList]);
 
   // ============= EFFECTS: COUNT-UP ANIMATION FOR STATS SECTION =============
   useEffect(() => {
@@ -236,10 +248,10 @@ const Index = () => {
   }, [setActiveSection]);
 
   // ============= HANDLERS =============
-  const refreshStats = () => refetchStats();
+  // const refreshStats = () => refetchStats(); // Removed as stats are now dynamic
   const refreshHistory = () => {
     refetchHistory();
-    refetchStats();
+    // refetchStats(); // Removed
   };
 
   const handleContactSubmit = (e: React.FormEvent) => {
@@ -304,12 +316,17 @@ const Index = () => {
     await apiAuth.logout();
     setIsAuthenticated(false);
     setUserName("");
+    setUserId(null);
+    // 6. Reset on Logout - prevent fake display
+    setStats({ safe: 0, suspicious: 0, threats: 0, totalScans: 0, activeUsers: 0 });
     navTo("home");
   };
 
   // ============= COMPUTED VALUES =============
   // Determine navbar active state based on current view
   const navActiveSection = currentView === "scanning" ? "scanning" : activeSection;
+
+  console.log("[DEBUG] Index Render State:", { currentView, navActiveSection, isAuthenticated });
 
   const featureCards = useMemo(
     () => [
@@ -321,7 +338,7 @@ const Index = () => {
     []
   );
 
-  const historyList = historyData?.history || [];
+  // const historyList = historyData?.history || []; // Moved up to fix ReferenceError
 
   return (
     <div className="flex flex-col min-h-screen bg-background">

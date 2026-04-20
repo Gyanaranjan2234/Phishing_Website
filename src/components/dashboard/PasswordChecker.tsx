@@ -8,8 +8,8 @@ import { Input } from "@/components/ui/input";
 
 import { toast } from "sonner";
 
-import { apiScans } from "@/lib/api";
-
+import { apiScans } from "@/lib/api-backend";  // UPDATED: Use backend API
+import { handleScanAttempt } from "@/lib/guestAccess";  // ADDED: Guest access control
 import confetti from "canvas-confetti"; // Import confetti
 
 
@@ -144,7 +144,18 @@ const PasswordChecker = ({ onScanComplete, isAuthenticated = false, scanData, se
 
     if (!password.trim()) { toast.error("Enter a password to check"); return; }
 
-    
+    // GUEST ACCESS CHECK: Verify scan limit before proceeding
+    const scanAccess = handleScanAttempt();
+    if (!scanAccess.success) {
+      // Guest limit reached - block scan and show message
+      toast.error(scanAccess.message);
+      return;
+    }
+
+    // Show guest scan info (only for guests)
+    if (!isAuthenticated) {
+      toast.info(`📝 ${scanAccess.message}`);
+    }
 
     setChecking(true);
 
@@ -178,15 +189,22 @@ const PasswordChecker = ({ onScanComplete, isAuthenticated = false, scanData, se
 
       if (isAuthenticated) {
 
-        await apiScans.saveScan({
-
-          type: "password",
-
-          target: "Password Audit",
-
-          status: finalResult.breached ? "breached" : "safe"
-
-        });
+        // Get user_id from localStorage for secure data isolation
+        const userId = localStorage.getItem('user_id');
+        console.log('💾 Saving password scan - user_id:', userId, 'status:', finalResult.breached ? "breached" : "safe");
+        
+        if (userId) {
+          const saveResult = await apiScans.saveScan(
+            parseInt(userId),  // Use user_id (NOT username)
+            "password",
+            "Password Audit",
+            finalResult.breached ? "breached" : "safe"
+          );
+          
+          console.log('✅ Scan save result:', saveResult);
+        } else {
+          console.warn('⚠️ No user_id found in localStorage - scan not saved');
+        }
 
       }
 

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { apiAuth } from "@/lib/api";
+import { apiAuth } from "@/lib/api-backend";  // UPDATED: Changed to backend API
 
 type ViewType = 'login' | 'signup' | 'forgot';
 
@@ -103,14 +103,14 @@ const Login = () => {
 
     setLoading(true);
     try {
-      const data = await apiAuth.login({
-        email: loginEmail,
-        password: loginPassword,
-      });
+      // REPLACED: Using backend API instead of mock
+      const data = await apiAuth.login(loginEmail, loginPassword);
 
-      if (data.success) {
-        toast.success("Login successful!");
+      if (data.status === 'success') {
+        toast.success(data.message || "Login successful!");
         navigate("/");
+      } else {
+        toast.error(data.message || "Invalid credentials");
       }
     } catch (err: any) {
       toast.error(err.message || "An error occurred during login");
@@ -138,16 +138,15 @@ const Login = () => {
 
     setLoading(true);
     try {
-      const data = await apiAuth.register({
-        username: signupUsername,
-        email: signupEmail,
-        password: signupPassword,
-      });
+      // REPLACED: Using backend API instead of mock
+      const data = await apiAuth.signup(signupEmail, signupUsername, signupPassword);
 
-      if (data.success) {
-        toast.success("Account created successfully! Please sign in.");
+      if (data.status === 'success') {
+        toast.success(data.message || "Account created successfully! Please sign in.");
         // Use switchView instead of setCurrentView to reset all forms
         switchView('login');
+      } else {
+        toast.error(data.message || "Signup failed");
       }
     } catch (err: any) {
       toast.error(err.message || "An error occurred during signup");

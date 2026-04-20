@@ -4,8 +4,8 @@ import { Globe, FileText, Mail, Lock, ShieldCheck, Zap, Users, Phone, Loader2, U
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { useQuery } from "@tanstack/react-query";
-import { apiAuth, apiScans } from "@/lib/api";
+import { apiAuth, apiScans } from "@/lib/api-backend";  // UPDATED: Use backend API
+import { getGuestScanCount } from "@/lib/guestAccess";  // ADDED: Guest access info
 import UrlScanner from "@/components/dashboard/UrlScanner";
 import EmailBreachChecker from "@/components/dashboard/EmailBreachChecker";
 import FileScanner from "@/components/dashboard/FileScanner";
@@ -18,6 +18,10 @@ const Scanning = () => {
   const [theme, setTheme] = useState<"dark" | "light">(() => (localStorage.getItem("apgs-theme") === "light" ? "light" : "dark"));
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [userName, setUserName] = useState<string>("");
+  const [userId, setUserId] = useState<string | null>(null); // Replaced number with string for localStorage compatibility
+  const [guestScanCount, setGuestScanCount] = useState<number>(0);
+  const [history, setHistory] = useState<any[]>([]);  // ADDED: Explicit state for history
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);  // ADDED: Loading state
   
   // Scan state management - preserved across tab switches
   const [urlScanData, setUrlScanData] = useState({ input: "", result: null as any });
@@ -47,24 +51,71 @@ const Scanning = () => {
         setIsAuthenticated(!!session?.user);
         if (session?.user) {
           setUserName(session.user.username || session.user.email || "");
+          setUserId(session.user.id);
         } else {
           setUserName("");
+          setUserId(null);
+          setHistory([]);  // CRITICAL: Clear history when no user
         }
       } catch (err) {
         setIsAuthenticated(false);
         setUserName("");
+        // Note: setUserId is handled separately by the mount useEffect and logout
       }
     };
     updateAuth();
+    
+    setGuestScanCount(getGuestScanCount());
   }, []);
 
-  const { data: historyData, refetch } = useQuery({
-    queryKey: ['history'],
-    queryFn: apiScans.getHistory,
-    enabled: !!isAuthenticated,
-  });
+  // 1. Load user_id inside useEffect on mount
+  useEffect(() => {
+    const id = localStorage.getItem("user_id");
+    console.log("userId from localStorage:", id);
+    setUserId(id);
+  }, []);
 
-  const history = historyData?.history || [];
+  // 2. Fix fetch timing: Run ONLY when userId is available
+  useEffect(() => {
+    console.log("userId state updated:", userId);
+    if (userId) {
+      fetchHistory(userId);
+    } else {
+      setHistory([]);
+    }
+  }, [userId]);
+
+  // 4. Fix fetchHistory function: Ensure it accepts userId as parameter
+  const fetchHistory = async (id: string) => {
+    console.log('🔍 Fetching scan history for user_id:', id);
+    setIsLoadingHistory(true);
+    
+    try {
+      // Using existing apiScans helper but ensuring it uses the passed ID
+      const response = await apiScans.getHistory(Number(id));
+      console.log('history:', response.data); // Debugging: Log history data
+      
+      // Transform and set history
+      if (response.data && Array.isArray(response.data)) {
+        const transformed = response.data.map((scan: any) => ({
+          id: scan.id.toString(),
+          type: scan.scan_type as "url" | "file" | "email" | "password",
+          target: scan.target,
+          status: scan.status as "safe" | "phishing" | "breached" | "weak" | "medium" | "strong",
+          timestamp: new Date(scan.timestamp)
+        }));
+        
+        setHistory(transformed);
+      } else {
+        setHistory([]);
+      }
+    } catch (err) {
+      console.error('❌ Failed to fetch history:', err);
+      setHistory([]);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
 
   const scrollHome = (anchor: string) => {
     if (location.pathname !== "/") {
@@ -80,13 +131,27 @@ const Scanning = () => {
   };
 
   const handleLogout = async () => {
+    // 6. Logout fix: Clear state and localStorage
+    localStorage.removeItem("user_id");
     await apiAuth.logout();
+    
     setIsAuthenticated(false);
     setUserName("");
+    setUserId(null);
+    setHistory([]);
+    setGuestScanCount(0);  // CRITICAL: Reset guest count
+    
+    console.log('✅ Logout complete - all state cleared');
+    console.log('📋 History after logout:', history);
+    
+    // Navigate to home
     navigate("/");
   };
 
-  const refreshHistory = () => { refetch(); };
+  const refreshHistory = async () => { 
+    if (!userId) return;
+    fetchHistory(userId);
+  };
 
   return (
     <div className="min-h-screen cyber-grid text-foreground transition-colors duration-300" style={{ scrollBehavior: 'smooth' }}>
@@ -164,7 +229,12 @@ const Scanning = () => {
         
         <section className="bg-card/70 rounded-xl border border-border p-6 shadow-lg">
           <h1 className="text-3xl font-heading font-bold mb-2">Scanning Hub</h1>
-          <p className="text-muted-foreground">Access all scanning modules in one place. {isAuthenticated ? "Your scan history is automatically saved." : "Guest mode works without login. Sign in to save history and view results."}</p>
+          <p className="text-muted-foreground">
+            Access all scanning modules in one place. 
+            {isAuthenticated 
+              ? "Your scan history is automatically saved." 
+              : `Guest mode: ${guestScanCount}/3 scans used. Sign in to save history and get unlimited scans.`}
+          </p>
         </section>
 
         <section className="border border-border rounded-xl bg-card/70 p-4 transition-all duration-300">
@@ -196,10 +266,13 @@ const Scanning = () => {
           {activeTab === "password" && <PasswordChecker onScanComplete={refreshHistory} isAuthenticated={!!isAuthenticated} userName={userName} scanData={passwordScanData} setScanData={setPasswordScanData} />}
         </section>
 
-        {isAuthenticated ? (
+        {isAuthenticated && userId ? (
           <ActivityHistory history={history} />
         ) : (
-          <div className="rounded-xl border border-border p-4 bg-card/60 text-sm text-muted-foreground">Log in to save activity and review history. Guest scans are still available but are not stored.</div>
+          <div className="rounded-xl border border-border p-4 bg-card/60 text-sm text-muted-foreground">
+            <p className="font-medium mb-1">🔒 Login to View Scan History</p>
+            <p>Sign in to save your scan results, track security threats over time, and access your complete dashboard.</p>
+          </div>
         )}
       </main>
     </div>

@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
 import type { UrlAnalysis, ScanStatus } from "@/lib/interfaces";
-import { apiScans } from "@/lib/api";
+import { apiScans } from "@/lib/api-backend";  // UPDATED: Use backend API instead of mock
+import { handleScanAttempt } from "@/lib/guestAccess";  // ADDED: Guest access control
 import RiskAnalysisReport from "@/components/RiskAnalysisReport";
 import { generatePDFReport } from "@/lib/pdfReportGenerator";
 import { scanUrlWithVT } from "@/lib/virustotal";
@@ -80,6 +81,19 @@ const handleAnalyze = async (e: React.FormEvent) => {
   e.preventDefault();
   if (!url.trim()) { showToast("Enter a URL to analyze", "error"); return; }
 
+  // GUEST ACCESS CHECK: Verify scan limit before proceeding
+  const scanAccess = handleScanAttempt();
+  if (!scanAccess.success) {
+    // Guest limit reached - block scan and show message
+    showToast(scanAccess.message, "error");
+    return;
+  }
+
+  // Show guest scan info (only for guests)
+  if (!isAuthenticated) {
+    showToast(`📝 ${scanAccess.message}`, "info");
+  }
+
   setScanning(true);
   setResult(null);
 
@@ -99,14 +113,34 @@ const handleAnalyze = async (e: React.FormEvent) => {
 
     if (isAuthenticated) {
       try {
-        await apiScans.saveScan({ type: "url", target: url, status: analysis.status });
-        showToast("✅ Result saved to history", "success");
+        // Get user_id from localStorage for secure data isolation
+        const userId = localStorage.getItem('user_id');
+        console.log('💾 Saving URL scan - user_id:', userId, 'url:', url, 'status:', analysis.status);
+        
+        if (userId) {
+          const saveResult = await apiScans.saveScan(
+            parseInt(userId),  // Use user_id (NOT username)
+            "url",
+            url,
+            analysis.status
+          );
+          
+          console.log('✅ Scan save result:', saveResult);
+          
+          if (saveResult.status === 'success') {
+            showToast("✅ Result saved to history", "success");
+          } else {
+            console.error('❌ Failed to save scan:', saveResult.message);
+            showToast("⚠️ Scan completed but failed to save to history", "error");
+          }
+        } else {
+          console.warn('⚠️ No user_id found in localStorage - scan not saved');
+        }
       } catch (err) {
-        console.error("Failed to save scan:", err);
+        console.error("❌ Failed to save scan:", err);
       }
-    } else {
-      showToast("📝 Guest scan (not saved - login to save history)", "info");
     }
+    // REMOVED: Guest scan message (already shown above)
 
     if (analysis.status === "phishing")        showToast("⚠️ Phishing threat detected!", "error");
     else if (analysis.status === "suspicious") showToast("⚠️ Suspicious URL detected!", "error");

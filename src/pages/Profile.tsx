@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { apiAuth } from "@/lib/api";
+import { apiAuth } from "@/lib/api-backend";  // UPDATED: Changed to backend API
 
 const Profile = () => {
   const navigate = useNavigate();

@@ -4,6 +4,7 @@ import { Shield, Lock, Mail, User, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { signup } from "@/lib/api-backend";  // ADDED: Import backend signup function
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !password) {
       toast.error("Please fill in all fields");
@@ -31,13 +32,24 @@ const Signup = () => {
       toast.error("Password must be at least 6 characters");
       return;
     }
+    
     setLoading(true);
-    setTimeout(() => {
-      localStorage.setItem("apgs-auth", "true");
-      toast.success("Account created successfully");
-      navigate("/");
+    try {
+      // REPLACED: Using backend API instead of localStorage mock
+      const data = await signup(email, name, password);
+      
+      if (data.status === 'success') {
+        toast.success(data.message || "Account created successfully");
+        // Redirect to login page after successful signup
+        navigate("/login");
+      } else {
+        toast.error(data.message || "Signup failed");
+      }
+    } catch (error) {
+      toast.error("An error occurred during signup");
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (

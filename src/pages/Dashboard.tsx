@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
-import { apiAuth, apiScans } from "@/lib/api";
+import { apiAuth, apiScans } from "@/lib/api-backend";  // FIXED: Use real backend, not mock
 import StatsCards from "@/components/dashboard/StatsCards";
 import UrlScanner from "@/components/dashboard/UrlScanner";
 import FileScanner from "@/components/dashboard/FileScanner";
@@ -19,6 +19,7 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState<"url" | "file" | "search">("url");
   const [activeNav, setActiveNav] = useState<"home" | "features" | "how" | "contact" | "dashboard">("dashboard");
   const [userName, setUserName] = useState<string>("");
+  const [userId, setUserId] = useState<number | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">(() => (localStorage.getItem("apgs-theme") === "light" ? "light" : "dark"));
 
   useEffect(() => {
@@ -26,11 +27,14 @@ const Dashboard = () => {
       try {
         const { session } = await apiAuth.getSession();
         if (!session || !session.user) {
+          setUserId(null);
           navigate("/");
           return;
         }
         setUserName(session.user.username || session.user.email || "");
+        setUserId(Number(session.user.id));
       } catch (err) {
+        setUserId(null);
         navigate("/");
       }
     };
@@ -45,27 +49,44 @@ const Dashboard = () => {
 
   const handleLogout = async () => {
     await apiAuth.logout();
+    // 4. Clear data on logout
+    console.log("Logging out - clearing history and stats");
     navigate("/");
   };
 
+  /* Removed API Stats call as per request
   const { data: statsData, refetch: refetchStats } = useQuery({
     queryKey: ['stats'],
     queryFn: apiScans.getStats,
   });
+  */
 
   const { data: historyData, refetch: refetchHistory } = useQuery({
-    queryKey: ['history'],
-    queryFn: apiScans.getHistory,
+    queryKey: ['history', userId],
+    queryFn: () => userId ? apiScans.getHistory(userId) : Promise.resolve({ history: [] }),
+    enabled: !!userId,
   });
 
-  const stats = statsData?.stats || { totalScans: 0, threats: 0, safe: 0 };
+  // 2. Calculate Stats Dynamically: After fetching history
   const history = historyData?.history || [];
+  
+  const stats = {
+    totalScans: history.length,
+    // Safe: status is 'safe' or 'strong'
+    safe: history.filter((item: any) => item.status === "safe" || item.status === "strong").length,
+    // Threats: status is 'phishing', 'breached'
+    threats: history.filter((item: any) => item.status === "phishing" || item.status === "breached").length,
+  };
+
+  // 6. Debugging
+  console.log("history from API:", history);
+  console.log("stats:", stats);
 
   const refresh = useCallback(() => {
     setRefreshKey((k) => k + 1);
-    refetchStats();
+    // refetchStats(); // Removed
     refetchHistory();
-  }, [refetchStats, refetchHistory]);
+  }, [refetchHistory]);
 
   const goToLandingSection = (anchor: "home" | "features" | "contact") => {
     navigate(`/#${anchor}`);

@@ -16,6 +16,10 @@ const statusConfig: Record<string, { color: string; label: string }> = {
 };
 
 const ActivityHistory = ({ history }: ActivityHistoryProps) => {
+  // Debug: Log received history data
+  console.log('📋 ActivityHistory received:', history);
+  console.log('📋 History length:', history.length);
+  
   const formatTime = (date: Date) => {
     const diff = Date.now() - date.getTime();
     const mins = Math.floor(diff / 60000);
