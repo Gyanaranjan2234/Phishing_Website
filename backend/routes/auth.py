@@ -5,15 +5,92 @@ This file contains the /signup and /login API endpoints.
 Handles user registration and authentication logic.
 """
 
+import smtplib
+import os
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database.db import get_db
 from models.user_model import User
+from models.contact_model import ContactMessage
 from schemas.auth_schema import UserSignup, UserLogin, UserResponse, AuthResponse
+from schemas.contact_schema import ContactCreate, ContactResponse
 from utils.security import hash_password, verify_password
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Gmail configuration from .env
+GMAIL_SENDER = os.getenv("GMAIL_SENDER_EMAIL", "")
+GMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
+GMAIL_RECEIVER = os.getenv("GMAIL_RECEIVER_EMAIL", "support.apgs@gmail.com")
 
 # Create router for authentication endpoints
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+
+
+def send_email_notification(name: str, email: str, message: str):
+    """
+    Send a contact form notification email via Gmail SMTP.
+    Uses App Password for secure authentication.
+    """
+    try:
+        if not GMAIL_SENDER or not GMAIL_PASSWORD or GMAIL_PASSWORD == "your_16_char_app_password_here":
+            print("⚠️  Email not configured. Skipping email notification.")
+            return False
+
+        # Create email message
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"[APGS Contact] New message from {name}"
+        msg["From"] = GMAIL_SENDER
+        msg["To"] = GMAIL_RECEIVER
+
+        # HTML email body
+        html_body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; background: #0f1117; color: #e0e0e0; padding: 20px;">
+            <div style="max-width: 600px; margin: auto; background: #1a1d27; border-radius: 12px; border: 1px solid #00ff9c33; padding: 30px;">
+                <h2 style="color: #00ff9c; margin-bottom: 4px;">📩 New Contact Message</h2>
+                <p style="color: #aaa; font-size: 13px; margin-top: 0;">Received via APGS Contact Form</p>
+                <hr style="border-color: #00ff9c33; margin: 20px 0;" />
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <td style="padding: 8px; color: #aaa; width: 80px;"><strong>Name</strong></td>
+                        <td style="padding: 8px; color: #e0e0e0;">{name}</td>
+                    </tr>
+                    <tr style="background: #ffffff08;">
+                        <td style="padding: 8px; color: #aaa;"><strong>Email</strong></td>
+                        <td style="padding: 8px;"><a href="mailto:{email}" style="color: #00ff9c;">{email}</a></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; color: #aaa; vertical-align: top;"><strong>Message</strong></td>
+                        <td style="padding: 8px; color: #e0e0e0; white-space: pre-wrap;">{message}</td>
+                    </tr>
+                </table>
+                <hr style="border-color: #00ff9c33; margin: 20px 0;" />
+                <p style="color: #555; font-size: 12px;">This notification was sent by the APGS backend system.</p>
+            </div>
+        </body>
+        </html>
+        """
+
+        msg.attach(MIMEText(html_body, "html"))
+
+        # Connect to Gmail SMTP and send
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(GMAIL_SENDER, GMAIL_PASSWORD)
+            server.sendmail(GMAIL_SENDER, GMAIL_RECEIVER, msg.as_string())
+
+        print(f"✅ Email notification sent to {GMAIL_RECEIVER}")
+        return True
+
+    except Exception as e:
+        # Email failure should NOT break the form submission
+        print(f"⚠️  Email send failed (non-critical): {str(e)}")
+        return False
+
 
 
 @router.post("/signup", response_model=AuthResponse)
@@ -178,4 +255,41 @@ def login(user_data: UserLogin, db: Session = Depends(get_db)):
         return AuthResponse(
             status="error",
             message=f"Login failed: {str(e)}"
+        )
+
+
+@router.post("/contact/send", response_model=ContactResponse)
+def send_contact_message(contact_data: ContactCreate, db: Session = Depends(get_db)):
+    """
+    Receive a contact form message and save it to the database.
+    """
+    try:
+        # Create new database record
+        new_message = ContactMessage(
+            name=contact_data.name.strip(),
+            email=contact_data.email.strip(),
+            message=contact_data.message.strip()
+        )
+        
+        db.add(new_message)
+        db.commit()
+        db.refresh(new_message)
+
+        # Send email notification (non-blocking - failure won't break the response)
+        send_email_notification(
+            name=contact_data.name.strip(),
+            email=contact_data.email.strip(),
+            message=contact_data.message.strip()
+        )
+        
+        return ContactResponse(
+            status="success",
+            message="Your message has been received! We will get back to you soon."
+        )
+        
+    except Exception as e:
+        db.rollback()
+        return ContactResponse(
+            status="error",
+            message=f"Failed to send message: {str(e)}"
         )

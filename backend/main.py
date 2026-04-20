@@ -11,10 +11,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database.db import engine, Base
 from routes.auth import router as auth_router
-from routes.scans import router as scans_router  # ADDED: Scan history routes
+from routes.scans import router as scans_router
 
 # ============ Create Database Tables ============
-# This creates the 'users' and 'scan_history' tables if they don't exist
+# This creates the 'users', 'scan_history', and 'contact_messages' tables if they don't exist
 # Should be called before the app starts
 Base.metadata.create_all(bind=engine)
 

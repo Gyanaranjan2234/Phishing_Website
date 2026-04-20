@@ -2,8 +2,10 @@
 // Backend API integration - connects React frontend to FastAPI backend
 console.log("Using backend API");
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api/auth';
-const SCAN_API_URL = 'http://127.0.0.1:8000/api/scans';  // ADDED: Scan history API
+const BASE_URL = 'http://127.0.0.1:8000';
+const AUTH_API_URL = `${BASE_URL}/api/auth`;
+const SCAN_API_URL = `${BASE_URL}/api/scans`;
+const CONTACT_API_URL = `${BASE_URL}/api/contact`;
 
 /**
  * User Signup - sends request to backend
@@ -14,7 +16,7 @@ const SCAN_API_URL = 'http://127.0.0.1:8000/api/scans';  // ADDED: Scan history 
  */
 export const signup = async (email: string, username: string, password: string) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/signup`, {
+    const response = await fetch(`${AUTH_API_URL}/signup`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -42,7 +44,7 @@ export const signup = async (email: string, username: string, password: string) 
  */
 export const login = async (email: string, password: string) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/login`, {
+    const response = await fetch(`${AUTH_API_URL}/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -291,6 +293,31 @@ export const deleteScan = async (scanId: number, userId: number) => {
       message: 'Network error. Failed to delete scan.',
       data: null
     };
+  }
+};
+
+/**
+ * API for Contact Form
+ */
+export const apiContacts = {
+  sendMessage: async (data: { name: string; email: string; message: string }) => {
+    try {
+      console.log('📡 API: Sending contact message');
+      const response = await fetch(`${AUTH_API_URL}/contact/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const result = await response.json();
+      console.log('📡 API: Contact response:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Contact submission error:', error);
+      return {
+        status: 'error',
+        message: 'Network error. Failed to send message. Please try again later.'
+      };
+    }
   }
 };
 

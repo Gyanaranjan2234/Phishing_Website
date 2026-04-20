@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
-import { apiAuth, apiScans } from "@/lib/api-backend";  // FIXED: Using real backend
+import { apiAuth, apiScans, apiContacts } from "@/lib/api-backend";  // FIXED: Using real backend
 import { useScrollActiveSection } from "@/hooks/use-scroll-active-section";
 import UrlScanner from "@/components/dashboard/UrlScanner";
 import EmailBreachChecker from "@/components/dashboard/EmailBreachChecker";
@@ -88,6 +88,7 @@ const Index = () => {
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [contact, setContact] = useState({ name: "", email: "", message: "" });
   const [sent, setSent] = useState(false);
+  const [contactLoading, setContactLoading] = useState(false);
   
   // ============= STATS ANIMATION STATE =============
   const [displayedScans24h, setDisplayedScans24h] = useState(0);
@@ -268,12 +269,32 @@ const Index = () => {
     // refetchStats(); // Removed
   };
 
-  const handleContactSubmit = (e: React.FormEvent) => {
+  const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSent(true);
-    toast.success("Thanks! Your message has been queued for support.");
-    setContact({ name: "", email: "", message: "" });
-    setTimeout(() => setSent(false), 2200);
+    
+    // Basic validation
+    if (!contact.name || !contact.email || !contact.message) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    setContactLoading(true);
+    try {
+      const response = await apiContacts.sendMessage(contact);
+      
+      if (response.status === "success") {
+        setSent(true);
+        toast.success(response.message || "Thanks! Your message has been received.");
+        setContact({ name: "", email: "", message: "" });
+        setTimeout(() => setSent(false), 3000);
+      } else {
+        toast.error(response.message || "Failed to send message. Please try again.");
+      }
+    } catch (error) {
+      toast.error("An unexpected error occurred. Please try again.");
+    } finally {
+      setContactLoading(false);
+    }
   };
 
   const scrollToSection = (sectionId: string) => {
@@ -726,8 +747,21 @@ const Index = () => {
                 rows={4}
                 required
               />
-              <Button type="submit" className="w-full rounded-lg py-2.5">
-                {sent ? "Message sent" : "Send Message"}
+              <Button 
+                type="submit" 
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-2.5 rounded-lg transition-all duration-300 shadow-[0_0_15px_rgba(0,255,156,0.2)] hover:shadow-[0_0_20px_rgba(0,255,156,0.4)] disabled:opacity-70"
+                disabled={contactLoading || sent}
+              >
+                {contactLoading ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Sending...
+                  </span>
+                ) : sent ? (
+                  "Message Received!"
+                ) : (
+                  "Send Message"
+                )}
               </Button>
             </form>
           </section>

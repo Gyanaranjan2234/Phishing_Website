@@ -159,16 +159,16 @@ const Dashboard = () => {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
-        <div className="animate-fade-in-up">
-          <h1 className="text-2xl md:text-3xl font-heading font-bold text-foreground">Security Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Monitor threats, analyze URLs, and check for breaches</p>
-        </div>
-
-        <StatsCards totalScans={stats.totalScans} threats={stats.threats} safe={stats.safe} />
-
-        {/* 2. Conditional Rendering: Only show Scanning Hub if userId exists */}
+        {/* 2. Conditional Rendering: Only show the FULL Scanning Hub if userId exists */}
         {userId && (
           <>
+            <div className="animate-fade-in-up">
+              <h1 className="text-2xl md:text-3xl font-heading font-bold text-foreground">Security Dashboard</h1>
+              <p className="text-muted-foreground mt-1">Monitor threats, analyze URLs, and check for breaches</p>
+            </div>
+
+            <StatsCards totalScans={stats.totalScans} threats={stats.threats} safe={stats.safe} />
+
             <div className="border border-border rounded-lg overflow-hidden bg-card/40 backdrop-blur-sm">
               <div className="grid grid-cols-3 text-center text-xs sm:text-sm font-semibold uppercase">
                 <button
