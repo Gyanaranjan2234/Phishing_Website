@@ -107,13 +107,27 @@ const Index = () => {
   });
 
   // ============= HISTORY DATA =============
-  const { data: historyData, refetch: refetchHistory } = useQuery({
+  const { data: historyList, refetch: refetchHistory } = useQuery({
     queryKey: ['history', userId],
-    queryFn: () => userId ? apiScans.getHistory(userId) : Promise.resolve({ history: [] }),
+    queryFn: async () => {
+      if (!userId) return [];
+      const res = await apiScans.getHistory(userId);
+      
+      const rawData = res.data || [];
+      // Transform raw backend data to frontend ScanHistoryItem format
+      const transformed = rawData.map((scan: any) => ({
+        id: scan.id.toString(),
+        type: (scan.scan_type || "url") as "url" | "file" | "email" | "password",
+        target: scan.target || "",
+        status: (scan.status || "safe") as "safe" | "phishing" | "breached" | "weak" | "medium" | "strong",
+        timestamp: scan.timestamp ? new Date(scan.timestamp) : new Date()
+      }));
+      
+      console.log("[Index] Transformed history:", transformed);
+      return transformed;
+    },
     enabled: !!isAuthenticated && !!userId,
   });
-
-  const historyList = historyData?.history || [];
 
   // Removed API Stats call as per request to calculate dynamically from history
   /*
@@ -883,7 +897,7 @@ const Index = () => {
 
           {/* Activity History */}
           {isAuthenticated ? (
-            <ActivityHistory history={historyList} />
+            <ActivityHistory history={historyList || []} />
           ) : (
             <div className="rounded-xl border border-border p-4 bg-card/60 text-sm text-muted-foreground">
               Log in to save activity and review history. Guest scans are still available but are not stored.

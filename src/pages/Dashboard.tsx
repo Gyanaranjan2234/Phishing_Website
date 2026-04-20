@@ -28,14 +28,14 @@ const Dashboard = () => {
         const { session } = await apiAuth.getSession();
         if (!session || !session.user) {
           setUserId(null);
-          navigate("/");
+          // navigate("/"); // 3. Removed auto-redirect as per request
           return;
         }
         setUserName(session.user.username || session.user.email || "");
         setUserId(Number(session.user.id));
       } catch (err) {
         setUserId(null);
-        navigate("/");
+        // navigate("/"); // 3. Removed auto-redirect as per request
       }
     };
     checkAuth();
@@ -61,28 +61,43 @@ const Dashboard = () => {
   });
   */
 
-  const { data: historyData, refetch: refetchHistory } = useQuery({
+  const { data: history, refetch: refetchHistory } = useQuery({
     queryKey: ['history', userId],
-    queryFn: () => userId ? apiScans.getHistory(userId) : Promise.resolve({ history: [] }),
+    queryFn: async () => {
+      if (!userId) return [];
+      const res = await apiScans.getHistory(userId, 50);
+      
+      const rawData = res.data || [];
+      // 2. Transform raw backend data to frontend ScanHistoryItem format
+      const transformed = rawData.map((scan: any) => ({
+        id: scan.id.toString(),
+        type: (scan.scan_type || "url") as "url" | "file" | "email" | "password",
+        target: scan.target || "",
+        status: (scan.status || "safe") as "safe" | "phishing" | "breached" | "weak" | "medium" | "strong",
+        timestamp: scan.timestamp ? new Date(scan.timestamp) : new Date()
+      }));
+      
+      console.log("Transformed history for Dashboard:", transformed);
+      return transformed;
+    },
     enabled: !!userId,
   });
 
   // 2. Calculate Stats Dynamically: After fetching history
-  const history = historyData?.history || [];
-  
+  // 'history' is now the array itself from useQuery
   const stats = {
-    totalScans: history.length,
+    totalScans: history?.length || 0,
     // Safe: status is 'safe' or 'strong'
-    safe: history.filter((item: any) => item.status === "safe" || item.status === "strong").length,
+    safe: (history || []).filter((item: any) => item.status === "safe" || item.status === "strong").length,
     // Threats: status is 'phishing', 'breached'
-    threats: history.filter((item: any) => item.status === "phishing" || item.status === "breached").length,
+    threats: (history || []).filter((item: any) => item.status === "phishing" || item.status === "breached").length,
   };
 
   // 6. Debugging
   console.log("history from API:", history);
   console.log("stats:", stats);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
     setRefreshKey((k) => k + 1);
     // refetchStats(); // Removed
     refetchHistory();
@@ -98,12 +113,12 @@ const Dashboard = () => {
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-shrink-0">
-            <img 
-              src="/apgs-logo.png" 
-              alt="APGS Logo" 
-              width="40" 
+            <img
+              src="/apgs-logo.png"
+              alt="APGS Logo"
+              width="40"
               height="40"
-              className="h-10 w-10 object-contain flex-shrink-0 transition-all duration-300 hover:drop-shadow-lg" 
+              className="h-10 w-10 object-contain flex-shrink-0 transition-all duration-300 hover:drop-shadow-lg"
               style={{ filter: 'drop-shadow(0 0 6px rgba(0, 255, 156, 0.2))' }}
             />
             <div className="flex flex-col">
@@ -151,61 +166,66 @@ const Dashboard = () => {
 
         <StatsCards totalScans={stats.totalScans} threats={stats.threats} safe={stats.safe} />
 
-        <div className="border border-border rounded-lg overflow-hidden bg-card/40 backdrop-blur-sm">
-          <div className="grid grid-cols-3 text-center text-xs sm:text-sm font-semibold uppercase">
-            <button
-              onClick={() => setActiveTab("url")}
-              className={`px-4 py-3 transition relative ${activeTab === "url" ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              <div className="inline-flex items-center justify-center gap-2">
-                <Globe className="w-4 h-4" />
-                URL
+        {/* 2. Conditional Rendering: Only show Scanning Hub if userId exists */}
+        {userId && (
+          <>
+            <div className="border border-border rounded-lg overflow-hidden bg-card/40 backdrop-blur-sm">
+              <div className="grid grid-cols-3 text-center text-xs sm:text-sm font-semibold uppercase">
+                <button
+                  onClick={() => setActiveTab("url")}
+                  className={`px-4 py-3 transition relative ${activeTab === "url" ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <div className="inline-flex items-center justify-center gap-2">
+                    <Globe className="w-4 h-4" />
+                    URL
+                  </div>
+                  <span className={`absolute left-0 right-0 bottom-0 h-0.5 transition-all duration-300 ${activeTab === "url" ? "bg-primary" : "bg-transparent"}`} />
+                </button>
+                <button
+                  onClick={() => setActiveTab("file")}
+                  className={`px-4 py-3 transition relative ${activeTab === "file" ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <div className="inline-flex items-center justify-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    File
+                  </div>
+                  <span className={`absolute left-0 right-0 bottom-0 h-0.5 transition-all duration-300 ${activeTab === "file" ? "bg-primary" : "bg-transparent"}`} />
+                </button>
+                <button
+                  onClick={() => setActiveTab("search")}
+                  className={`px-4 py-3 transition relative ${activeTab === "search" ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <div className="inline-flex items-center justify-center gap-2">
+                    <Search className="w-4 h-4" />
+                    Search
+                  </div>
+                  <span className={`absolute left-0 right-0 bottom-0 h-0.5 transition-all duration-300 ${activeTab === "search" ? "bg-primary" : "bg-transparent"}`} />
+                </button>
               </div>
-              <span className={`absolute left-0 right-0 bottom-0 h-0.5 transition-all duration-300 ${activeTab === "url" ? "bg-primary" : "bg-transparent"}`} />
-            </button>
-            <button
-              onClick={() => setActiveTab("file")}
-              className={`px-4 py-3 transition relative ${activeTab === "file" ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              <div className="inline-flex items-center justify-center gap-2">
-                <FileText className="w-4 h-4" />
-                File
-              </div>
-              <span className={`absolute left-0 right-0 bottom-0 h-0.5 transition-all duration-300 ${activeTab === "file" ? "bg-primary" : "bg-transparent"}`} />
-            </button>
-            <button
-              onClick={() => setActiveTab("search")}
-              className={`px-4 py-3 transition relative ${activeTab === "search" ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              <div className="inline-flex items-center justify-center gap-2">
-                <Search className="w-4 h-4" />
-                Search
-              </div>
-              <span className={`absolute left-0 right-0 bottom-0 h-0.5 transition-all duration-300 ${activeTab === "search" ? "bg-primary" : "bg-transparent"}`} />
-            </button>
-          </div>
-        </div>
+            </div>
 
-        {activeTab === "url" && (
-          <div className="pt-4">
-            <UrlScanner onScanComplete={refresh} isAuthenticated={true} />
-          </div>
+            {activeTab === "url" && (
+              <div className="pt-4">
+                <UrlScanner onScanComplete={refresh} isAuthenticated={true} />
+              </div>
+            )}
+
+            {activeTab === "file" && (
+              <div className="pt-4">
+                <FileScanner onScanComplete={refresh} />
+              </div>
+            )}
+
+            {activeTab === "search" && (
+              <div className="grid lg:grid-cols-2 gap-6 pt-4">
+                <EmailBreachChecker onScanComplete={refresh} />
+                <PasswordChecker onScanComplete={refresh} />
+              </div>
+            )}
+          </>
         )}
 
-        {activeTab === "file" && (
-          <div className="pt-4">
-            <FileScanner onScanComplete={refresh} />
-          </div>
-        )}
-
-        {activeTab === "search" && (
-          <div className="grid lg:grid-cols-2 gap-6 pt-4">
-            <EmailBreachChecker onScanComplete={refresh} />
-            <PasswordChecker onScanComplete={refresh} />
-          </div>
-        )}
-
-        <ActivityHistory history={history} />
+        <ActivityHistory history={history || []} />
       </main>
     </div>
   );

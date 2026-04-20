@@ -15,18 +15,25 @@ const statusConfig: Record<string, { color: string; label: string }> = {
   strong: { color: "text-primary", label: "Strong" },
 };
 
-const ActivityHistory = ({ history }: ActivityHistoryProps) => {
+  const ActivityHistory = ({ history }: ActivityHistoryProps) => {
+  // Safe default for mapping
+  const items = Array.isArray(history) ? history : [];
+  
   // Debug: Log received history data
   console.log('📋 ActivityHistory received:', history);
-  console.log('📋 History length:', history.length);
   
   const formatTime = (date: Date) => {
-    const diff = Date.now() - date.getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    return `${Math.floor(hrs / 24)}d ago`;
+    if (!date) return "Just now";
+    try {
+      const diff = Date.now() - date.getTime();
+      const mins = Math.floor(diff / 60000);
+      if (mins < 60) return `${mins}m ago`;
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24) return `${hrs}h ago`;
+      return `${Math.floor(hrs / 24)}d ago`;
+    } catch (e) {
+      return "Recently";
+    }
   };
 
   return (
@@ -34,11 +41,11 @@ const ActivityHistory = ({ history }: ActivityHistoryProps) => {
       <h2 className="font-heading font-semibold text-foreground mb-4 flex items-center gap-2">
         <Clock className="w-5 h-5 text-primary" /> Activity History
       </h2>
-      {history.length === 0 ? (
+      {items.length === 0 ? (
         <p className="text-muted-foreground text-sm text-center py-6">No scan history yet</p>
       ) : (
         <div className="space-y-2 max-h-72 overflow-y-auto scrollbar-thin">
-          {history.map((item) => {
+          {items.map((item) => {
             const Icon = typeIcons[item.type];
             const config = statusConfig[item.status] || statusConfig.safe;
             const isSafe = item.status === "safe" || item.status === "strong";
