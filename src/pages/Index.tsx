@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
-import { apiAuth, apiScans, apiContacts } from "@/lib/api-backend";  // FIXED: Using real backend
+import { apiAuth, apiScans, apiContacts, getPlatformStats } from "@/lib/api-backend";  // FIXED: Using real backend
 import { useScrollActiveSection } from "@/hooks/use-scroll-active-section";
 import UrlScanner from "@/components/dashboard/UrlScanner";
 import EmailBreachChecker from "@/components/dashboard/EmailBreachChecker";
@@ -91,8 +91,23 @@ const Index = () => {
   const [contactLoading, setContactLoading] = useState(false);
   
   // ============= STATS ANIMATION STATE =============
+  const [platformStats, setPlatformStats] = useState({ totalUsers: 0, totalScans: 0 });
   const [displayedScans24h, setDisplayedScans24h] = useState(0);
   const [displayedActiveUsers, setDisplayedActiveUsers] = useState(0);
+
+  // Fetch real global platform stats from backend
+  useEffect(() => {
+    const fetchStats = async () => {
+      const data = await getPlatformStats();
+      if (data) {
+        setPlatformStats({
+          totalUsers: data.total_users || 0,
+          totalScans: data.total_scans || 0
+        });
+      }
+    };
+    fetchStats();
+  }, []);
 
   // ============= SCAN STATE - PRESERVED ACROSS TAB SWITCHES =============
   const [urlScanData, setUrlScanData] = useState({ input: "", result: null as any });
@@ -221,19 +236,21 @@ const Index = () => {
 
   // ============= EFFECTS: COUNT-UP ANIMATION FOR STATS SECTION =============
   useEffect(() => {
+    if (platformStats.totalUsers === 0 && platformStats.totalScans === 0) return;
+
     let scansRaf = 0, usersRaf = 0;
     const start = Date.now();
     const duration = 1500;
     
     const animateScans = () => {
       const progress = Math.min(1, (Date.now() - start) / duration);
-      setDisplayedScans24h(Math.floor(progress * 1240));
+      setDisplayedScans24h(Math.floor(progress * platformStats.totalScans));
       if (progress < 1) scansRaf = requestAnimationFrame(animateScans);
     };
     
     const animateUsers = () => {
       const progress = Math.min(1, (Date.now() - start) / duration);
-      setDisplayedActiveUsers(Math.floor(progress * 8500));
+      setDisplayedActiveUsers(Math.floor(progress * platformStats.totalUsers));
       if (progress < 1) usersRaf = requestAnimationFrame(animateUsers);
     };
     
@@ -244,7 +261,7 @@ const Index = () => {
       cancelAnimationFrame(scansRaf);
       cancelAnimationFrame(usersRaf);
     };
-  }, [currentView]);
+  }, [currentView, platformStats]);
 
   // ============= EFFECTS: BACK TO TOP =============
   useEffect(() => {
@@ -650,25 +667,25 @@ const Index = () => {
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-                {/* Scans in Last 24 Hours */}
+                {/* Total Scans */}
                 <div className="flex flex-col items-center justify-center space-y-3 group">
                   <div className="text-4xl md:text-5xl font-heading font-bold text-primary transition-transform group-hover:scale-110">
                     {displayedScans24h.toLocaleString()}
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <span className="text-2xl">🔍</span>
-                    <p className="text-sm md:text-base font-medium">Scans in Last 24 Hours</p>
+                    <p className="text-sm md:text-base font-medium">Total Scans</p>
                   </div>
                 </div>
                 
-                {/* Active Users */}
+                {/* Total Users */}
                 <div className="flex flex-col items-center justify-center space-y-3 group">
                   <div className="text-4xl md:text-5xl font-heading font-bold text-cyan-400 transition-transform group-hover:scale-110">
                     {displayedActiveUsers.toLocaleString()}
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <span className="text-2xl">👥</span>
-                    <p className="text-sm md:text-base font-medium">Active Users</p>
+                    <p className="text-sm md:text-base font-medium">Total Users</p>
                   </div>
                 </div>
                 

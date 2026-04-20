@@ -7,9 +7,12 @@ It sets up the app, includes routes, and handles CORS.
 Run this file with: uvicorn main:app --reload
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from database.db import engine, Base
+from database.db import engine, Base, get_db
+from sqlalchemy.orm import Session
+from models.user_model import User
+from models.scan_model import ScanHistory
 from routes.auth import router as auth_router
 from routes.scans import router as scans_router
 
@@ -58,6 +61,21 @@ def read_root():
         "status": "success",
         "message": "APGS Authentication API is running",
         "docs": "Visit http://localhost:8000/docs for API documentation"
+    }
+
+# ============ Global Stats Endpoint ============
+@app.get("/api/stats")
+def get_platform_stats(db: Session = Depends(get_db)):
+    """
+    Public endpoint to get global platform statistics.
+    Returns the total number of users and total number of scans.
+    """
+    total_users = db.query(User).count()
+    total_scans = db.query(ScanHistory).count()
+    
+    return {
+        "total_users": total_users,
+        "total_scans": total_scans
     }
 
 

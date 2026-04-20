@@ -8,6 +8,20 @@ const SCAN_API_URL = `${BASE_URL}/api/scans`;
 const CONTACT_API_URL = `${BASE_URL}/api/contact`;
 
 /**
+ * Get global platform statistics
+ * Returns total registered users and total performed scans
+ */
+export const getPlatformStats = async () => {
+  try {
+    const response = await fetch(`${BASE_URL}/api/stats`);
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching platform stats:', error);
+    return { total_users: 0, total_scans: 0 };
+  }
+};
+
+/**
  * User Signup - sends request to backend
  * @param email - User's email
  * @param username - User's chosen username  
