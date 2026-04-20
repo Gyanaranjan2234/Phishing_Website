@@ -164,14 +164,16 @@ const Login = () => {
 
     setLoading(true);
     try {
-      // PHP API doesn't have an email reset configured yet, mock it for now.
-      setTimeout(() => {
+      const data = await apiAuth.forgotPassword(forgotEmail);
+      if (data.status === 'success') {
         setResetSent(true);
         toast.success("Password reset email sent!");
-        setLoading(false);
-      }, 1000);
+      } else {
+        toast.error(data.message || "An error occurred");
+      }
     } catch (err: any) {
       toast.error(err.message || "An error occurred");
+    } finally {
       setLoading(false);
     }
   };

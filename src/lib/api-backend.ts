@@ -179,6 +179,43 @@ export const deleteAccount = async (data: { password: string }) => {
   return { success: true };
 };
 
+/**
+ * Forgot password
+ * @param email User's email to send reset link to
+ */
+export const forgotPassword = async (email: string) => {
+  try {
+    const response = await fetch(`${AUTH_API_URL}/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    return { status: 'error', message: 'Network error. Please try again later.' };
+  }
+};
+
+/**
+ * Reset password
+ * @param token Secure token from email link
+ * @param new_password New password
+ */
+export const resetPassword = async (token: string, new_password: string) => {
+  try {
+    const response = await fetch(`${AUTH_API_URL}/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, new_password }),
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Reset password error:', error);
+    return { status: 'error', message: 'Network error. Please try again later.' };
+  }
+};
+
 // Export as apiAuth object for compatibility with existing code
 export const apiAuth = {
   signup,
@@ -188,6 +225,8 @@ export const apiAuth = {
   updateProfile,
   updatePassword,
   deleteAccount,
+  forgotPassword,
+  resetPassword,
 };
 
 // ============ SCAN HISTORY API FUNCTIONS ============

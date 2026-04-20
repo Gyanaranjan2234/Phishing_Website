@@ -33,6 +33,23 @@ class UserLogin(BaseModel):
     password: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    """
+    Schema for forgot password requests.
+    Validates that a correctly formatted email is provided.
+    """
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """
+    Schema for reset password requests.
+    Validates token and new password format.
+    """
+    token: str
+    new_password: str
+
+
 # ============ Response Schemas ============
 
 class UserResponse(BaseModel):

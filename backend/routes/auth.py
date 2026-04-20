@@ -7,6 +7,8 @@ Handles user registration and authentication logic.
 
 import smtplib
 import os
+import secrets
+from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
@@ -15,7 +17,8 @@ from sqlalchemy.orm import Session
 from database.db import get_db
 from models.user_model import User
 from models.contact_model import ContactMessage
-from schemas.auth_schema import UserSignup, UserLogin, UserResponse, AuthResponse
+from models.token_model import PasswordResetToken
+from schemas.auth_schema import UserSignup, UserLogin, UserResponse, AuthResponse, ForgotPasswordRequest, ResetPasswordRequest
 from schemas.contact_schema import ContactCreate, ContactResponse
 from utils.security import hash_password, verify_password
 
@@ -292,4 +295,129 @@ def send_contact_message(contact_data: ContactCreate, db: Session = Depends(get_
         return ContactResponse(
             status="error",
             message=f"Failed to send message: {str(e)}"
+        )
+
+
+def send_password_reset_email(email: str, reset_link: str):
+    """
+    Send a beautifully formatted password reset email.
+    """
+    try:
+        if not GMAIL_SENDER or not GMAIL_PASSWORD or GMAIL_PASSWORD == "your_16_char_app_password_here":
+            print("⚠️ Email not configured. Skipping reset email notification.")
+            return False
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = "APGS - Password Reset Request"
+        msg["From"] = f"APGS Support <{GMAIL_SENDER}>"
+        msg["To"] = email
+
+        html_body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; background: #0f1117; color: #e0e0e0; padding: 20px;">
+            <div style="max-width: 600px; margin: auto; background: #1a1d27; border-radius: 12px; border: 1px solid #00ff9c33; padding: 30px;">
+                <h2 style="color: #00ff9c; margin-bottom: 20px; text-align: center;">Lock Verified</h2>
+                <p>Hello,</p>
+                <p>We received a request to reset your password for your Advanced Phishing Guard System account.</p>
+                <p style="text-align: center; margin: 30px 0;">
+                    <a href="{reset_link}" style="background-color: #00ff9c; color: #000; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Reset Password</a>
+                </p>
+                <p>If you didn't request a password reset, you can safely ignore this email.</p>
+                <p style="color: #555; font-size: 12px; margin-top: 30px;">This link will expire in 15 minutes.</p>
+            </div>
+        </body>
+        </html>
+        """
+
+        msg.attach(MIMEText(html_body, "html"))
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(GMAIL_SENDER, GMAIL_PASSWORD)
+            server.sendmail(GMAIL_SENDER, email, msg.as_string())
+
+        print(f"✅ Password reset email sent to {email}")
+        return True
+    except Exception as e:
+        print(f"⚠️ Failed to send reset email: {str(e)}")
+        return False
+
+
+@router.post("/forgot-password", response_model=AuthResponse)
+def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Generates a secure password reset token and sends an email.
+    """
+    try:
+        user = db.query(User).filter(User.email == request.email).first()
+        
+        # We don't reveal if user exists to prevent email enumeration
+        if user:
+            # Delete any existing tokens for this user
+            db.query(PasswordResetToken).filter(PasswordResetToken.user_id == user.id).delete()
+            
+            # Generate secure token
+            token = secrets.token_urlsafe(32)
+            expires_at = datetime.utcnow() + timedelta(minutes=15)
+            
+            new_token = PasswordResetToken(user_id=user.id, token=token, expires_at=expires_at)
+            db.add(new_token)
+            db.commit()
+            
+            # Construct link using frontend URL port
+            FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8080")
+            reset_link = f"{FRONTEND_URL}/reset-password?token={token}"
+            
+            # Dispatch email
+            send_password_reset_email(user.email, reset_link)
+
+        return AuthResponse(
+            status="success",
+            message="If an account exists with that email, a reset link was sent."
+        )
+        
+    except Exception as e:
+        db.rollback()
+        return AuthResponse(
+            status="error",
+            message="An internal error occurred."
+        )
+
+
+@router.post("/reset-password", response_model=AuthResponse)
+def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Verifies the reset token and updates the user's password.
+    """
+    try:
+        # Find active token
+        token_record = db.query(PasswordResetToken).filter(PasswordResetToken.token == request.token).first()
+        
+        if not token_record or token_record.expires_at < datetime.utcnow():
+            return AuthResponse(
+                status="error",
+                message="Invalid or expired reset token."
+            )
+            
+        user = db.query(User).filter(User.id == token_record.user_id).first()
+        if not user:
+            return AuthResponse(status="error", message="User not found.")
+            
+        # Update user's password
+        user.hashed_password = hash_password(request.new_password)
+        db.add(user)
+        
+        # Delete used token
+        db.delete(token_record)
+        db.commit()
+        
+        return AuthResponse(
+            status="success",
+            message="Your password has been successfully reset."
+        )
+        
+    except Exception as e:
+        db.rollback()
+        return AuthResponse(
+            status="error",
+            message="Failed to reset password."
         )

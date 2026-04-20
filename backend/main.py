@@ -13,6 +13,7 @@ from database.db import engine, Base, get_db
 from sqlalchemy.orm import Session
 from models.user_model import User
 from models.scan_model import ScanHistory
+from models.token_model import PasswordResetToken
 from routes.auth import router as auth_router
 from routes.scans import router as scans_router
 
