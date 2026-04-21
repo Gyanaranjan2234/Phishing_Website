@@ -7,6 +7,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { apiAuth, apiScans, apiContacts, getPlatformStats } from "@/lib/api-backend";  // FIXED: Using real backend
+import { getGuestScanCount } from "@/lib/guestAccess";
 import { useScrollActiveSection } from "@/hooks/use-scroll-active-section";
 import UrlScanner from "@/components/dashboard/UrlScanner";
 import EmailBreachChecker from "@/components/dashboard/EmailBreachChecker";
@@ -67,6 +68,20 @@ const Index = () => {
   const [authLoading, setAuthLoading] = useState(true);
   const [userName, setUserName] = useState<string>("");
   const [userId, setUserId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const storedUserId = localStorage.getItem("user_id");
+    if (storedUserId) {
+      setUserId(Number(storedUserId));
+    }
+  }, []);
+  const [guestScanCount, setGuestScanCount] = useState<number>(() => {
+    try {
+      return getGuestScanCount();
+    } catch {
+      return 0;
+    }
+  });
 
   // ============= VIEW MANAGEMENT =============
   // Single source of truth for current view - NO ROUTING
@@ -283,6 +298,7 @@ const Index = () => {
   // const refreshStats = () => refetchStats(); // Removed as stats are now dynamic
   const refreshHistory = () => {
     refetchHistory();
+    setGuestScanCount(getGuestScanCount());
     // refetchStats(); // Removed
   };
 
@@ -793,165 +809,155 @@ const Index = () => {
       >
         {currentView === "scanning" && console.log("[DEBUG] Rendering scanning view, scanActiveTab is:", scanActiveTab)}
         <main className="max-w-6xl mx-auto px-4 py-10 space-y-8">
-          {/* Login CTA - Only show when not authenticated */}
-          {!isAuthenticated && (
-            <section className="bg-gradient-to-r from-primary/20 to-primary/10 rounded-xl border border-primary/40 p-6 shadow-lg transition-all duration-300">
-              <div className="flex items-center justify-between gap-4 flex-col sm:flex-row">
+          {userId ? (
+            <>
+              {/* Scanning Hub - Stats Dashboard */}
+              <section className="space-y-4">
                 <div>
-                  <h2 className="text-xl font-heading font-bold text-primary mb-1">Save Your Scan History</h2>
-                  <p className="text-muted-foreground text-sm">Sign in to automatically save all scan results and track security threats over time.</p>
+                  <h1 className="text-3xl font-heading font-bold mb-1">Scanning Hub</h1>
+                  <p className="text-sm text-muted-foreground">
+                    Your scan history is automatically saved.
+                  </p>
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  <Button onClick={() => navigate("/login")} className="gap-2 hover:shadow-[0_0_16px_hsl(150_100%_45%/0.3)] transition-shadow">
-                    <LogIn className="w-4 h-4" />
-                    <span>Login</span>
-                  </Button>
-                  <Button onClick={() => navigate("/login?view=signup")} variant="outline" className="gap-2 border-border hover:bg-card/70 transition">
-                    <span>Sign Up</span>
-                  </Button>
-                </div>
-              </div>
-            </section>
-          )}
+                
+                {/* Stats Dashboard Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Safe Scans Card */}
+                  <div className="relative overflow-hidden rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-emerald-500/20 backdrop-blur-sm">
+                    <div className="relative z-10 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-2xl">✔</span>
+                      </div>
+                      <div>
+                        <p className="text-3xl font-heading font-bold text-foreground">{stats.safe}</p>
+                        <p className="text-xs text-muted-foreground font-medium mt-1">Safe Scans</p>
+                      </div>
+                    </div>
+                  </div>
 
-          {/* Scanning Hub - Stats Dashboard */}
-          <section className="space-y-4">
-            <div>
-              <h1 className="text-3xl font-heading font-bold mb-1">Scanning Hub</h1>
-              <p className="text-sm text-muted-foreground">
-                {isAuthenticated ? "Your scan history is automatically saved." : "Guest mode works without login. Sign in to save history and view results."}
-              </p>
-            </div>
-            
-            {/* Stats Dashboard Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Safe Scans Card */}
-              <div className="relative overflow-hidden rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-emerald-500/20 backdrop-blur-sm">
-                <div className="relative z-10 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl">✔</span>
+                  {/* Suspicious Card */}
+                  <div className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-amber-500/20 backdrop-blur-sm">
+                    <div className="relative z-10 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-2xl">⚠</span>
+                      </div>
+                      <div>
+                        <p className="text-3xl font-heading font-bold text-foreground">{Math.max(0, stats.totalScans - stats.safe - stats.threats)}</p>
+                        <p className="text-xs text-muted-foreground font-medium mt-1">Suspicious</p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-3xl font-heading font-bold text-foreground">{stats.safe}</p>
-                    <p className="text-xs text-muted-foreground font-medium mt-1">Safe Scans</p>
-                  </div>
-                </div>
-              </div>
 
-              {/* Suspicious Card */}
-              <div className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-amber-500/20 backdrop-blur-sm">
-                <div className="relative z-10 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl">⚠</span>
+                  {/* Threats Found Card */}
+                  <div className="relative overflow-hidden rounded-xl border border-red-500/30 bg-red-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-red-500/20 backdrop-blur-sm">
+                    <div className="relative z-10 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-2xl">❌</span>
+                      </div>
+                      <div>
+                        <p className="text-3xl font-heading font-bold text-foreground">{stats.threats}</p>
+                        <p className="text-xs text-muted-foreground font-medium mt-1">Threats Found</p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-3xl font-heading font-bold text-foreground">{Math.max(0, stats.totalScans - stats.safe - stats.threats)}</p>
-                    <p className="text-xs text-muted-foreground font-medium mt-1">Suspicious</p>
-                  </div>
-                </div>
-              </div>
 
-              {/* Threats Found Card */}
-              <div className="relative overflow-hidden rounded-xl border border-red-500/30 bg-red-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-red-500/20 backdrop-blur-sm">
-                <div className="relative z-10 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl">❌</span>
-                  </div>
-                  <div>
-                    <p className="text-3xl font-heading font-bold text-foreground">{stats.threats}</p>
-                    <p className="text-xs text-muted-foreground font-medium mt-1">Threats Found</p>
+                  {/* Total Scans Card */}
+                  <div className="relative overflow-hidden rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-cyan-500/20 backdrop-blur-sm">
+                    <div className="relative z-10 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-2xl">📊</span>
+                      </div>
+                      <div>
+                        <p className="text-3xl font-heading font-bold text-foreground">{stats.totalScans}</p>
+                        <p className="text-xs text-muted-foreground font-medium mt-1">Total Scans</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </section>
 
-              {/* Total Scans Card */}
-              <div className="relative overflow-hidden rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-cyan-500/20 backdrop-blur-sm">
-                <div className="relative z-10 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl">📊</span>
-                  </div>
-                  <div>
-                    <p className="text-3xl font-heading font-bold text-foreground">{stats.totalScans}</p>
-                    <p className="text-xs text-muted-foreground font-medium mt-1">Total Scans</p>
-                  </div>
+              {/* Tab Selection */}
+              <section className="border border-border rounded-xl bg-card/70 p-4 transition-all duration-300">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: "url", label: "URL Scan", icon: Globe },
+                    { id: "email", label: "Email Check", icon: Mail },
+                    { id: "file", label: "File Analysis", icon: FileText },
+                    { id: "password", label: "Password Check", icon: Lock },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setScanActiveTab(tab.id as "url" | "email" | "file" | "password")}
+                      className={`py-2 px-3 rounded-lg border transition-all duration-200 ${
+                        scanActiveTab === tab.id
+                          ? "border-primary text-primary bg-primary/10 shadow-[0_0_8px_hsl(150_100%_45%_/_0.2)]"
+                          : "border-border text-muted-foreground hover:border-primary/70"
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-2 text-sm font-medium">
+                        <tab.icon className="w-4 h-4" />
+                        {tab.label}
+                      </div>
+                    </button>
+                  ))}
                 </div>
-              </div>
-            </div>
-          </section>
+              </section>
 
-          {/* Tab Selection */}
-          <section className="border border-border rounded-xl bg-card/70 p-4 transition-all duration-300">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {[
-                { id: "url", label: "URL Scan", icon: Globe },
-                { id: "email", label: "Email Check", icon: Mail },
-                { id: "file", label: "File Analysis", icon: FileText },
-                { id: "password", label: "Password Check", icon: Lock },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setScanActiveTab(tab.id as "url" | "email" | "file" | "password")}
-                  className={`py-2 px-3 rounded-lg border transition-all duration-200 ${
-                    scanActiveTab === tab.id
-                      ? "border-primary text-primary bg-primary/10 shadow-[0_0_8px_hsl(150_100%_45%_/_0.2)]"
-                      : "border-border text-muted-foreground hover:border-primary/70"
-                  }`}
-                >
-                  <div className="flex items-center justify-center gap-2 text-sm font-medium">
-                    <tab.icon className="w-4 h-4" />
-                    {tab.label}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </section>
+              {/* Scanner Content - ALL RENDERED, TOGGLED BY CSS */}
+              <section className="space-y-4 transition-all duration-300">
+                {scanActiveTab === "url" && (
+                  <UrlScanner
+                    onScanComplete={refreshHistory}
+                    isAuthenticated={!!isAuthenticated}
+                    userName={userName}
+                    scanData={urlScanData}
+                    setScanData={setUrlScanData}
+                  />
+                )}
+                {scanActiveTab === "email" && (
+                  <EmailBreachChecker
+                    onScanComplete={refreshHistory}
+                    isAuthenticated={!!isAuthenticated}
+                    userName={userName}
+                    scanData={emailScanData}
+                    setScanData={setEmailScanData}
+                  />
+                )}
+                {scanActiveTab === "file" && (
+                  <FileScanner
+                    onScanComplete={refreshHistory}
+                    isAuthenticated={!!isAuthenticated}
+                    userName={userName}
+                    scanData={fileScanData}
+                    setScanData={setFileScanData}
+                  />
+                )}
+                {scanActiveTab === "password" && (
+                  <PasswordChecker
+                    onScanComplete={refreshHistory}
+                    isAuthenticated={!!isAuthenticated}
+                    userName={userName}
+                    scanData={passwordScanData}
+                    setScanData={setPasswordScanData}
+                  />
+                )}
+              </section>
 
-          {/* Scanner Content - ALL RENDERED, TOGGLED BY CSS */}
-          <section className="space-y-4 transition-all duration-300">
-            {scanActiveTab === "url" && (
-              <UrlScanner
-                onScanComplete={refreshHistory}
-                isAuthenticated={!!isAuthenticated}
-                userName={userName}
-                scanData={urlScanData}
-                setScanData={setUrlScanData}
-              />
-            )}
-            {scanActiveTab === "email" && (
-              <EmailBreachChecker
-                onScanComplete={refreshHistory}
-                isAuthenticated={!!isAuthenticated}
-                userName={userName}
-                scanData={emailScanData}
-                setScanData={setEmailScanData}
-              />
-            )}
-            {scanActiveTab === "file" && (
-              <FileScanner
-                onScanComplete={refreshHistory}
-                isAuthenticated={!!isAuthenticated}
-                userName={userName}
-                scanData={fileScanData}
-                setScanData={setFileScanData}
-              />
-            )}
-            {scanActiveTab === "password" && (
-              <PasswordChecker
-                onScanComplete={refreshHistory}
-                isAuthenticated={!!isAuthenticated}
-                userName={userName}
-                scanData={passwordScanData}
-                setScanData={setPasswordScanData}
-              />
-            )}
-          </section>
-
-          {/* Activity History */}
-          {isAuthenticated ? (
-            <ActivityHistory history={historyList || []} />
+              {/* Activity History */}
+              <ActivityHistory history={historyList || []} />
+            </>
           ) : (
-            <div className="rounded-xl border border-border p-4 bg-card/60 text-sm text-muted-foreground">
-              Log in to save activity and review history. Guest scans are still available but are not stored.
+            <div className="text-center py-20 space-y-6">
+              <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Lock className="w-10 h-10 text-primary" />
+              </div>
+              <h2 className="text-3xl font-heading font-bold text-foreground">Scanning Hub Restricted</h2>
+              <p className="text-muted-foreground text-lg max-w-lg mx-auto">
+                Please log in to access the Advanced Phishing Guard System scanning features and protect your digital assets.
+              </p>
+              <Button onClick={() => navigate("/login")} className="px-8 py-3 text-lg bg-primary hover:bg-primary/90">
+                Login to Access
+              </Button>
             </div>
           )}
         </main>
