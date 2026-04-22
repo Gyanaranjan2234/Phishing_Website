@@ -102,33 +102,28 @@ const Dashboard = () => {
 
   const queryClient = useQueryClient();
   const refresh = useCallback(async () => {
-    console.log("🔄 Dashboard: Triggering manual refresh of stats and history...");
-    
-    // 1. Instant UI update: Clear caches immediately
-    queryClient.setQueryData(['history', userId], []);
-    queryClient.setQueryData(['stats', userId], { data: { totalScans: 0, safeScans: 0, threatScans: 0 } });
-    
-    // 2. Invalidate queries to force fresh fetch from backend
-    await queryClient.invalidateQueries({ queryKey: ['history', userId] });
-    await queryClient.invalidateQueries({ queryKey: ['stats', userId] });
-    
-    setRefreshKey((k) => k + 1);
+    console.log("🔄 Dashboard: Refreshing history and stats after clear...");
     
     try {
-      // 3. Perform manual refetch to be 100% sure
+      // 1. Instant UI update: Clear caches immediately
+      queryClient.setQueryData(['history', userId], []);
+      queryClient.setQueryData(['stats', userId], { data: { totalScans: 0, safeScans: 0, threatScans: 0 } });
+      
+      // 2. Invalidate queries to force fresh fetch from backend
+      await queryClient.invalidateQueries({ queryKey: ['history', userId] });
+      await queryClient.invalidateQueries({ queryKey: ['stats', userId] });
+      
+      // 3. Perform manual refetch to ensure data is reloaded
       await Promise.all([
         refetchStats(),
         refetchHistory()
       ]);
       
-      // 4. Hard refresh as requested by user to ensure absolute synchronization
-      console.log("🚀 Dashboard: Performing automatic page refresh...");
-      setTimeout(() => {
-        window.location.reload();
-      }, 800); 
+      console.log("✅ Dashboard: History and stats refreshed successfully");
       
     } catch (err) {
       console.error("Refresh error:", err);
+      // Only reload on error as fallback
       window.location.reload(); 
     }
   }, [refetchHistory, refetchStats, queryClient, userId]);

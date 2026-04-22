@@ -267,7 +267,11 @@ const Scanning = () => {
         </section>
 
         {isAuthenticated && userId ? (
-          <ActivityHistory history={history} />
+          <ActivityHistory 
+            history={history} 
+            onHistoryChange={refreshHistory}
+            userId={Number(userId)}
+          />
         ) : (
           <div className="rounded-xl border border-border p-4 bg-card/60 text-sm text-muted-foreground">
             <p className="font-medium mb-1">🔒 Login to View Scan History</p>

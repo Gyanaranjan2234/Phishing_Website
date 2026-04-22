@@ -98,7 +98,7 @@ const Index = () => {
   const [scanActiveTab, setScanActiveTab] = useState<"url" | "email" | "file" | "password">("url");
 
   // ============= HOME PAGE STATE =============
-  const [stats, setStats] = useState({ totalScans: 0, threats: 0, safe: 0, activeUsers: 0 });
+  const [stats, setStats] = useState({ totalScans: 0, threats: 0, safe: 0, activeUsers: 0, suspicious: 0 });
   const [featureLoading, setFeatureLoading] = useState<string | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [contact, setContact] = useState({ name: "", email: "", message: "" });
@@ -944,7 +944,11 @@ const Index = () => {
               </section>
 
               {/* Activity History */}
-              <ActivityHistory history={historyList || []} />
+              <ActivityHistory 
+                history={historyList || []} 
+                onHistoryChange={refreshHistory}
+                userId={userId}
+              />
             </>
           ) : (
             <div className="text-center py-20 space-y-6">

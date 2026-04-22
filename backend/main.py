@@ -71,8 +71,13 @@ def get_platform_stats(db: Session = Depends(get_db)):
     Public endpoint to get global platform statistics.
     Returns the total number of users and total number of scans.
     """
+    from models.scan_stats_model import ScanStats
+    
     total_users = db.query(User).count()
-    total_scans = db.query(ScanHistory).count()
+    
+    # Get global scan counter (NEVER decreases)
+    stats_record = db.query(ScanStats).filter(ScanStats.id == 1).first()
+    total_scans = stats_record.total_scans if stats_record else db.query(ScanHistory).count()
     
     return {
         "total_users": total_users,

@@ -15,10 +15,12 @@ import confetti from "canvas-confetti"; // Import confetti
 
 
 
-// --- ZXCVBN-BASED STRENGTH + CRACK TIME ANALYSIS ---
-// Uses offline_slow_hashing_1e4_per_second = 10,000 guesses/sec
-// This matches Bitwarden's approach: realistic bcrypt/scrypt offline cracking.
-// Score map: 0=Very Weak, 1=Weak, 2=Medium, 3=Strong, 4=Very Strong
+/**
+ * ZXCVBN-BASED STRENGTH + CRACK TIME ANALYSIS
+ * Uses offline_slow_hashing_1e4_per_second = 10,000 guesses/sec
+ * This matches Bitwarden's approach: realistic bcrypt/scrypt offline cracking.
+ * Score map: 0=Very Weak, 1=Weak, 2=Medium, 3=Strong, 4=Very Strong
+ */
 const analyzeWithZxcvbn = (password: string) => {
   const res = zxcvbn(password);
 
@@ -39,12 +41,90 @@ const analyzeWithZxcvbn = (password: string) => {
   // This is what Bitwarden uses — gives more realistic human-readable times.
   const crackTime = res.crack_times_display.offline_slow_hashing_1e4_per_second as string;
 
-  // Feedback: combine warning + suggestions from zxcvbn (no manual overrides)
-  const feedbackItems: string[] = [];
-  if (res.feedback.warning) feedbackItems.push(res.feedback.warning);
-  res.feedback.suggestions.forEach((s) => feedbackItems.push(s));
+  return { 
+    score: scorePercent, 
+    zxcvbnScore: res.score, 
+    strength, 
+    crackTime, 
+    feedback: res.feedback,
+    raw: res
+  };
+};
 
-  return { score: scorePercent, zxcvbnScore: res.score, strength, crackTime, suggestions: feedbackItems };
+/**
+ * Generate dynamic password improvement suggestions based on actual password analysis.
+ * Analyzes: length, character types, common patterns, and overall strength.
+ * Returns an array of actionable suggestions (empty if password is already strong).
+ */
+const generateDynamicSuggestions = (password: string, zxcvbnResult: any): string[] => {
+  const suggestions: string[] = [];
+  const hasLower = /[a-z]/.test(password);
+  const hasUpper = /[A-Z]/.test(password);
+  const hasDigit = /[0-9]/.test(password);
+  const hasSymbol = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password);
+  const length = password.length;
+
+  // Length-based suggestions
+  if (length < 8) {
+    suggestions.push("Add at least 8 characters for minimum security");
+  } else if (length < 12) {
+    suggestions.push("Consider using 12+ characters for stronger protection");
+  } else if (length < 16) {
+    suggestions.push("For maximum security, use 16+ characters");
+  }
+
+  // Character variety suggestions
+  if (!hasUpper) {
+    suggestions.push("Add uppercase letters (A-Z)");
+  }
+  if (!hasLower) {
+    suggestions.push("Add lowercase letters (a-z)");
+  }
+  if (!hasDigit) {
+    suggestions.push("Include numbers (0-9) for complexity");
+  }
+  if (!hasSymbol) {
+    suggestions.push("Add special characters (!@#$%^&*) to boost strength");
+  }
+
+  // Common pattern detection
+  const commonPatterns = [
+    /123|abc|qwerty|password|admin|letmein|welcome|monkey|dragon|master/i,
+    /(.)\1{2,}/, // Repeated characters (aaa, 111)
+    /(012|123|234|345|456|567|678|789|abc|bcd|cde|def)/i, // Sequences
+  ];
+  
+  if (commonPatterns.some(pattern => pattern.test(password))) {
+    suggestions.push("Avoid common patterns and sequences (123, abc, qwerty)");
+  }
+
+  // Personal info patterns (basic detection)
+  const yearPattern = /(19|20)\d{2}/;
+  if (yearPattern.test(password)) {
+    suggestions.push("Remove years or dates - they're easy to guess");
+  }
+
+  // Keyboard patterns
+  const keyboardPatterns = [/qwerty|asdf|zxcv|qazwsx/i];
+  if (keyboardPatterns.some(pattern => pattern.test(password))) {
+    suggestions.push("Avoid keyboard patterns (qwerty, asdf)");
+  }
+
+  // zxcvbn-based suggestions (if score < 4)
+  if (zxcvbnResult.score < 4 && zxcvbnResult.feedback?.suggestions) {
+    zxcvbnResult.feedback.suggestions.forEach((s: string) => {
+      if (!suggestions.includes(s)) {
+        suggestions.push(s);
+      }
+    });
+  }
+
+  // Breach-related suggestion
+  if (zxcvbnResult.breached) {
+    suggestions.unshift("⚠️ This password was found in breaches - change immediately");
+  }
+
+  return suggestions;
 };
 
 
@@ -311,16 +391,24 @@ const PasswordChecker = ({ onScanComplete, isAuthenticated = false, scanData, se
       // Single zxcvbn call — provides strength, crack time, and feedback
       const analysis = analyzeWithZxcvbn(password);
 
-      // Generate user-inspired suggestions (async: validates zxcvbn + HIBP)
-      const smartSuggestions = await generateSmartSuggestions(password);
+      // Generate dynamic improvement suggestions based on password analysis
+      const dynamicSuggestions = generateDynamicSuggestions(password, analysis);
 
-      const finalResult = { ...analysis, breached: leakCount > 0, leakCount };
+      // Generate user-inspired smart passwords (async: validates zxcvbn + HIBP)
+      const smartPasswords = await generateSmartSuggestions(password);
+
+      const finalResult = { 
+        ...analysis, 
+        breached: leakCount > 0, 
+        leakCount,
+        suggestions: dynamicSuggestions // Use dynamic suggestions instead of zxcvbn's
+      };
 
 
 
       setResult(finalResult);
 
-      setSuggestions(smartSuggestions);
+      setSuggestions(smartPasswords); // Store smart password suggestions separately
 
       setScanData({ input: password, result: finalResult });
 
@@ -597,36 +685,49 @@ const PasswordChecker = ({ onScanComplete, isAuthenticated = false, scanData, se
             </div>
 
 
-            {result.suggestions.length > 0 && (
-
-              <div className="pt-2 flex flex-wrap gap-2">
-
-                {result.suggestions.map((s: string, i: number) => (
-
-                  <span key={i} className="text-[10px] text-muted-foreground border border-border px-2 py-0.5 rounded bg-muted/30">
-
-                    • {s}
-
-                  </span>
-
-                ))}
-
+            {/* DYNAMIC PASSWORD IMPROVEMENT SUGGESTIONS */}
+            {result.suggestions && result.suggestions.length > 0 ? (
+              <div className="pt-3 border-t border-border/50">
+                <div className="flex items-center gap-2 mb-2">
+                  <Lightbulb className="w-4 h-4 text-yellow-400" />
+                  <span className="text-xs font-semibold text-foreground">Improvement Suggestions</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {result.suggestions.map((s: string, i: number) => (
+                    <span 
+                      key={i} 
+                      className={`text-[11px] border px-2.5 py-1 rounded-md transition-all ${
+                        s.startsWith("⚠️") 
+                          ? "bg-destructive/10 border-destructive/40 text-destructive font-medium" 
+                          : "bg-muted/30 border-border/40 text-muted-foreground"
+                      }`}
+                    >
+                      • {s}
+                    </span>
+                  ))}
+                </div>
               </div>
-
+            ) : (
+              <div className="pt-3 border-t border-border/50">
+                <div className="flex items-center gap-2 text-primary">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span className="text-xs font-semibold">Strong password 👍 No improvements needed</span>
+                </div>
+              </div>
             )}
 
           </div>
 
 
-          {/* SMART PASSWORD SUGGESTIONS */}
+          {/* SMART PASSWORD SUGGESTIONS - Alternative Strong Passwords */}
           {suggestions.length > 0 && (
             <div className="p-5 rounded-lg border border-border bg-card/50 space-y-3">
               <div className="flex items-center gap-2">
                 <Lightbulb className="w-4 h-4 text-yellow-400" />
-                <h3 className="font-heading font-semibold text-sm text-foreground">Smart Password Suggestions</h3>
+                <h3 className="font-heading font-semibold text-sm text-foreground">Alternative Strong Passwords</h3>
               </div>
-              <p className="text-[10px] text-muted-foreground">
-                Based on your input — strong alternatives you can use:
+              <p className="text-[11px] text-muted-foreground">
+                Cryptographically secure options based on your input — zxcvbn score 4/4 & HIBP verified:
               </p>
               <div className="space-y-2">
                 {suggestions.map((sug, idx) => (

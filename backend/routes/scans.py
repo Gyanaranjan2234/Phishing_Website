@@ -9,12 +9,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database.db import get_db
 from models.scan_model import ScanHistory
+from models.scan_stats_model import ScanStats
 from models.user_model import User
 from schemas.scan_schema import ScanCreate, ScanHistoryResponse, ScanStatsResponse
 from typing import Optional, List, Dict
 import hashlib
 import time
 from collections import defaultdict
+from datetime import datetime
 
 router = APIRouter(prefix="/api/scans", tags=["scans"])
 
@@ -116,6 +118,28 @@ def save_scan(scan_data: ScanCreate, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(new_scan)
         
+        # INCREMENT GLOBAL SCAN COUNTER
+        # This counter ONLY increases and NEVER decreases
+        try:
+            stats_record = db.query(ScanStats).filter(ScanStats.id == 1).first()
+            if stats_record:
+                stats_record.total_scans += 1
+                stats_record.last_updated = datetime.utcnow()
+                db.commit()
+            else:
+                # Create initial record if it doesn't exist
+                stats_record = ScanStats(
+                    id=1,
+                    total_scans=1,
+                    last_updated=datetime.utcnow()
+                )
+                db.add(stats_record)
+                db.commit()
+        except Exception as e:
+            # Don't fail the scan save if stats update fails
+            print(f"Warning: Failed to update global scan counter: {e}")
+            db.rollback()
+        
         return {
             "status": "success",
             "message": "Scan saved successfully",
@@ -216,15 +240,15 @@ def get_scan_stats(
     
     SECURITY:
     - Uses user_id (NOT username)
-    - Only calculates stats for the specified user
-    - Prevents stats data leakage
+    - Returns user-specific safe/threat counts from history
+    - Returns GLOBAL total_scans that NEVER decreases
     
     Args:
         user_id: Unique user identifier (required)
         db: Database session
     
     Returns:
-        Aggregated scan statistics
+        Aggregated scan statistics with global total counter
     """
     try:
         # Verify user exists
@@ -236,20 +260,23 @@ def get_scan_stats(
                 "data": {}
             }
         
-        # Get all scans for this user
+        # Get GLOBAL total scans (NEVER decreases)
+        stats_record = db.query(ScanStats).filter(ScanStats.id == 1).first()
+        global_total_scans = stats_record.total_scans if stats_record else 0
+        
+        # Get user-specific scans for safe/threat breakdown
         user_scans = db.query(ScanHistory).filter(ScanHistory.user_id == user_id).all()
         
-        # Calculate statistics
-        total_scans = len(user_scans)
+        # Calculate user-specific statistics
         safe_scans = len([s for s in user_scans if s.status in ["safe", "strong", "very_strong"]])
         suspicious_scans = len([s for s in user_scans if s.status == "suspicious"])
         threat_scans = len([s for s in user_scans if s.status in ["phishing", "breached", "infected", "dangerous", "weak", "very_weak"]])
         
         stats = {
-            "totalScans": total_scans,
-            "safeScans": safe_scans,
-            "suspiciousScans": suspicious_scans,
-            "threatScans": threat_scans,
+            "totalScans": global_total_scans,  # GLOBAL counter - NEVER decreases
+            "safeScans": safe_scans,            # User-specific
+            "suspiciousScans": suspicious_scans, # User-specific
+            "threatScans": threat_scans,         # User-specific
             "user_id": user_id
         }
         
