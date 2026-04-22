@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Globe, FileText, Mail, Lock, ShieldCheck, Zap, Phone, Loader2, User, ChevronDown, ArrowUp, LogIn, Link, Shield, AlertTriangle, FileCheck, Eye } from "lucide-react";
+import { Globe, FileText, Mail, Lock, ShieldCheck, Zap, Phone, Loader2, User, ChevronDown, ArrowUp, LogIn, Link, Shield, AlertTriangle, FileCheck, Eye, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -14,6 +13,7 @@ import EmailBreachChecker from "@/components/dashboard/EmailBreachChecker";
 import FileScanner from "@/components/dashboard/FileScanner";
 import PasswordChecker from "@/components/dashboard/PasswordChecker";
 import ActivityHistory from "@/components/dashboard/ActivityHistory";
+import SecurityQuizComponent from "@/components/dashboard/SecurityQuiz";
 
 /**
  * FaqItem Component
@@ -85,12 +85,12 @@ const Index = () => {
 
   // ============= VIEW MANAGEMENT =============
   // Single source of truth for current view - NO ROUTING
-  // "home" | "scanning" | "prevention" - determines which section is visible via CSS
+  // "home" | "scanning" | "prevention" | "quiz" - determines which section is visible via CSS
   // Initialize from localStorage if available, otherwise default to "home"
-  const [currentView, setCurrentView] = useState<"home" | "scanning" | "prevention">(() => {
+  const [currentView, setCurrentView] = useState<"home" | "scanning" | "prevention" | "quiz">(() => {
     try {
       const savedView = localStorage.getItem("apgs-lastView");
-      return (savedView === "scanning" || savedView === "home" || savedView === "prevention") ? savedView : "home";
+      return (savedView === "scanning" || savedView === "home" || savedView === "prevention" || savedView === "quiz") ? savedView : "home";
     } catch {
       return "home";
     }
@@ -372,6 +372,17 @@ const Index = () => {
     }, 100);
   };
 
+  const switchToQuiz = () => {
+    // Switch to quiz view
+    setCurrentView("quiz"); // This will trigger localStorage save via useEffect
+    console.log("[DEBUG] Set currentView to quiz");
+    // Scroll to top
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      console.log("[DEBUG] Scrolled to top, currentView is now:", "quiz");
+    }, 100);
+  };
+
   const handleFeatureCardClick = (sectionId: string) => {
     setFeatureLoading(sectionId);
     const tabMap: Record<string, "url" | "email" | "file" | "password"> = {
@@ -422,10 +433,10 @@ const Index = () => {
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* ========== MAIN CONTENT WRAPPER ========== */}
-      <div className="cyber-grid text-foreground flex-1">
+      <div className="cyber-grid text-foreground flex-1 section-animate">
         {/* ========== NAVBAR: ALWAYS VISIBLE, STRUCTURE CONSTANT ========== */}
-        <header className="sticky top-0 z-50 border-b border-border bg-card/90 backdrop-blur-lg transition-all duration-200">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
+        <header className="sticky top-0 z-50 border-b border-border/50 bg-card/80 backdrop-blur-xl transition-all duration-200 shadow-lg">
+        <div className="max-w-7xl mx-auto px-6 py-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity flex-shrink-0">
               <img 
@@ -446,12 +457,71 @@ const Index = () => {
           {/* NAVBAR: ALWAYS THE SAME STRUCTURE - NO DYNAMIC ADD/REMOVE */}
           <nav className="flex items-center gap-2 text-sm flex-wrap">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">{theme === "dark" ? "🌙" : "☀️"}</span>
-              <Switch
-                checked={theme === "light"}
-                onCheckedChange={(checked) => setTheme(checked ? "light" : "dark")}
-                className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted/40 transition-colors duration-300"
-              />
+              <button
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                className="relative w-10 h-10 rounded-lg border border-border/50 bg-card/50 
+                           hover:border-primary/50 hover:bg-primary/10 
+                           transition-all duration-300 hover:scale-105 
+                           hover:shadow-[0_0_12px_hsl(150_100%_45%_/_0.3)]
+                           flex items-center justify-center group"
+                aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+              >
+                {/* Sun Icon - Shows in light mode */}
+                <span 
+                  className={`absolute transition-all duration-300 ${
+                    theme === "light" 
+                      ? "opacity-100 scale-100 rotate-0" 
+                      : "opacity-0 scale-50 rotate-90"
+                  }`}
+                >
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    width="20" 
+                    height="20" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    className="text-amber-500 group-hover:text-primary"
+                  >
+                    <circle cx="12" cy="12" r="5" />
+                    <line x1="12" y1="1" x2="12" y2="3" />
+                    <line x1="12" y1="21" x2="12" y2="23" />
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                    <line x1="1" y1="12" x2="3" y2="12" />
+                    <line x1="21" y1="12" x2="23" y2="12" />
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                  </svg>
+                </span>
+                
+                {/* Moon Icon - Shows in dark mode */}
+                <span 
+                  className={`absolute transition-all duration-300 ${
+                    theme === "dark" 
+                      ? "opacity-100 scale-100 rotate-0" 
+                      : "opacity-0 scale-50 -rotate-90"
+                  }`}
+                >
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    width="20" 
+                    height="20" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    className="text-blue-400 group-hover:text-primary"
+                  >
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                  </svg>
+                </span>
+              </button>
             </div>
 
             <button
@@ -499,12 +569,27 @@ const Index = () => {
             </button>
 
             {!authLoading && isAuthenticated && (
+              <button
+                onClick={() => switchToQuiz()}
+                className={`px-3 py-1 rounded-lg border transition-all duration-300 ${
+                  navActiveSection === "quiz"
+                    ? "border-primary text-primary shadow-[0_0_12px_hsl(150_100%_45%_/_0.4)]"
+                    : "border-border text-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-primary hover:shadow-[0_0_12px_hsl(150_100%_45%_/_0.2)]"
+                }`}
+              >
+                Security Quiz
+              </button>
+            )}
+
+            {!authLoading && isAuthenticated && (
               <DropdownMenu>
-                <DropdownMenuTrigger className="flex items-center gap-2 border border-border rounded-full px-3 py-1 bg-card/70 hover:bg-card/90 transition">
-                  <User className="w-4 h-4 text-primary" />
-                  <span className="hidden sm:inline">{userName || "Profile"}</span>
+                <DropdownMenuTrigger className="flex items-center gap-2 border border-border/50 rounded-full px-2 py-1.5 bg-gradient-to-r from-primary/10 to-cyan-500/10 hover:from-primary/20 hover:to-cyan-500/20 transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_12px_hsl(150_100%_45%_/_0.2)]">
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-cyan-500 flex items-center justify-center text-primary-foreground font-semibold text-sm">
+                    {(userName || "U").charAt(0).toUpperCase()}
+                  </div>
+                  <span className="hidden sm:inline text-sm font-medium">{userName || "Profile"}</span>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent side="bottom" align="end" className="bg-card border border-border text-foreground">
+                <DropdownMenuContent side="bottom" align="end" className="bg-card border border-border text-foreground shadow-xl">
                   <DropdownMenuItem onSelect={() => navigate("/profile")} className="hover:bg-primary/10">
                     Profile
                   </DropdownMenuItem>
@@ -519,13 +604,13 @@ const Index = () => {
               <>
                 <button
                   onClick={() => navigate("/login")}
-                  className="px-3 py-1 rounded-lg border border-border text-foreground hover:bg-primary/30 hover:border-primary hover:text-primary transition-all duration-200 font-medium"
+                  className="px-4 py-1.5 rounded-lg border border-primary/50 text-primary hover:bg-primary/20 hover:border-primary transition-all duration-300 font-medium text-sm hover:shadow-[0_0_12px_hsl(150_100%_45%_/_0.3)]"
                 >
                   Login
                 </button>
                 <button
                   onClick={() => navigate("/login?view=signup")}
-                  className="px-3 py-1 rounded-lg border border-border text-foreground hover:bg-primary/30 hover:border-primary hover:text-primary transition-all duration-200 font-medium"
+                  className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-primary to-cyan-500 text-primary-foreground hover:shadow-[0_0_16px_hsl(150_100%_45%_/_0.4)] transition-all duration-300 font-semibold text-sm hover:scale-105"
                 >
                   Sign Up
                 </button>
@@ -547,20 +632,28 @@ const Index = () => {
         {currentView === "home" && console.log("[DEBUG] Rendering home view")}
         <main id="home" className="max-w-6xl mx-auto px-4 py-10 space-y-16 scroll-mt-[120px]">
           {/* Hero Section */}
-          <div className="w-full">
+          <div className="w-full text-center mb-8">
               <h1
-  className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-heading font-bold bg-gradient-to-r from-[#00ff88] via-[#00d4ff] to-[#3b82f6] bg-clip-text text-transparent drop-shadow-lg break-words max-w-full"
+  className="font-heading font-bold bg-gradient-to-r from-[#00ff88] via-[#00d4ff] to-[#3b82f6] bg-clip-text text-transparent drop-shadow-lg mx-auto"
   style={{
     backgroundImage: 'linear-gradient(90deg, #00ff88, #00d4ff, #3b82f6)',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
     filter: 'drop-shadow(0 0 10px rgba(0, 255, 136, 0.2))',
     lineHeight: '1.2',
-    letterSpacing: '-0.02em'
+    letterSpacing: '-0.02em',
+    textAlign: 'center',
+    fontSize: 'clamp(2.2rem, 4.5vw, 3.5rem)',
+    fontWeight: 700,
+    whiteSpace: 'nowrap',
+    margin: '0 auto',
+    maxWidth: '100%',
+    overflow: 'hidden'
   }}
 >
   Advanced Phishing Guard System
-</h1></div>
+</h1>
+          </div>
 
           <section className="grid gap-8 lg:grid-cols-2 items-center transition-all duration-300">
                           
@@ -1467,6 +1560,48 @@ const Index = () => {
         </main>
       </div>
 
+      {/* ========== QUIZ VIEW SECTION ========== */}
+      <div
+        className={`transition-all duration-300 ${
+          currentView === "quiz" ? "block opacity-100" : "hidden opacity-0"
+        }`}
+      >
+        {currentView === "quiz" && (
+          <main className="max-w-6xl mx-auto px-4 py-10">
+            {!userId ? (
+              // GUEST - Show login prompt
+              <div className="text-center py-20 space-y-6">
+                <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Lock className="w-10 h-10 text-primary" />
+                </div>
+                <h2 className="text-3xl font-heading font-bold text-foreground">Login Required</h2>
+                <p className="text-muted-foreground text-lg max-w-md mx-auto">
+                  Please login to access the Security Quiz and test your cybersecurity awareness.
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <Button
+                    onClick={() => navigate("/login")}
+                    className="px-6 bg-primary hover:bg-primary/90"
+                  >
+                    Login to Access
+                  </Button>
+                  <Button
+                    onClick={() => navTo("home")}
+                    variant="outline"
+                    className="px-6"
+                  >
+                    Back to Home
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              // LOGGED-IN - Show quiz component
+              <SecurityQuizComponent />
+            )}
+          </main>
+        )}
+      </div>
+
       {/* ========== BACK TO TOP BUTTON ========== */}
       {showBackToTop && (
         <button
@@ -1480,51 +1615,160 @@ const Index = () => {
 
       {/* ========== FOOTER (FULL WIDTH) ========== */}
       <footer className="w-full bg-card/50 mt-16">
-        <div className="max-w-6xl mx-auto px-4 py-10 border-t border-border">
-          {/* Footer Links Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 mb-8">
-            {/* Brand Section */}
-            <div className="space-y-3">
+        {/* Top border glow effect */}
+        <div className="h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent"></div>
+        
+        <div className="max-w-6xl mx-auto px-4 py-12">
+          {/* Footer Links Grid - 4 Columns */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-10 mb-10">
+            {/* Column 1: Brand */}
+            <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <img src="/apgs-logo.png" alt="APGS Logo" className="h-8 w-auto object-contain" />
-                <h3 className="text-lg font-heading font-bold">APGS</h3>
+                <img 
+                  src="/apgs-logo.png" 
+                  alt="APGS Logo" 
+                  className="h-10 w-auto object-contain" 
+                  style={{ filter: 'drop-shadow(0 0 8px rgba(0, 255, 156, 0.3))' }}
+                />
+                <h3 className="text-xl font-heading font-bold text-primary">APGS</h3>
               </div>
-              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                Advanced Phishing Guard System - Your trusted cybersecurity platform providing real-time protection against cyber threats.
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                APGS (Advanced Phishing Guard System) is a cybersecurity platform that detects phishing URLs, checks data breaches, analyzes files, and strengthens password security.
+              </p>
+              <p className="text-xs text-primary/80 font-medium italic">
+                "Your first line of defense against phishing."
               </p>
             </div>
             
-            {/* Platform Links */}
-            <div className="space-y-3">
-              <h4 className="font-heading font-semibold text-foreground text-sm">Platform</h4>
-              <nav className="space-y-2">
-                <a href="#features" className="text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors block">
-                  Features
-                </a>
-                <a href="#contact" className="text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors block">
-                  Contact
-                </a>
+            {/* Column 2: Platform */}
+            <div className="space-y-4">
+              <h4 className="font-heading font-semibold text-foreground text-sm uppercase tracking-wide">Platform</h4>
+              <nav className="space-y-3">
+                <button 
+                  onClick={() => switchToScanning("url")} 
+                  className="text-sm text-muted-foreground hover:text-primary transition-all duration-200 block hover:translate-x-1 hover:drop-shadow-[0_0_8px_hsl(150_100%_45%_/_0.4)]"
+                >
+                  URL Scanner
+                </button>
+                <button 
+                  onClick={() => switchToScanning("email")} 
+                  className="text-sm text-muted-foreground hover:text-primary transition-all duration-200 block hover:translate-x-1 hover:drop-shadow-[0_0_8px_hsl(150_100%_45%_/_0.4)]"
+                >
+                  Email Checker
+                </button>
+                <button 
+                  onClick={() => switchToScanning("file")} 
+                  className="text-sm text-muted-foreground hover:text-primary transition-all duration-200 block hover:translate-x-1 hover:drop-shadow-[0_0_8px_hsl(150_100%_45%_/_0.4)]"
+                >
+                  File Analysis
+                </button>
+                <button 
+                  onClick={() => switchToScanning("password")} 
+                  className="text-sm text-muted-foreground hover:text-primary transition-all duration-200 block hover:translate-x-1 hover:drop-shadow-[0_0_8px_hsl(150_100%_45%_/_0.4)]"
+                >
+                  Password Checker
+                </button>
               </nav>
             </div>
             
-            {/* Legal Links */}
-            <div className="space-y-3">
-              <h4 className="font-heading font-semibold text-foreground text-sm">Legal</h4>
-              <nav className="space-y-2">
-                <a href="/privacy-policy" className="text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors block">
-                  Privacy Policy
-                </a>
-                <a href="/terms-of-service" className="text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors block">
-                  Terms of Service
-                </a>
+            {/* Column 3: Security */}
+            <div className="space-y-4">
+              <h4 className="font-heading font-semibold text-foreground text-sm uppercase tracking-wide">Security</h4>
+              <nav className="space-y-3">
+                <button 
+                  onClick={() => switchToPrevention()} 
+                  className="text-sm text-muted-foreground hover:text-primary transition-all duration-200 block hover:translate-x-1 hover:drop-shadow-[0_0_8px_hsl(150_100%_45%_/_0.4)]"
+                >
+                  Prevention Guide
+                </button>
+                {!authLoading && isAuthenticated && (
+                  <button 
+                    onClick={() => switchToQuiz()} 
+                    className="text-sm text-muted-foreground hover:text-primary transition-all duration-200 block hover:translate-x-1 hover:drop-shadow-[0_0_8px_hsl(150_100%_45%_/_0.4)]"
+                  >
+                    Security Quiz
+                  </button>
+                )}
+              </nav>
+            </div>
+            
+            {/* Column 4: Quick Links */}
+            <div className="space-y-4">
+              <h4 className="font-heading font-semibold text-foreground text-sm uppercase tracking-wide">Quick Links</h4>
+              <nav className="space-y-3">
+                <button 
+                  onClick={() => navTo("home")} 
+                  className="text-sm text-muted-foreground hover:text-primary transition-all duration-200 block hover:translate-x-1 hover:drop-shadow-[0_0_8px_hsl(150_100%_45%_/_0.4)]"
+                >
+                  Home
+                </button>
+                <button 
+                  onClick={() => navTo("contact")} 
+                  className="text-sm text-muted-foreground hover:text-primary transition-all duration-200 block hover:translate-x-1 hover:drop-shadow-[0_0_8px_hsl(150_100%_45%_/_0.4)]"
+                >
+                  Contact
+                </button>
+                <button 
+                  onClick={() => switchToScanning()} 
+                  className="text-sm text-muted-foreground hover:text-primary transition-all duration-200 block hover:translate-x-1 hover:drop-shadow-[0_0_8px_hsl(150_100%_45%_/_0.4)]"
+                >
+                  Scanning
+                </button>
               </nav>
             </div>
           </div>
           
+          {/* Social Icons & Legal Links */}
+          <div className="border-t border-border/50 pt-8 mb-6">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+              {/* Social Icons */}
+              <div className="flex items-center gap-4">
+                <a 
+                  href="https://github.com" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground hover:text-primary transition-all duration-200 hover:scale-110"
+                  aria-label="GitHub"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 2.694.56 1.983-1.815 5.108-2.567 5.108-2.567 2.694-.322 4.023.469 4.023.469 1.155 2.958 1.155 2.958.657 1.155.657 1.155.217.743.217 1.618 0 1.166-.045 2.118-.075 2.374-.418.467-.128.793.966.997 1.305 1.361 2.114 3.306 1.593 4.213 1.247.064-.466.174-.978.322-1.437-2.568-.583-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 2.694.56 1.983-1.815 5.108-2.567 5.108-2.567 2.694-.322 4.023.469 4.023.469 1.155 2.958 1.155 2.958.657 1.155.657 1.155.217.743.217 1.618 0 1.166-.045 2.118-.075 2.374-.418.467-.128.793.966.997 1.305 1.361 2.114 3.306 1.593 4.213 1.247.064-.466.174-.978.322-1.437-2.568-.583-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 2.694.56 1.983-1.815 5.108-2.567 5.108-2.567"/>
+                  </svg>
+                </a>
+                <a 
+                  href="https://linkedin.com" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground hover:text-primary transition-all duration-200 hover:scale-110"
+                  aria-label="LinkedIn"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                  </svg>
+                </a>
+              </div>
+              
+              {/* Legal Links */}
+              <div className="flex items-center gap-6">
+                <a 
+                  href="/privacy-policy" 
+                  className="text-sm text-muted-foreground hover:text-primary transition-all duration-200 hover:translate-x-1 hover:drop-shadow-[0_0_8px_hsl(150_100%_45%_/_0.4)]"
+                >
+                  Privacy Policy
+                </a>
+                <a 
+                  href="/terms-of-service" 
+                  className="text-sm text-muted-foreground hover:text-primary transition-all duration-200 hover:translate-x-1 hover:drop-shadow-[0_0_8px_hsl(150_100%_45%_/_0.4)]"
+                >
+                  Terms of Service
+                </a>
+              </div>
+            </div>
+          </div>
+          
           {/* Copyright */}
-          <div className="border-t border-border/50 pt-6 text-center">
-            <p className="text-xs text-muted-foreground">
-              © 2026 Advanced Phishing Guard System. All rights reserved.
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">
+              © 2026 APGS — Advanced Phishing Guard System
             </p>
           </div>
         </div>

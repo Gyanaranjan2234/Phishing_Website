@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Shield, Lock, Mail, Eye, EyeOff, Check, Chrome, Facebook, Apple } from "lucide-react";
+import { Shield, Lock, Mail, Eye, EyeOff, Check, Chrome } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -190,12 +190,14 @@ const Login = () => {
 
   const renderLoginForm = () => (
     <div className="space-y-4">
-      {/* Social Login */}
-      <div className="space-y-2">
-        <SocialButton icon={Chrome} label="Continue with Google" onClick={() => toast.info("Google login not implemented")} />
-        <SocialButton icon={Facebook} label="Continue with Facebook" onClick={() => toast.info("Facebook login not implemented")} />
-        <SocialButton icon={Apple} label="Continue with Apple" onClick={() => toast.info("Apple login not implemented")} />
-      </div>
+      {/* Google Login - Primary */}
+      <button
+        onClick={() => toast.info("Google login not implemented")}
+        className="w-full flex items-center justify-center gap-3 px-4 py-3 border-2 border-primary/50 rounded-lg bg-primary/10 hover:bg-primary/20 transition-all duration-200 text-foreground font-medium hover:shadow-[0_0_15px_hsl(150_100%_45%_/_0.3)]"
+      >
+        <Chrome className="w-5 h-5 text-primary" />
+        <span className="text-base">Continue with Google</span>
+      </button>
 
       {/* Divider */}
       <div className="relative">
@@ -205,6 +207,13 @@ const Login = () => {
         <div className="relative flex justify-center text-xs uppercase">
           <span className="bg-card px-2 text-muted-foreground">Or continue with email</span>
         </div>
+      </div>
+
+      {/* Trust Message */}
+      <div className="text-center py-2">
+        <p className="text-xs text-muted-foreground">
+          🔒 We never store your personal data
+        </p>
       </div>
 
       {/* Email Input */}
@@ -461,6 +470,11 @@ const Login = () => {
               {currentView === 'signup' && 'Create your account'}
               {currentView === 'forgot' && 'Reset your password'}
             </h2>
+            {currentView === 'login' && (
+              <p className="text-sm text-muted-foreground">
+                Secure your digital presence with APGS
+              </p>
+            )}
           </div>
 
           {/* Forms */}
