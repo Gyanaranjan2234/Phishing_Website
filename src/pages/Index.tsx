@@ -132,7 +132,7 @@ const Index = () => {
 
   // ============= SCROLL-BASED ACTIVE SECTION (HOME PAGE ONLY) =============
   const { activeSection, setActiveSection } = useScrollActiveSection({
-    sectionIds: ["home", "about", "contact"],
+    sectionIds: ["home", "contact"],
     rootMargin: "-35% 0px -65% 0px",
     threshold: [0.1, 0.5],
   });
@@ -392,7 +392,7 @@ const Index = () => {
 
   // ============= COMPUTED VALUES =============
   // Determine navbar active state based on current view
-  const navActiveSection = currentView === "scanning" ? "scanning" : activeSection;
+  const navActiveSection = currentView === "scanning" ? "scanning" : (activeSection || "home");
 
   console.log("[DEBUG] Index Render State:", { currentView, navActiveSection, isAuthenticated });
 
@@ -452,17 +452,6 @@ const Index = () => {
               }`}
             >
               Home
-            </button>
-
-            <button
-              onClick={() => navTo("about")}
-              className={`px-3 py-1 rounded-lg border transition-all duration-300 ${
-                navActiveSection === "about"
-                  ? "border-primary text-primary shadow-[0_0_12px_hsl(150_100%_45%_/_0.4)]"
-                  : "border-border text-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-primary hover:shadow-[0_0_12px_hsl(150_100%_45%_/_0.2)]"
-              }`}
-            >
-              About
             </button>
 
             <button
@@ -584,6 +573,44 @@ const Index = () => {
             </div>
           </section>
 
+          {/* Features Section */}
+          <section id="features" className="space-y-6 scroll-mt-[120px] transition-all duration-300">
+            <div className="space-y-6">
+              <h2 className="text-2xl font-heading font-bold">Features</h2>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {featureCards.map((card, i) => {
+                  const Icon = card.icon;
+                  const loading = featureLoading === card.sectionId;
+                  return (
+                    <article
+                      key={`feature-${card.sectionId}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleFeatureCardClick(card.sectionId)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          handleFeatureCardClick(card.sectionId);
+                        }
+                      }}
+                      className={`rounded-xl border p-4 bg-card/75 cursor-pointer transition-all duration-200 ${
+                        activeSection === card.sectionId
+                          ? "border-primary shadow-[0_0_18px_hsl(150_100%_45%_/_0.35)] scale-105"
+                          : "border-border hover:shadow-[0_0_18px_hsl(150_100%_45%_/_0.2)] hover:scale-105"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 text-primary mb-2">
+                        <Icon className="w-5 h-5" />
+                        <h3 className="text-sm font-semibold">{card.title}</h3>
+                        {loading && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{card.text}</p>
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+
           {/* About Section */}
           <section id="about" className="space-y-10 scroll-mt-[120px] transition-all duration-300">
             <div className="space-y-6">
@@ -631,42 +658,6 @@ const Index = () => {
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Feature Cards */}
-            <div className="space-y-6 pt-4 border-t border-border">
-              <h3 className="text-xl font-heading font-bold">Features</h3>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {featureCards.map((card, i) => {
-                  const Icon = card.icon;
-                  const loading = featureLoading === card.sectionId;
-                  return (
-                    <article
-                      key={`feature-${card.sectionId}`}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => handleFeatureCardClick(card.sectionId)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          handleFeatureCardClick(card.sectionId);
-                        }
-                      }}
-                      className={`rounded-xl border p-4 bg-card/75 cursor-pointer transition-all duration-200 ${
-                        activeSection === card.sectionId
-                          ? "border-primary shadow-[0_0_18px_hsl(150_100%_45%_/_0.35)] scale-105"
-                          : "border-border hover:shadow-[0_0_18px_hsl(150_100%_45%_/_0.2)] hover:scale-105"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 text-primary mb-2">
-                        <Icon className="w-5 h-5" />
-                        <h3 className="text-sm font-semibold">{card.title}</h3>
-                        {loading && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
-                      </div>
-                      <p className="text-sm text-muted-foreground">{card.text}</p>
-                    </article>
-                  );
-                })}
               </div>
             </div>
           </section>
@@ -999,7 +990,7 @@ const Index = () => {
             <div className="space-y-3">
               <h4 className="font-heading font-semibold text-foreground text-sm">Platform</h4>
               <nav className="space-y-2">
-                <a href="#about" className="text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors block">
+                <a href="#features" className="text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors block">
                   Features
                 </a>
                 <a href="#contact" className="text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors block">
