@@ -62,7 +62,7 @@ def save_scan(scan_data: ScanCreate, db: Session = Depends(get_db)):
                 "scan_type": new_scan.scan_type,
                 "target": new_scan.target,
                 "status": new_scan.status,
-                "timestamp": new_scan.timestamp.isoformat()
+                "timestamp": new_scan.timestamp.isoformat() + "Z" if new_scan.timestamp else None
             }
         }
     
@@ -125,7 +125,7 @@ def get_scan_history(
                 "target": scan.target,
                 "status": scan.status,
                 "result_details": scan.result_details,
-                "timestamp": scan.timestamp.isoformat()
+                "timestamp": scan.timestamp.isoformat() + "Z" if scan.timestamp else None
             })
         
         return {

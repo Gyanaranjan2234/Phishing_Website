@@ -54,11 +54,12 @@ const EmailBreachChecker = ({ onScanComplete, isAuthenticated = false, scanData,
       // XposedOrNot returns 404 or an empty response if no breaches found
       // Based on your JSON: { "breaches": [ ["Source"] ], "status": "success" }
       const isBreached = data && data.breaches && data.breaches.length > 0;
+      const flatSources = isBreached ? data.breaches.flat() : [];
       
       const finalResult = {
         breached: isBreached,
-        sources: isBreached ? data.breaches.flat() : [],
-        count: isBreached ? data.breaches.length : 0,
+        sources: flatSources,
+        count: isBreached ? flatSources.length : 0,
         email: email
       };
 
