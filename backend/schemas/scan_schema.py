@@ -19,6 +19,7 @@ class ScanCreate(BaseModel):
     target: str  # What was scanned
     status: str  # safe, suspicious, phishing, breached, etc.
     result_details: Optional[str] = None  # Optional JSON details
+    raw_target: Optional[str] = None  # RAW data for backend validation (NEVER STORED PLAIN)
 
 
 class ScanResponse(BaseModel):

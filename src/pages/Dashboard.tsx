@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Shield, LogOut, User, Globe, FileText, Search } from "lucide-react";
+import { Shield, LogOut, User, Globe, FileText, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { apiAuth, apiScans } from "@/lib/api-backend";  // FIXED: Use real backend, not mock
 import StatsCards from "@/components/dashboard/StatsCards";
 import UrlScanner from "@/components/dashboard/UrlScanner";
@@ -54,18 +55,29 @@ const Dashboard = () => {
     navigate("/");
   };
 
-  /* Removed API Stats call as per request
-  const { data: statsData, refetch: refetchStats } = useQuery({
-    queryKey: ['stats'],
-    queryFn: apiScans.getStats,
+  // Fetch real-time stats from backend
+  const { data: statsResponse, refetch: refetchStats, isLoading: statsLoading } = useQuery({
+    queryKey: ['stats', userId],
+    queryFn: async () => {
+      if (!userId) return { data: { totalScans: 0, safeScans: 0, threatScans: 0 } };
+      console.log(`📡 Dashboard: Fetching real-time stats for user ${userId}...`);
+      const res = await apiScans.getStats(userId);
+      console.log("📊 Dashboard: Stats API response received:", res.data);
+      return res;
+    },
+    enabled: !!userId,
+    staleTime: 0, // Ensure we always get fresh data
+    gcTime: 0,
   });
-  */
+
+  const stats = statsResponse?.data || { totalScans: 0, safeScans: 0, threatScans: 0 };
+
 
   const { data: history, refetch: refetchHistory } = useQuery({
     queryKey: ['history', userId],
     queryFn: async () => {
       if (!userId) return [];
-      const res = await apiScans.getHistory(userId, 50);
+      const res = await apiScans.getHistory(userId, 1000);
       
       const rawData = res.data || [];
       // 2. Transform raw backend data to frontend ScanHistoryItem format
@@ -81,27 +93,45 @@ const Dashboard = () => {
       return transformed;
     },
     enabled: !!userId,
+    staleTime: 0,
   });
-
-  // 2. Calculate Stats Dynamically: After fetching history
-  // 'history' is now the array itself from useQuery
-  const stats = {
-    totalScans: history?.length || 0,
-    // Safe: status is 'safe' or 'strong'
-    safe: (history || []).filter((item: any) => item.status === "safe" || item.status === "strong").length,
-    // Threats: status is 'phishing', 'breached'
-    threats: (history || []).filter((item: any) => item.status === "phishing" || item.status === "breached").length,
-  };
 
   // 6. Debugging
   console.log("history from API:", history);
-  console.log("stats:", stats);
+  console.log("stats from API:", stats);
 
+  const queryClient = useQueryClient();
   const refresh = useCallback(async () => {
+    console.log("🔄 Dashboard: Triggering manual refresh of stats and history...");
+    
+    // 1. Instant UI update: Clear caches immediately
+    queryClient.setQueryData(['history', userId], []);
+    queryClient.setQueryData(['stats', userId], { data: { totalScans: 0, safeScans: 0, threatScans: 0 } });
+    
+    // 2. Invalidate queries to force fresh fetch from backend
+    await queryClient.invalidateQueries({ queryKey: ['history', userId] });
+    await queryClient.invalidateQueries({ queryKey: ['stats', userId] });
+    
     setRefreshKey((k) => k + 1);
-    // refetchStats(); // Removed
-    refetchHistory();
-  }, [refetchHistory]);
+    
+    try {
+      // 3. Perform manual refetch to be 100% sure
+      await Promise.all([
+        refetchStats(),
+        refetchHistory()
+      ]);
+      
+      // 4. Hard refresh as requested by user to ensure absolute synchronization
+      console.log("🚀 Dashboard: Performing automatic page refresh...");
+      setTimeout(() => {
+        window.location.reload();
+      }, 800); 
+      
+    } catch (err) {
+      console.error("Refresh error:", err);
+      window.location.reload(); 
+    }
+  }, [refetchHistory, refetchStats, queryClient, userId]);
 
   const goToLandingSection = (anchor: "home" | "features" | "contact") => {
     navigate(`/#${anchor}`);
@@ -109,9 +139,9 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen cyber-grid">
-      <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="min-h-screen cyber-grid !overflow-visible">
+      <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-[100] !overflow-visible">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3 !overflow-visible">
           <div className="flex items-center gap-2 flex-shrink-0">
             <img
               src="/apgs-logo.png"
@@ -148,10 +178,27 @@ const Dashboard = () => {
                 <User className="w-4 h-4 text-primary" />
                 <span className="hidden sm:inline">{userName || "Profile"}</span>
               </DropdownMenuTrigger>
-              <DropdownMenuContent side="bottom" align="end" className="bg-card border-border ring-primary">
-                <DropdownMenuItem onSelect={() => navigate("/profile")}>Profile</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={handleLogout}>Sign Out</DropdownMenuItem>
+              <DropdownMenuContent 
+                side="bottom" 
+                align="end" 
+                className="bg-slate-900 text-green-400 border border-green-400/50 z-[9999] min-w-[180px] shadow-[0_0_20px_rgba(0,255,156,0.2)] p-1.5 animate-in fade-in zoom-in-95"
+                sideOffset={10}
+              >
+                <DropdownMenuItem 
+                  onSelect={() => navigate("/profile")}
+                  className="hover:bg-slate-800 focus:bg-slate-800 focus:text-green-300 cursor-pointer rounded-md transition-colors"
+                >
+                  <User className="w-4 h-4 mr-2" />
+                  View Profile
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-green-400/20 my-1" />
+                <DropdownMenuItem 
+                  onSelect={handleLogout}
+                  className="hover:bg-red-500/10 focus:bg-red-500/10 text-red-400 focus:text-red-300 cursor-pointer rounded-md transition-colors"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -167,7 +214,11 @@ const Dashboard = () => {
               <p className="text-muted-foreground mt-1">Monitor threats, analyze URLs, and check for breaches</p>
             </div>
 
-            <StatsCards totalScans={stats.totalScans} threats={stats.threats} safe={stats.safe} />
+            <StatsCards 
+              totalScans={stats.totalScans || 0} 
+              threats={stats.threatScans || 0} 
+              safe={stats.safeScans || 0} 
+            />
 
             <div className="border border-border rounded-lg overflow-hidden bg-card/40 backdrop-blur-sm">
               <div className="grid grid-cols-3 text-center text-xs sm:text-sm font-semibold uppercase">
@@ -225,7 +276,13 @@ const Dashboard = () => {
           </>
         )}
 
-        <ActivityHistory history={history || []} />
+
+        <ActivityHistory 
+          key={`history-list-${history?.length || 0}-${userId || 'none'}`}
+          history={history || []} 
+          onHistoryChange={refresh}
+          userId={userId}
+        />
       </main>
     </div>
   );

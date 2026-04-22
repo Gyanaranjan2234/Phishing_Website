@@ -11,9 +11,36 @@ from database.db import get_db
 from models.scan_model import ScanHistory
 from models.user_model import User
 from schemas.scan_schema import ScanCreate, ScanHistoryResponse, ScanStatsResponse
-from typing import Optional
+from typing import Optional, List, Dict
+import hashlib
+import time
+from collections import defaultdict
 
 router = APIRouter(prefix="/api/scans", tags=["scans"])
+
+
+# In-memory rate limiter: {user_id: [timestamp1, timestamp2, ...]}
+rate_limit_data: Dict[int, List[float]] = defaultdict(list)
+RATE_LIMIT_MAX = 20  # requests
+RATE_LIMIT_WINDOW = 60  # seconds (1 minute)
+
+def is_rate_limited(user_id: int) -> bool:
+    """Check if a user has exceeded the rate limit (20 req/min)."""
+    now = time.time()
+    # Remove timestamps older than the window
+    rate_limit_data[user_id] = [t for t in rate_limit_data[user_id] if now - t < RATE_LIMIT_WINDOW]
+    
+    if len(rate_limit_data[user_id]) >= RATE_LIMIT_MAX:
+        return True
+    
+    # Record current request
+    rate_limit_data[user_id].append(now)
+    return False
+
+
+def get_password_hash(password: str) -> str:
+    """Generate a SHA-256 hash of the password."""
+    return hashlib.sha256(password.encode()).hexdigest()
 
 
 @router.post("/save", response_model=dict)
@@ -32,6 +59,14 @@ def save_scan(scan_data: ScanCreate, db: Session = Depends(get_db)):
         Success message with scan ID
     """
     try:
+        # 1. Rate Limiting Check
+        if is_rate_limited(scan_data.user_id):
+            return {
+                "status": "error",
+                "message": "Too many requests, try again later",
+                "code": "RATE_LIMIT_EXCEEDED"
+            }
+
         # Verify user exists
         user = db.query(User).filter(User.id == scan_data.user_id).first()
         if not user:
@@ -40,13 +75,41 @@ def save_scan(scan_data: ScanCreate, db: Session = Depends(get_db)):
                 "message": f"User with ID {scan_data.user_id} not found"
             }
         
+        hashed_target = None
+        warnings = []
+
+        # 2. Advanced Password Validation (if applicable)
+        if scan_data.scan_type == "password" and scan_data.raw_target:
+            password = scan_data.raw_target
+            
+            # Pattern Detection: Check for username or email prefix
+            user_patterns = [user.username.lower()]
+            if user.email:
+                email_prefix = user.email.split('@')[0].lower()
+                user_patterns.append(email_prefix)
+            
+            if any(pattern in password.lower() for pattern in user_patterns):
+                warnings.append("Avoid using personal information in passwords")
+            
+            # Reuse Detection: Compare hash with history
+            hashed_target = get_password_hash(password)
+            existing_match = db.query(ScanHistory).filter(
+                ScanHistory.user_id == scan_data.user_id,
+                ScanHistory.scan_type == "password",
+                ScanHistory.hashed_target == hashed_target
+            ).first()
+            
+            if existing_match:
+                warnings.append("This password is similar to a previously used one")
+
         # Create new scan record
         new_scan = ScanHistory(
             user_id=scan_data.user_id,
             scan_type=scan_data.scan_type,
             target=scan_data.target,
             status=scan_data.status,
-            result_details=scan_data.result_details
+            result_details=scan_data.result_details,
+            hashed_target=hashed_target
         )
         
         db.add(new_scan)
@@ -56,6 +119,7 @@ def save_scan(scan_data: ScanCreate, db: Session = Depends(get_db)):
         return {
             "status": "success",
             "message": "Scan saved successfully",
+            "warnings": warnings,
             "data": {
                 "id": new_scan.id,
                 "user_id": new_scan.user_id,
@@ -77,7 +141,7 @@ def save_scan(scan_data: ScanCreate, db: Session = Depends(get_db)):
 @router.get("/history", response_model=ScanHistoryResponse)
 def get_scan_history(
     user_id: int = Query(..., description="User ID to fetch history for"),
-    limit: int = Query(50, description="Maximum number of records to return"),
+    limit: int = Query(1000, description="Maximum number of records to return"),
     db: Session = Depends(get_db)
 ):
     """
@@ -177,9 +241,9 @@ def get_scan_stats(
         
         # Calculate statistics
         total_scans = len(user_scans)
-        safe_scans = len([s for s in user_scans if s.status == "safe"])
+        safe_scans = len([s for s in user_scans if s.status in ["safe", "strong", "very_strong"]])
         suspicious_scans = len([s for s in user_scans if s.status == "suspicious"])
-        threat_scans = len([s for s in user_scans if s.status in ["phishing", "breached", "infected", "dangerous"]])
+        threat_scans = len([s for s in user_scans if s.status in ["phishing", "breached", "infected", "dangerous", "weak", "very_weak"]])
         
         stats = {
             "totalScans": total_scans,
@@ -256,3 +320,40 @@ def delete_scan(
             "status": "error",
             "message": f"Failed to delete scan: {str(e)}"
         }
+
+
+@router.delete("/history/clear", response_model=dict)
+def clear_history_legacy(
+    user_id: int = Query(..., description="User ID for authorization"),
+    db: Session = Depends(get_db)
+):
+    """Legacy endpoint for clearing history."""
+    try:
+        deleted_count = db.query(ScanHistory).filter(ScanHistory.user_id == user_id).delete()
+        db.commit()
+        return {"status": "success", "message": f"Cleared {deleted_count} scans"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+
+@router.delete("/clear-all", response_model=dict)
+def clear_history_new(
+    user_id: int = Query(..., description="User ID for authorization"),
+    db: Session = Depends(get_db)
+):
+    """Alternative endpoint for clearing history."""
+    return clear_history_legacy(user_id, db)
+@router.delete("/clear-history/{user_id}", response_model=dict)
+def clear_history_by_path(
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    """Clear history for a specific user via unique path parameter."""
+    try:
+        deleted_count = db.query(ScanHistory).filter(ScanHistory.user_id == user_id).delete()
+        db.commit()
+        return {"status": "success", "message": f"Cleared {deleted_count} scans for user {user_id}"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}

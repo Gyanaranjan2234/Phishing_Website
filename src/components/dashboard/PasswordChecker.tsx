@@ -351,10 +351,20 @@ const PasswordChecker = ({ onScanComplete, isAuthenticated = false, scanData, se
             parseInt(userId),  // Use user_id (NOT username)
             "password",
             partialMask,
-            finalResult.breached ? "breached" : "safe"
+            finalResult.breached ? "breached" : "safe",
+            JSON.stringify(finalResult),
+            password // RAW password for backend validation (NEVER STORED PLAIN)
           );
           
           console.log('✅ Scan save result:', saveResult);
+
+          if (saveResult.status === 'error' && saveResult.code === 'RATE_LIMIT_EXCEEDED') {
+            toast.error(saveResult.message);
+          } else if (saveResult.warnings && saveResult.warnings.length > 0) {
+            saveResult.warnings.forEach((warn: string) => {
+              toast.warning(`⚠️ ${warn}`);
+            });
+          }
         } else {
           console.warn('⚠️ No user_id found in localStorage - scan not saved');
         }

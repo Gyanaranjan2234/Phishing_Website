@@ -13,7 +13,7 @@ const CONTACT_API_URL = `${BASE_URL}/api/contact`;
  */
 export const getPlatformStats = async () => {
   try {
-    const response = await fetch(`${BASE_URL}/api/stats`);
+    const response = await fetch(`${BASE_URL}/api/stats`, { cache: 'no-store' });
     return await response.json();
   } catch (error) {
     console.error('Error fetching platform stats:', error);
@@ -70,10 +70,11 @@ export const login = async (email: string, password: string) => {
 
     // If login successful, store user data in localStorage
     if (data.status === 'success' && data.data) {
-      // Store complete user session with user_id (CRITICAL for data isolation)
+      console.log("🔐 Login successful, storing user data:", data.data);
       localStorage.setItem('user_session', JSON.stringify(data.data));
+      localStorage.setItem('user', JSON.stringify(data.data));
       localStorage.setItem('username', data.data.username);
-      localStorage.setItem('user_id', data.data.id.toString());  // ADDED: Store user_id
+      localStorage.setItem('user_id', data.data.id.toString());
     }
 
     return data;
@@ -244,7 +245,8 @@ export const saveScan = async (
   scanType: string,
   target: string,
   status: string,
-  resultDetails?: string
+  resultDetails?: string,
+  rawTarget?: string
 ) => {
   try {
     console.log('📡 API: Saving scan...', { userId, scanType, target, status });
@@ -259,7 +261,8 @@ export const saveScan = async (
         scan_type: scanType,
         target: target,
         status: status,
-        result_details: resultDetails || null
+        result_details: resultDetails || null,
+        raw_target: rawTarget || null
       }),
     });
 
@@ -282,11 +285,11 @@ export const saveScan = async (
  * @param userId - Unique user ID (NOT username)
  * @param limit - Maximum number of records to return (default 50)
  */
-export const getScanHistory = async (userId: number, limit: number = 50) => {
+export const getScanHistory = async (userId: number, limit: number = 1000) => {
   try {
     console.log('📡 API: Fetching scan history for user_id:', userId);
     
-    const response = await fetch(`${SCAN_API_URL}/history?user_id=${userId}&limit=${limit}`);
+    const response = await fetch(`${SCAN_API_URL}/history?user_id=${userId}&limit=${limit}`, { cache: 'no-store' });
     const data = await response.json();
     
     console.log('📡 API: Scan history response:', data);
@@ -308,7 +311,7 @@ export const getScanHistory = async (userId: number, limit: number = 50) => {
  */
 export const getScanStats = async (userId: number) => {
   try {
-    const response = await fetch(`${SCAN_API_URL}/stats?user_id=${userId}`);
+    const response = await fetch(`${SCAN_API_URL}/stats?user_id=${userId}`, { cache: 'no-store' });
     const data = await response.json();
     return data;
   } catch (error) {
@@ -350,6 +353,32 @@ export const deleteScan = async (scanId: number, userId: number) => {
 };
 
 /**
+ * Clear all scan history for a user
+ * @param userId - Unique user ID for authorization
+ */
+export const clearHistory = async (userId: number) => {
+  try {
+    console.log(`📡 API: Clearing history for user_id: ${userId} via path parameter...`);
+    const response = await fetch(`${SCAN_API_URL}/clear-history/${userId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Clear history error:', error);
+    return {
+      status: 'error',
+      message: 'Network error. Failed to clear history.',
+      data: null
+    };
+  }
+};
+
+/**
  * API for Contact Form
  */
 export const apiContacts = {
@@ -380,4 +409,5 @@ export const apiScans = {
   getHistory: getScanHistory,
   getStats: getScanStats,
   deleteScan,
+  clearHistory,
 };

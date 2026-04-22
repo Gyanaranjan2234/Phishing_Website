@@ -44,6 +44,9 @@ class ScanHistory(Base):
     # Detailed scan results (stored as JSON string)
     result_details = Column(String(5000), nullable=True)
     
+    # SECURITY: Stored hash of target (only for password scans) to detect reuse/similarity
+    hashed_target = Column(String(128), nullable=True, index=True)
+    
     # Timestamp of when scan was performed
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
     
