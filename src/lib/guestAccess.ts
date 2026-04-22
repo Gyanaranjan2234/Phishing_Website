@@ -1,8 +1,21 @@
 // src/lib/guestAccess.ts
-// Guest access control - limits scans for unauthenticated users
+// Guest access control - limits scans for unauthenticated users with daily reset
 
-const GUEST_SCAN_LIMIT = 3; // Maximum scans allowed for guests
+const GUEST_SCAN_LIMIT = 3; // Maximum scans allowed for guests per day
 const GUEST_SCAN_COUNT_KEY = "guest_scan_count";
+const GUEST_LAST_SCAN_DATE_KEY = "guest_last_scan_date";
+
+/**
+ * Get today's date in YYYY-MM-DD format
+ * @returns string representing today's date
+ */
+const getTodayDate = (): string => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 /**
  * Check if user is logged in
@@ -15,10 +28,25 @@ export const isUserLoggedIn = (): boolean => {
 };
 
 /**
- * Get current guest scan count
- * @returns number of scans performed by guest
+ * Check and reset guest scan count if it's a new day
+ */
+const checkAndResetDaily = (): void => {
+  const today = getTodayDate();
+  const lastScanDate = localStorage.getItem(GUEST_LAST_SCAN_DATE_KEY);
+  
+  // If no date stored or date is different from today, reset
+  if (!lastScanDate || lastScanDate !== today) {
+    localStorage.setItem(GUEST_SCAN_COUNT_KEY, "0");
+    localStorage.setItem(GUEST_LAST_SCAN_DATE_KEY, today);
+  }
+};
+
+/**
+ * Get current guest scan count (with daily reset check)
+ * @returns number of scans performed by guest today
  */
 export const getGuestScanCount = (): number => {
+  checkAndResetDaily();
   const count = localStorage.getItem(GUEST_SCAN_COUNT_KEY);
   return count ? parseInt(count, 10) : 0;
 };
@@ -28,9 +56,11 @@ export const getGuestScanCount = (): number => {
  * @returns new scan count
  */
 export const incrementGuestScanCount = (): number => {
+  checkAndResetDaily(); // Ensure we're tracking today's count
   const currentCount = getGuestScanCount();
   const newCount = currentCount + 1;
   localStorage.setItem(GUEST_SCAN_COUNT_KEY, newCount.toString());
+  localStorage.setItem(GUEST_LAST_SCAN_DATE_KEY, getTodayDate());
   return newCount;
 };
 
@@ -54,7 +84,7 @@ export const canGuestScan = (): {
     };
   }
 
-  // Check guest scan count
+  // Check guest scan count (with daily reset)
   const count = getGuestScanCount();
   
   if (count >= GUEST_SCAN_LIMIT) {
@@ -62,7 +92,7 @@ export const canGuestScan = (): {
       allowed: false,
       count,
       limit: GUEST_SCAN_LIMIT,
-      message: `Guest limit reached (${count}/${GUEST_SCAN_LIMIT}). Please login to continue scanning.`
+      message: "Daily guest scan limit reached. Try again tomorrow or login."
     };
   }
 
@@ -70,7 +100,7 @@ export const canGuestScan = (): {
     allowed: true,
     count,
     limit: GUEST_SCAN_LIMIT,
-    message: `Guest scan ${count + 1} of ${GUEST_SCAN_LIMIT}`
+    message: `Guest scan ${count + 1} of ${GUEST_SCAN_LIMIT} (resets daily)`
   };
 };
 
@@ -79,6 +109,7 @@ export const canGuestScan = (): {
  */
 export const resetGuestScanCount = (): void => {
   localStorage.removeItem(GUEST_SCAN_COUNT_KEY);
+  localStorage.removeItem(GUEST_LAST_SCAN_DATE_KEY);
 };
 
 /**

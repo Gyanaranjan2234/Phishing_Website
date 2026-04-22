@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Globe, FileText, Mail, Lock, ShieldCheck, Zap, Phone, Loader2, User, ChevronDown, ArrowUp, LogIn } from "lucide-react";
+import { Globe, FileText, Mail, Lock, ShieldCheck, Zap, Phone, Loader2, User, ChevronDown, ArrowUp, LogIn, Link, Shield, AlertTriangle, FileCheck, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { apiAuth, apiScans, apiContacts, getPlatformStats } from "@/lib/api-backend";  // FIXED: Using real backend
-import { getGuestScanCount } from "@/lib/guestAccess";
+import { getGuestScanCount, canGuestScan } from "@/lib/guestAccess";
 import { useScrollActiveSection } from "@/hooks/use-scroll-active-section";
 import UrlScanner from "@/components/dashboard/UrlScanner";
 import EmailBreachChecker from "@/components/dashboard/EmailBreachChecker";
@@ -85,12 +85,12 @@ const Index = () => {
 
   // ============= VIEW MANAGEMENT =============
   // Single source of truth for current view - NO ROUTING
-  // "home" | "scanning" - determines which section is visible via CSS
+  // "home" | "scanning" | "prevention" - determines which section is visible via CSS
   // Initialize from localStorage if available, otherwise default to "home"
-  const [currentView, setCurrentView] = useState<"home" | "scanning">(() => {
+  const [currentView, setCurrentView] = useState<"home" | "scanning" | "prevention">(() => {
     try {
       const savedView = localStorage.getItem("apgs-lastView");
-      return (savedView === "scanning" || savedView === "home") ? savedView : "home";
+      return (savedView === "scanning" || savedView === "home" || savedView === "prevention") ? savedView : "home";
     } catch {
       return "home";
     }
@@ -361,6 +361,17 @@ const Index = () => {
     }, 100);
   };
 
+  const switchToPrevention = () => {
+    // Switch to prevention view
+    setCurrentView("prevention"); // This will trigger localStorage save via useEffect
+    console.log("[DEBUG] Set currentView to prevention");
+    // Scroll to top
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      console.log("[DEBUG] Scrolled to top, currentView is now:", "prevention");
+    }, 100);
+  };
+
   const handleFeatureCardClick = (sectionId: string) => {
     setFeatureLoading(sectionId);
     const tabMap: Record<string, "url" | "email" | "file" | "password"> = {
@@ -392,7 +403,7 @@ const Index = () => {
 
   // ============= COMPUTED VALUES =============
   // Determine navbar active state based on current view
-  const navActiveSection = currentView === "scanning" ? "scanning" : (activeSection || "home");
+  const navActiveSection = currentView === "scanning" ? "scanning" : currentView === "prevention" ? "prevention" : (activeSection || "home");
 
   console.log("[DEBUG] Index Render State:", { currentView, navActiveSection, isAuthenticated });
 
@@ -474,6 +485,17 @@ const Index = () => {
               }`}
             >
               Scanning
+            </button>
+
+            <button
+              onClick={() => switchToPrevention()}
+              className={`px-3 py-1 rounded-lg border transition-all duration-300 ${
+                navActiveSection === "prevention"
+                  ? "border-primary text-primary shadow-[0_0_12px_hsl(150_100%_45%_/_0.4)]"
+                  : "border-border text-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-primary hover:shadow-[0_0_12px_hsl(150_100%_45%_/_0.2)]"
+              }`}
+            >
+              Prevention
             </button>
 
             {!authLoading && isAuthenticated && (
@@ -662,6 +684,140 @@ const Index = () => {
             </div>
           </section>
 
+          {/* Why Security Checks Matter Section */}
+          <section id="why-security" className="space-y-10 scroll-mt-[120px] transition-all duration-300">
+            <div className="text-center space-y-4">
+              <h2 className="text-3xl md:text-4xl font-heading font-bold bg-gradient-to-r from-primary via-cyan-400 to-blue-500 bg-clip-text text-transparent">
+                Why Security Checks Matter
+              </h2>
+              <p className="text-muted-foreground text-base md:text-lg max-w-3xl mx-auto">
+                Protect your digital life with comprehensive security scanning. Every check is designed to keep you safe from modern cyber threats.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Card 1: URL Security */}
+              <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-[0_8px_30px_rgba(0,255,136,0.15)]">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="relative z-10">
+                  <div className="flex items-start gap-4 mb-6">
+                    <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br from-primary/20 to-cyan-500/20 border border-primary/30 flex items-center justify-center">
+                      <Link className="w-7 h-7 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-heading font-bold text-foreground mb-1">URL Security</h3>
+                      <p className="text-sm text-muted-foreground">Real-time link analysis</p>
+                    </div>
+                  </div>
+                  <ul className="space-y-3">
+                    <li className="flex items-start gap-3">
+                      <ShieldCheck className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-muted-foreground">Detect phishing and malicious links</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <Shield className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-muted-foreground">Prevent fake login pages</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-muted-foreground">Analyze domain reputation and patterns</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Card 2: Email Breach Check */}
+              <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 transition-all duration-300 hover:-translate-y-1 hover:border-cyan-400/30 hover:shadow-[0_8px_30px_rgba(0,212,255,0.15)]">
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="relative z-10">
+                  <div className="flex items-start gap-4 mb-6">
+                    <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-400/20 to-blue-500/20 border border-cyan-400/30 flex items-center justify-center">
+                      <Mail className="w-7 h-7 text-cyan-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-heading font-bold text-foreground mb-1">Email Breach Check</h3>
+                      <p className="text-sm text-muted-foreground">Data breach monitoring</p>
+                    </div>
+                  </div>
+                  <ul className="space-y-3">
+                    <li className="flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-muted-foreground">Check if email is exposed in data breaches</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <Shield className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-muted-foreground">Prevent account takeover risks</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <ShieldCheck className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-muted-foreground">Stay informed about compromised data</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Card 3: File Security */}
+              <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 transition-all duration-300 hover:-translate-y-1 hover:border-blue-500/30 hover:shadow-[0_8px_30px_rgba(59,130,246,0.15)]">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="relative z-10">
+                  <div className="flex items-start gap-4 mb-6">
+                    <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30 flex items-center justify-center">
+                      <FileCheck className="w-7 h-7 text-blue-500" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-heading font-bold text-foreground mb-1">File Security</h3>
+                      <p className="text-sm text-muted-foreground">Malware detection & prevention</p>
+                    </div>
+                  </div>
+                  <ul className="space-y-3">
+                    <li className="flex items-start gap-3">
+                      <Shield className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-muted-foreground">Scan files for malware and threats</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-muted-foreground">Prevent harmful downloads</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <FileCheck className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-muted-foreground">Ensure file safety before use</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Card 4: Password Security */}
+              <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 transition-all duration-300 hover:-translate-y-1 hover:border-purple-500/30 hover:shadow-[0_8px_30px_rgba(168,85,247,0.15)]">
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="relative z-10">
+                  <div className="flex items-start gap-4 mb-6">
+                    <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 flex items-center justify-center">
+                      <Lock className="w-7 h-7 text-purple-500" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-heading font-bold text-foreground mb-1">Password Security</h3>
+                      <p className="text-sm text-muted-foreground">Strength & breach analysis</p>
+                    </div>
+                  </div>
+                  <ul className="space-y-3">
+                    <li className="flex items-start gap-3">
+                      <Lock className="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-muted-foreground">Detect weak and reused passwords</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-muted-foreground">Check for leaked passwords in breaches</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <ShieldCheck className="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-muted-foreground">Improve overall account security</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* Stats Section */}
           <section id="stats" className="relative overflow-hidden rounded-xl border border-primary/30 bg-gradient-to-r from-blue-500/10 via-primary/5 to-cyan-500/10 p-10 backdrop-blur-sm transition-all duration-300 scroll-mt-[120px]">
             {/* Decorative gradient background */}
@@ -800,7 +956,23 @@ const Index = () => {
       >
         {currentView === "scanning" && console.log("[DEBUG] Rendering scanning view, scanActiveTab is:", scanActiveTab)}
         <main className="max-w-6xl mx-auto px-4 py-10 space-y-8">
-          {userId ? (
+          {/* Check if guest limit is exceeded */}
+          {!userId && !canGuestScan().allowed ? (
+            // GUEST LIMIT EXCEEDED - Show restriction message
+            <div className="text-center py-20 space-y-6">
+              <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Lock className="w-10 h-10 text-primary" />
+              </div>
+              <h2 className="text-3xl font-heading font-bold text-foreground">Scanning Hub Restricted</h2>
+              <p className="text-muted-foreground text-lg max-w-lg mx-auto">
+                Daily guest scan limit reached. Try again tomorrow or login for unlimited scans.
+              </p>
+              <Button onClick={() => navigate("/login")} className="px-8 py-3 text-lg bg-primary hover:bg-primary/90">
+                Login to Access
+              </Button>
+            </div>
+          ) : userId ? (
+            // LOGGED-IN USERS - Show full Scanning Hub
             <>
               {/* Scanning Hub - Stats Dashboard */}
               <section className="space-y-4">
@@ -934,29 +1106,365 @@ const Index = () => {
                 )}
               </section>
 
-              {/* Activity History */}
-              <ActivityHistory 
-                history={historyList || []} 
-                onHistoryChange={refreshHistory}
-                userId={userId}
-              />
+              {/* Activity History - Only for logged-in users */}
+              {userId && (
+                <ActivityHistory 
+                  history={historyList || []} 
+                  onHistoryChange={refreshHistory}
+                  userId={userId}
+                />
+              )}
             </>
           ) : (
-            <div className="text-center py-20 space-y-6">
-              <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Lock className="w-10 h-10 text-primary" />
-              </div>
-              <h2 className="text-3xl font-heading font-bold text-foreground">Scanning Hub Restricted</h2>
-              <p className="text-muted-foreground text-lg max-w-lg mx-auto">
-                Please log in to access the Advanced Phishing Guard System scanning features and protect your digital assets.
-              </p>
-              <Button onClick={() => navigate("/login")} className="px-8 py-3 text-lg bg-primary hover:bg-primary/90">
-                Login to Access
-              </Button>
-            </div>
+            // GUEST MODE - Simplified UI with upgrade prompt
+            <>
+              {/* Guest Mode Banner */}
+              <section className="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-r from-primary/10 via-cyan-500/5 to-blue-500/10 p-8 backdrop-blur-sm">
+                <div className="relative z-10">
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                    <div className="space-y-3 flex-1">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
+                          <Shield className="w-6 h-6 text-primary" />
+                        </div>
+                        <div>
+                          <h2 className="text-2xl font-heading font-bold text-foreground">Guest Mode Active</h2>
+                          <p className="text-sm text-muted-foreground">Limited access - Login to unlock full features</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Button 
+                        onClick={() => navigate("/login")} 
+                        className="px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg transition-all duration-300 hover:scale-105 whitespace-nowrap"
+                      >
+                        <LogIn className="w-4 h-4 mr-2" />
+                        Login / Sign Up
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Tab Selection - Available for guests */}
+              <section className="border border-border rounded-xl bg-card/70 p-4 transition-all duration-300">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: "url", label: "URL Scan", icon: Globe },
+                    { id: "email", label: "Email Check", icon: Mail },
+                    { id: "file", label: "File Analysis", icon: FileText },
+                    { id: "password", label: "Password Check", icon: Lock },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setScanActiveTab(tab.id as "url" | "email" | "file" | "password")}
+                      className={`py-2 px-3 rounded-lg border transition-all duration-200 ${
+                        scanActiveTab === tab.id
+                          ? "border-primary text-primary bg-primary/10 shadow-[0_0_8px_hsl(150_100%_45%_/_0.2)]"
+                          : "border-border text-muted-foreground hover:border-primary/70"
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-2 text-sm font-medium">
+                        <tab.icon className="w-4 h-4" />
+                        {tab.label}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              {/* Scanner Content - Available for guests */}
+              <section className="space-y-4 transition-all duration-300">
+                {scanActiveTab === "url" && (
+                  <UrlScanner
+                    onScanComplete={refreshHistory}
+                    isAuthenticated={false}
+                    userName=""
+                    scanData={urlScanData}
+                    setScanData={setUrlScanData}
+                  />
+                )}
+                {scanActiveTab === "email" && (
+                  <EmailBreachChecker
+                    onScanComplete={refreshHistory}
+                    isAuthenticated={false}
+                    userName=""
+                    scanData={emailScanData}
+                    setScanData={setEmailScanData}
+                  />
+                )}
+                {scanActiveTab === "file" && (
+                  <FileScanner
+                    onScanComplete={refreshHistory}
+                    isAuthenticated={false}
+                    userName=""
+                    scanData={fileScanData}
+                    setScanData={setFileScanData}
+                  />
+                )}
+                {scanActiveTab === "password" && (
+                  <PasswordChecker
+                    onScanComplete={refreshHistory}
+                    isAuthenticated={false}
+                    userName=""
+                    scanData={passwordScanData}
+                    setScanData={setPasswordScanData}
+                  />
+                )}
+              </section>
+
+              {/* Guest Info Message */}
+              <section className="text-center py-4 px-6 rounded-xl border border-dashed border-border bg-muted/10">
+                <p className="text-sm text-muted-foreground">
+                  📝 You have <span className="text-primary font-semibold">3 free scans per day</span>. 
+                  Login to unlock unlimited scans and save your history.
+                </p>
+              </section>
+            </>
           )}
         </main>
       </div>
+      </div>
+
+      {/* ========== PREVENTION VIEW SECTION ========== */}
+      <div
+        className={`transition-all duration-300 ${
+          currentView === "prevention" ? "block opacity-100" : "hidden opacity-0"
+        }`}
+      >
+        <main className="max-w-7xl mx-auto px-4 py-12 space-y-16">
+          {/* Hero Section */}
+          <section className="text-center space-y-6">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-heading font-bold bg-gradient-to-r from-primary via-cyan-400 to-blue-500 bg-clip-text text-transparent">
+              How to Prevent Phishing Attacks
+            </h1>
+            <p className="text-muted-foreground text-lg md:text-xl max-w-3xl mx-auto leading-relaxed">
+              Stay protected with proven security practices. Learn essential techniques to identify and prevent phishing attempts before they compromise your data.
+            </p>
+          </section>
+
+          {/* Main Prevention Cards */}
+          <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Card 1: MFA */}
+            <div className="group relative overflow-hidden rounded-2xl border border-primary/30 bg-white/5 backdrop-blur-xl p-8 transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_8px_30px_rgba(0,255,136,0.15)]">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div className="relative z-10">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="flex-shrink-0 w-16 h-16 rounded-xl bg-gradient-to-br from-primary/20 to-cyan-500/20 border border-primary/30 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-heading font-bold text-foreground mb-1">Multi-Factor Authentication (MFA)</h3>
+                    <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
+                  </div>
+                </div>
+                <ul className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <ShieldCheck className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-muted-foreground leading-relaxed">Enable MFA on all important accounts (email, banking, social media)</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <ShieldCheck className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-muted-foreground leading-relaxed">Use authenticator apps (Google Authenticator, Authy) instead of SMS</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <ShieldCheck className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-muted-foreground leading-relaxed">Keep backup codes in a secure location for account recovery</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Card 2: Out-of-Band Verification */}
+            <div className="group relative overflow-hidden rounded-2xl border border-cyan-400/30 bg-white/5 backdrop-blur-xl p-8 transition-all duration-300 hover:-translate-y-1 hover:border-cyan-400/50 hover:shadow-[0_8px_30px_rgba(0,212,255,0.15)]">
+              <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div className="relative z-10">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="flex-shrink-0 w-16 h-16 rounded-xl bg-gradient-to-br from-cyan-400/20 to-blue-500/20 border border-cyan-400/30 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-heading font-bold text-foreground mb-1">Out-of-Band Verification</h3>
+                    <p className="text-sm text-muted-foreground">Verify through separate channels</p>
+                  </div>
+                </div>
+                <ul className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <ShieldCheck className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-muted-foreground leading-relaxed">Verify suspicious requests by contacting the person directly</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <ShieldCheck className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-muted-foreground leading-relaxed">Use a different communication channel (call instead of email)</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <ShieldCheck className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-muted-foreground leading-relaxed">Never trust urgent requests asking for sensitive information</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Card 3: URL & Certificate Inspection */}
+            <div className="group relative overflow-hidden rounded-2xl border border-blue-500/30 bg-white/5 backdrop-blur-xl p-8 transition-all duration-300 hover:-translate-y-1 hover:border-blue-500/50 hover:shadow-[0_8px_30px_rgba(59,130,246,0.15)]">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div className="relative z-10">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="flex-shrink-0 w-16 h-16 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-heading font-bold text-foreground mb-1">URL & Certificate Inspection</h3>
+                    <p className="text-sm text-muted-foreground">Check before you click</p>
+                  </div>
+                </div>
+                <ul className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <ShieldCheck className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-muted-foreground leading-relaxed">Hover over links to preview the actual URL before clicking</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <ShieldCheck className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-muted-foreground leading-relaxed">Check for HTTPS and valid SSL certificates on sensitive sites</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <ShieldCheck className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-muted-foreground leading-relaxed">Look for misspellings or unusual domain extensions in URLs</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Card 4: Password Managers */}
+            <div className="group relative overflow-hidden rounded-2xl border border-purple-500/30 bg-white/5 backdrop-blur-xl p-8 transition-all duration-300 hover:-translate-y-1 hover:border-purple-500/50 hover:shadow-[0_8px_30px_rgba(168,85,247,0.15)]">
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div className="relative z-10">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="flex-shrink-0 w-16 h-16 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 flex items-center justify-center">
+                    <Lock className="w-8 h-8 text-purple-500" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-heading font-bold text-foreground mb-1">Password Managers</h3>
+                    <p className="text-sm text-muted-foreground">Secure password generation & storage</p>
+                  </div>
+                </div>
+                <ul className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <ShieldCheck className="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-muted-foreground leading-relaxed">Use unique, strong passwords for every account</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <ShieldCheck className="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-muted-foreground leading-relaxed">Let the password manager generate complex passwords automatically</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <ShieldCheck className="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-muted-foreground leading-relaxed">Enable auto-fill to avoid typing passwords on suspicious sites</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          {/* Quick Safety Tips */}
+          <section className="space-y-8">
+            <div className="text-center space-y-3">
+              <h2 className="text-3xl md:text-4xl font-heading font-bold text-foreground">Quick Safety Tips</h2>
+              <p className="text-muted-foreground">Essential habits to maintain digital security</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[
+                { icon: Shield, text: "Keep software and antivirus updated" },
+                { icon: Mail, text: "Don't open attachments from unknown senders" },
+                { icon: Globe, text: "Use secure, encrypted connections (HTTPS)" },
+                { icon: Lock, text: "Lock your devices when not in use" },
+                { icon: Eye, text: "Regularly monitor account activity" },
+                { icon: AlertTriangle, text: "Report suspicious emails immediately" }
+              ].map((tip, index) => {
+                const Icon = tip.icon;
+                return (
+                  <div
+                    key={index}
+                    className="flex items-center gap-4 p-5 rounded-xl border border-border bg-card/50 hover:bg-card/70 hover:border-primary/30 transition-all duration-200 hover:scale-105"
+                  >
+                    <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Icon className="w-6 h-6 text-primary" />
+                    </div>
+                    <p className="text-sm font-medium text-foreground">{tip.text}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Common Mistakes to Avoid */}
+          <section className="space-y-8">
+            <div className="text-center space-y-3">
+              <h2 className="text-3xl md:text-4xl font-heading font-bold text-foreground">Common Mistakes to Avoid</h2>
+              <p className="text-muted-foreground">Learn from these frequent security errors</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {[
+                { title: "Clicking Urgent Links", description: "Phishers create fake urgency to bypass your critical thinking", icon: AlertTriangle, color: "text-red-400" },
+                { title: "Reusing Passwords", description: "One breach can compromise all your accounts with the same password", icon: Lock, color: "text-orange-400" },
+                { title: "Ignoring URL Details", description: "Small changes in URLs (paypa1.com vs paypal.com) indicate fraud", icon: Link, color: "text-yellow-400" },
+                { title: "Trusting Email Display Names", description: "Display names can be easily spoofed - always check the actual email address", icon: Mail, color: "text-blue-400" }
+              ].map((mistake, index) => {
+                const Icon = mistake.icon;
+                return (
+                  <div
+                    key={index}
+                    className="p-6 rounded-xl border border-border bg-card/50 hover:bg-card/70 transition-all duration-200"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0">
+                        <Icon className={`w-8 h-8 ${mistake.color}`} />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-heading font-bold text-foreground">{mistake.title}</h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{mistake.description}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* CTA Section */}
+          <section className="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-r from-primary/10 via-cyan-500/5 to-blue-500/10 p-12 text-center space-y-6">
+            <div className="relative z-10">
+              <h2 className="text-3xl md:text-4xl font-heading font-bold text-foreground mb-4">
+                Test Your Security Knowledge
+              </h2>
+              <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-8">
+                Use our scanning tools to check URLs, emails, files, and passwords for potential threats.
+              </p>
+              <div className="flex flex-wrap gap-4 justify-center">
+                <Button
+                  onClick={() => switchToScanning()}
+                  className="px-8 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg transition-all duration-300 hover:scale-105"
+                >
+                  Start Scanning Now
+                </Button>
+                <Button
+                  onClick={() => navTo("home")}
+                  variant="outline"
+                  className="px-8 py-3 border-primary text-primary hover:bg-primary/20 font-semibold rounded-lg transition-all duration-300 hover:scale-105"
+                >
+                  Return to Home
+                </Button>
+              </div>
+            </div>
+          </section>
+        </main>
       </div>
 
       {/* ========== BACK TO TOP BUTTON ========== */}
