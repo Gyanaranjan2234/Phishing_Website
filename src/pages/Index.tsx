@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Globe, FileText, Mail, Lock, ShieldCheck, Zap, Phone, Loader2, User, ChevronDown, ArrowUp, LogIn, Link, Shield, AlertTriangle, FileCheck, Eye, BookOpen } from "lucide-react";
+import { Globe, FileText, Mail, Lock, ShieldCheck, Zap, Phone, Loader2, User, ChevronDown, ArrowUp, LogIn, Link, Shield, AlertTriangle, FileCheck, Eye, BookOpen, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
@@ -67,6 +67,7 @@ const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [userName, setUserName] = useState<string>("");
+  const [userEmail, setUserEmail] = useState<string>("");
   const [userId, setUserId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -96,6 +97,7 @@ const Index = () => {
     }
   });
   const [scanActiveTab, setScanActiveTab] = useState<"url" | "email" | "file" | "password">("url");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // ============= HOME PAGE STATE =============
   const [stats, setStats] = useState({ totalScans: 0, threats: 0, safe: 0, activeUsers: 0, suspicious: 0 });
@@ -208,9 +210,11 @@ const Index = () => {
         setIsAuthenticated(!!session?.user);
         if (session?.user) {
           setUserName(session.user.username || session.user.email || "");
+          setUserEmail(session.user.email || "");
           setUserId(Number(session.user.id));
         } else {
           setUserName("");
+          setUserEmail("");
           setUserId(null);
         }
       } catch (err) {
@@ -435,10 +439,11 @@ const Index = () => {
       {/* ========== MAIN CONTENT WRAPPER ========== */}
       <div className="cyber-grid text-foreground flex-1 section-animate">
         {/* ========== NAVBAR: ALWAYS VISIBLE, STRUCTURE CONSTANT ========== */}
-        <header className="sticky top-0 z-50 border-b border-border/50 bg-card/80 backdrop-blur-xl transition-all duration-200 shadow-lg">
-        <div className="max-w-7xl mx-auto px-6 py-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity flex-shrink-0">
+        <header className="sticky top-0 z-50 border-b border-border/50 bg-card/80 backdrop-blur-xl transition-all duration-200 shadow-lg relative">
+        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-3">
+          {/* LOGO - Always left */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <img 
                 src="/apgs-logo.png" 
                 alt="APGS Logo" 
@@ -449,13 +454,15 @@ const Index = () => {
               />
               <div className="flex flex-col">
                 <div className="text-lg md:text-xl font-heading font-bold text-primary">APGS</div>
-                <div className="text-xs text-muted-foreground whitespace-nowrap">Advanced Phishing Guard System</div>
+                <div className="text-xs text-muted-foreground whitespace-nowrap hidden sm:block">Advanced Phishing Guard System</div>
               </div>
             </a>
           </div>
 
-          {/* NAVBAR: ALWAYS THE SAME STRUCTURE - NO DYNAMIC ADD/REMOVE */}
-          <nav className="flex items-center gap-2 text-sm flex-wrap">
+          {/* RIGHT SIDE - Toggle + Profile + Hamburger */}
+          <div className="flex items-center gap-2">
+            {/* DESKTOP NAV - Hidden on mobile (≤768px) */}
+            <nav className="hidden md:flex items-center gap-2 text-sm flex-nowrap">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -616,8 +623,143 @@ const Index = () => {
                 </button>
               </>
             )}
-          </nav>
+            </nav>
+
+            {/* MOBILE HAMBURGER BUTTON - Visible only on mobile (≤768px) */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden w-10 h-10 rounded-lg border border-border/50 bg-card/50 hover:border-primary/50 hover:bg-primary/10 transition-all duration-300 flex items-center justify-center"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? (
+                <X className="w-5 h-5 text-foreground" />
+              ) : (
+                <Menu className="w-5 h-5 text-foreground" />
+              )}
+            </button>
+          </div>
         </div>
+
+        {/* MOBILE DROPDOWN MENU - Absolute positioned overlay */}
+        {mobileMenuOpen && (
+          <div 
+            className="md:hidden absolute top-full left-0 w-full bg-[#0b0f1a] border-t border-border/50 shadow-2xl z-[1000] animate-in slide-in-from-top-2 duration-200"
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              width: '100%',
+              zIndex: 1000
+            }}
+          >
+            {/* USER PROFILE SECTION - Only show when authenticated */}
+            {!authLoading && isAuthenticated && (
+              <div className="max-w-7xl mx-auto px-6 py-4 border-b border-border/50">
+                <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-gradient-to-r from-primary/10 to-cyan-500/10 border border-primary/30">
+                  {/* Avatar */}
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-primary to-cyan-500 flex items-center justify-center text-primary-foreground font-bold text-lg border-2 border-primary/50">
+                    {(userName || "U").charAt(0).toUpperCase()}
+                  </div>
+                  {/* User Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-foreground truncate">
+                      {userName || "User"}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {userEmail || "user@example.com"}
+                    </p>
+                  </div>
+                  {/* Profile & Logout Actions */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { navigate("/profile"); setMobileMenuOpen(false); }}
+                      className="px-3 py-2 rounded-lg border border-primary/50 text-primary hover:bg-primary/20 transition-all duration-200 text-sm font-medium"
+                    >
+                      Profile
+                    </button>
+                    <button
+                      onClick={() => { logout(); setMobileMenuOpen(false); }}
+                      className="px-3 py-2 rounded-lg border border-red-500/50 text-red-400 hover:bg-red-500/20 transition-all duration-200 text-sm font-medium"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <nav className="max-w-7xl mx-auto px-6 py-4 space-y-2">
+              <button
+                onClick={() => { navTo("home"); setMobileMenuOpen(false); }}
+                className={`w-full text-left px-4 py-3 rounded-lg border transition-all duration-200 min-h-[44px] ${
+                  navActiveSection === "home"
+                    ? "border-primary text-primary bg-primary/10"
+                    : "border-border text-foreground hover:border-primary/50 hover:bg-primary/5"
+                }`}
+              >
+                Home
+              </button>
+              <button
+                onClick={() => { navTo("contact"); setMobileMenuOpen(false); }}
+                className={`w-full text-left px-4 py-3 rounded-lg border transition-all duration-200 min-h-[44px] ${
+                  navActiveSection === "contact"
+                    ? "border-primary text-primary bg-primary/10"
+                    : "border-border text-foreground hover:border-primary/50 hover:bg-primary/5"
+                }`}
+              >
+                Contact
+              </button>
+              <button
+                onClick={() => { switchToScanning(); setMobileMenuOpen(false); }}
+                className={`w-full text-left px-4 py-3 rounded-lg border transition-all duration-200 min-h-[44px] ${
+                  navActiveSection === "scanning"
+                    ? "border-primary text-primary bg-primary/10"
+                    : "border-border text-foreground hover:border-primary/50 hover:bg-primary/5"
+                }`}
+              >
+                Scanning
+              </button>
+              <button
+                onClick={() => { switchToPrevention(); setMobileMenuOpen(false); }}
+                className={`w-full text-left px-4 py-3 rounded-lg border transition-all duration-200 min-h-[44px] ${
+                  navActiveSection === "prevention"
+                    ? "border-primary text-primary bg-primary/10"
+                    : "border-border text-foreground hover:border-primary/50 hover:bg-primary/5"
+                }`}
+              >
+                Prevention
+              </button>
+              {!authLoading && isAuthenticated && (
+                <button
+                  onClick={() => { switchToQuiz(); setMobileMenuOpen(false); }}
+                  className={`w-full text-left px-4 py-3 rounded-lg border transition-all duration-200 min-h-[44px] ${
+                    navActiveSection === "quiz"
+                      ? "border-primary text-primary bg-primary/10"
+                      : "border-border text-foreground hover:border-primary/50 hover:bg-primary/5"
+                  }`}
+                >
+                  Security Quiz
+                </button>
+              )}
+              {!authLoading && !isAuthenticated && (
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={() => { navigate("/login"); setMobileMenuOpen(false); }}
+                    className="flex-1 px-4 py-3 rounded-lg border border-primary/50 text-primary hover:bg-primary/20 transition-all duration-200 font-medium min-h-[44px]"
+                  >
+                    Login
+                  </button>
+                  <button
+                    onClick={() => { navigate("/login?view=signup"); setMobileMenuOpen(false); }}
+                    className="flex-1 px-4 py-3 rounded-lg bg-gradient-to-r from-primary to-cyan-500 text-primary-foreground transition-all duration-200 font-semibold min-h-[44px]"
+                  >
+                    Sign Up
+                  </button>
+                </div>
+              )}
+            </nav>
+          </div>
+        )}
       </header>
 
       {/* ========== MAIN CONTENT: USE CSS TO TOGGLE VISIBILITY ========== */}
@@ -632,7 +774,7 @@ const Index = () => {
         {currentView === "home" && console.log("[DEBUG] Rendering home view")}
         <main id="home" className="max-w-6xl mx-auto px-4 py-10 space-y-16 scroll-mt-[120px]">
           {/* Hero Section */}
-          <div className="w-full text-center mb-8">
+          <div className="w-full text-center mb-8 px-4">
               <h1
   className="font-heading font-bold bg-gradient-to-r from-[#00ff88] via-[#00d4ff] to-[#3b82f6] bg-clip-text text-transparent drop-shadow-lg mx-auto"
   style={{
@@ -643,12 +785,12 @@ const Index = () => {
     lineHeight: '1.2',
     letterSpacing: '-0.02em',
     textAlign: 'center',
-    fontSize: 'clamp(2.2rem, 4.5vw, 3.5rem)',
+    fontSize: 'clamp(1.5rem, 6vw, 3.5rem)',
     fontWeight: 700,
-    whiteSpace: 'nowrap',
+    wordBreak: 'break-word',
+    overflowWrap: 'break-word',
     margin: '0 auto',
-    maxWidth: '100%',
-    overflow: 'hidden'
+    maxWidth: '100%'
   }}
 >
   Advanced Phishing Guard System
@@ -779,8 +921,16 @@ const Index = () => {
 
           {/* Why Security Checks Matter Section */}
           <section id="why-security" className="space-y-10 scroll-mt-[120px] transition-all duration-300">
-            <div className="text-center space-y-4">
-              <h2 className="text-3xl md:text-4xl font-heading font-bold bg-gradient-to-r from-primary via-cyan-400 to-blue-500 bg-clip-text text-transparent">
+            <div className="text-center space-y-4 px-4">
+              <h2 
+                className="font-heading font-bold bg-gradient-to-r from-primary via-cyan-400 to-blue-500 bg-clip-text text-transparent"
+                style={{
+                  fontSize: 'clamp(1.5rem, 5vw, 2.25rem)',
+                  lineHeight: '1.2',
+                  wordBreak: 'break-word',
+                  overflowWrap: 'break-word'
+                }}
+              >
                 Why Security Checks Matter
               </h2>
               <p className="text-muted-foreground text-base md:text-lg max-w-3xl mx-auto">
@@ -917,8 +1067,18 @@ const Index = () => {
             <div className="absolute inset-0 opacity-30 bg-gradient-to-r from-blue-500/5 via-transparent to-cyan-500/5 pointer-events-none rounded-xl"></div>
             
             <div className="relative z-10 space-y-8">
-              <div className="text-center space-y-2">
-                <h2 className="text-2xl md:text-3xl font-heading font-bold text-foreground">Platform Statistics</h2>
+              <div className="text-center space-y-2 px-4">
+                <h2 
+                  className="font-heading font-bold text-foreground"
+                  style={{
+                    fontSize: 'clamp(1.25rem, 4vw, 1.875rem)',
+                    lineHeight: '1.2',
+                    wordBreak: 'break-word',
+                    overflowWrap: 'break-word'
+                  }}
+                >
+                  Platform Statistics
+                </h2>
                 <p className="text-muted-foreground text-sm md:text-base">Protecting users worldwide with real-time threat detection</p>
               </div>
               
@@ -1070,7 +1230,17 @@ const Index = () => {
               {/* Scanning Hub - Stats Dashboard */}
               <section className="space-y-4">
                 <div>
-                  <h1 className="text-3xl font-heading font-bold mb-1">Scanning Hub</h1>
+                  <h1 
+                    className="font-heading font-bold mb-1"
+                    style={{
+                      fontSize: 'clamp(1.5rem, 5vw, 1.875rem)',
+                      lineHeight: '1.2',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word'
+                    }}
+                  >
+                    Scanning Hub
+                  </h1>
                   <p className="text-sm text-muted-foreground">
                     Your scan history is automatically saved.
                   </p>
@@ -1468,8 +1638,18 @@ const Index = () => {
 
           {/* Quick Safety Tips */}
           <section className="space-y-8">
-            <div className="text-center space-y-3">
-              <h2 className="text-3xl md:text-4xl font-heading font-bold text-foreground">Quick Safety Tips</h2>
+            <div className="text-center space-y-3 px-4">
+              <h2 
+                className="font-heading font-bold text-foreground"
+                style={{
+                  fontSize: 'clamp(1.5rem, 5vw, 2.25rem)',
+                  lineHeight: '1.2',
+                  wordBreak: 'break-word',
+                  overflowWrap: 'break-word'
+                }}
+              >
+                Quick Safety Tips
+              </h2>
               <p className="text-muted-foreground">Essential habits to maintain digital security</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1499,8 +1679,18 @@ const Index = () => {
 
           {/* Common Mistakes to Avoid */}
           <section className="space-y-8">
-            <div className="text-center space-y-3">
-              <h2 className="text-3xl md:text-4xl font-heading font-bold text-foreground">Common Mistakes to Avoid</h2>
+            <div className="text-center space-y-3 px-4">
+              <h2 
+                className="font-heading font-bold text-foreground"
+                style={{
+                  fontSize: 'clamp(1.5rem, 5vw, 2.25rem)',
+                  lineHeight: '1.2',
+                  wordBreak: 'break-word',
+                  overflowWrap: 'break-word'
+                }}
+              >
+                Common Mistakes to Avoid
+              </h2>
               <p className="text-muted-foreground">Learn from these frequent security errors</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

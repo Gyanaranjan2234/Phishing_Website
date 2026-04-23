@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Globe, FileText, Mail, Lock, ShieldCheck, Zap, Users, Phone, Loader2, User, LogIn } from "lucide-react";
+import { Globe, FileText, Mail, Lock, ShieldCheck, Zap, Users, Phone, Loader2, User, LogIn, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -18,10 +18,12 @@ const Scanning = () => {
   const [theme, setTheme] = useState<"dark" | "light">(() => (localStorage.getItem("apgs-theme") === "light" ? "light" : "dark"));
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [userName, setUserName] = useState<string>("");
+  const [userEmail, setUserEmail] = useState<string>("");
   const [userId, setUserId] = useState<string | null>(null); // Replaced number with string for localStorage compatibility
   const [guestScanCount, setGuestScanCount] = useState<number>(0);
   const [history, setHistory] = useState<any[]>([]);  // ADDED: Explicit state for history
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);  // ADDED: Loading state
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   // Scan state management - preserved across tab switches
   const [urlScanData, setUrlScanData] = useState({ input: "", result: null as any });
@@ -51,9 +53,11 @@ const Scanning = () => {
         setIsAuthenticated(!!session?.user);
         if (session?.user) {
           setUserName(session.user.username || session.user.email || "");
+          setUserEmail(session.user.email || "");
           setUserId(session.user.id);
         } else {
           setUserName("");
+          setUserEmail("");
           setUserId(null);
           setHistory([]);  // CRITICAL: Clear history when no user
         }
@@ -155,10 +159,11 @@ const Scanning = () => {
 
   return (
     <div className="min-h-screen cyber-grid text-foreground transition-colors duration-300" style={{ scrollBehavior: 'smooth' }}>
-      <header className="sticky top-0 z-30 border-b border-border bg-card/90 backdrop-blur-lg transition-all duration-300">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity flex-shrink-0">
+      <header className="sticky top-0 z-30 border-b border-border bg-card/90 backdrop-blur-lg transition-all duration-300 relative">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
+          {/* LOGO - Always left */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <img 
                 src="/apgs-logo.png" 
                 alt="APGS Logo" 
@@ -169,12 +174,15 @@ const Scanning = () => {
               />
               <div className="flex flex-col">
                 <div className="text-lg md:text-xl font-heading font-bold text-primary">APGS</div>
-                <div className="text-xs text-muted-foreground whitespace-nowrap">Advanced Phishing Guard System</div>
+                <div className="text-xs text-muted-foreground whitespace-nowrap hidden sm:block">Advanced Phishing Guard System</div>
               </div>
             </a>
           </div>
 
-          <nav className="flex items-center gap-2 text-sm flex-wrap">
+          {/* RIGHT SIDE - Toggle + Profile + Hamburger */}
+          <div className="flex items-center gap-2">
+            {/* DESKTOP NAV - Hidden on mobile (≤768px) */}
+            <nav className="hidden md:flex items-center gap-2 text-sm flex-nowrap">
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">{theme === "dark" ? "Dark" : "Light"}</span>
               <Switch checked={theme === "light"} onCheckedChange={(checked) => setTheme(checked ? "light" : "dark")} className="data-[state=checked]:bg-primary" />
@@ -201,8 +209,115 @@ const Scanning = () => {
                 <button onClick={() => navigate("/login?view=signup")} className="px-3 py-1 rounded-lg border border-border hover:bg-card/70 transition">Sign Up</button>
               </>
             )}
-          </nav>
+            </nav>
+
+            {/* MOBILE HAMBURGER BUTTON */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden w-10 h-10 rounded-lg border border-border/50 bg-card/50 hover:border-primary/50 hover:bg-primary/10 transition-all duration-300 flex items-center justify-center"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? (
+                <X className="w-5 h-5 text-foreground" />
+              ) : (
+                <Menu className="w-5 h-5 text-foreground" />
+              )}
+            </button>
+          </div>
         </div>
+
+        {/* MOBILE DROPDOWN MENU - Absolute positioned overlay */}
+        {mobileMenuOpen && (
+          <div 
+            className="md:hidden absolute top-full left-0 w-full bg-[#0b0f1a] border-t border-border/50 shadow-2xl z-[1000]"
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              width: '100%',
+              zIndex: 1000
+            }}
+          >
+            {/* USER PROFILE SECTION - Only show when authenticated */}
+            {isAuthenticated && (
+              <div className="max-w-7xl mx-auto px-6 py-4 border-b border-border/50">
+                <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-gradient-to-r from-primary/10 to-cyan-500/10 border border-primary/30">
+                  {/* Avatar */}
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-primary to-cyan-500 flex items-center justify-center text-primary-foreground font-bold text-lg border-2 border-primary/50">
+                    {(userName || "U").charAt(0).toUpperCase()}
+                  </div>
+                  {/* User Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-foreground truncate">
+                      {userName || "User"}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {userEmail || "user@example.com"}
+                    </p>
+                  </div>
+                  {/* Profile & Logout Actions */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { navigate("/profile"); setMobileMenuOpen(false); }}
+                      className="px-3 py-2 rounded-lg border border-primary/50 text-primary hover:bg-primary/20 transition-all duration-200 text-sm font-medium"
+                    >
+                      Profile
+                    </button>
+                    <button
+                      onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
+                      className="px-3 py-2 rounded-lg border border-red-500/50 text-red-400 hover:bg-red-500/20 transition-all duration-200 text-sm font-medium"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <nav className="max-w-7xl mx-auto px-6 py-4 space-y-2">
+              <button
+                onClick={() => { scrollHome("home"); setMobileMenuOpen(false); }}
+                className="w-full text-left px-4 py-3 rounded-lg border border-border text-foreground hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 min-h-[44px]"
+              >
+                Home
+              </button>
+              <button
+                onClick={() => { scrollHome("features"); setMobileMenuOpen(false); }}
+                className="w-full text-left px-4 py-3 rounded-lg border border-border text-foreground hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 min-h-[44px]"
+              >
+                Features
+              </button>
+              <button
+                onClick={() => { scrollHome("contact"); setMobileMenuOpen(false); }}
+                className="w-full text-left px-4 py-3 rounded-lg border border-border text-foreground hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 min-h-[44px]"
+              >
+                Contact
+              </button>
+              <button
+                onClick={() => { setMobileMenuOpen(false); }}
+                className="w-full text-left px-4 py-3 rounded-lg border border-primary text-primary bg-primary/10 transition-all duration-200 font-medium min-h-[44px]"
+              >
+                Scanning
+              </button>
+              {!isAuthenticated && (
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={() => { navigate("/login"); setMobileMenuOpen(false); }}
+                    className="flex-1 px-4 py-3 rounded-lg border border-primary/50 text-primary hover:bg-primary/20 transition-all duration-200 font-medium min-h-[44px]"
+                  >
+                    Login
+                  </button>
+                  <button
+                    onClick={() => { navigate("/login?view=signup"); setMobileMenuOpen(false); }}
+                    className="flex-1 px-4 py-3 rounded-lg bg-gradient-to-r from-primary to-cyan-500 text-primary-foreground transition-all duration-200 font-semibold min-h-[44px]"
+                  >
+                    Sign Up
+                  </button>
+                </div>
+              )}
+            </nav>
+          </div>
+        )}
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-10 space-y-8 transition-opacity duration-300">
