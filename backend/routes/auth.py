@@ -8,11 +8,14 @@ Handles user registration and authentication logic.
 import smtplib
 import os
 import secrets
+import httpx
+import jwt
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from database.db import get_db
 from models.user_model import User
@@ -421,3 +424,264 @@ def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db))
             status="error",
             message="Failed to reset password."
         )
+
+
+# ============ JWT Token Utilities ============
+def create_jwt_token(user_data: dict) -> str:
+    """
+    Create a JWT token for authenticated user.
+    
+    Args:
+        user_data (dict): User information to encode
+        
+    Returns:
+        str: Encoded JWT token
+    """
+    JWT_SECRET = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-this-in-production-2024")
+    JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+    JWT_EXPIRATION = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
+    
+    expire = datetime.utcnow() + timedelta(hours=JWT_EXPIRATION)
+    
+    payload = {
+        "user_id": user_data["id"],
+        "email": user_data["email"],
+        "username": user_data["username"],
+        "exp": expire,
+        "iat": datetime.utcnow()
+    }
+    
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+# ============ Google OAuth 2.0 Routes ============
+@router.get("/google")
+def google_login():
+    """
+    Redirect user to Google OAuth 2.0 authorization page.
+    
+    This endpoint initiates the Google OAuth flow by redirecting
+    the user to Google's consent screen.
+    
+    Returns:
+        RedirectResponse: Redirects to Google OAuth consent screen
+    """
+    print("🔵 [Google OAuth] Initiating Google login...")
+    
+    GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+    GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/auth/google/callback")
+    
+    if not GOOGLE_CLIENT_ID:
+        print("❌ [Google OAuth] Client ID not configured!")
+        raise HTTPException(status_code=500, detail="Google OAuth not configured")
+    
+    print(f"✅ [Google OAuth] Client ID: {GOOGLE_CLIENT_ID[:20]}...")
+    print(f"✅ [Google OAuth] Redirect URI: {GOOGLE_REDIRECT_URI}")
+    
+    # Google OAuth authorization URL
+    # IMPORTANT: URL must be properly encoded
+    from urllib.parse import quote
+    
+    auth_url = (
+        "https://accounts.google.com/o/oauth2/v2/auth?"
+        f"client_id={GOOGLE_CLIENT_ID}&"
+        f"redirect_uri={quote(GOOGLE_REDIRECT_URI, safe='')}"  # URL-encode the redirect_uri
+        "&response_type=code&"
+        "&scope=openid%20email%20profile&"
+        "&access_type=offline&"
+        "&prompt=consent"
+    )
+    
+    print(f"🔄 [Google OAuth] Full auth URL:")
+    print(f"   {auth_url}")
+    print(f"\n🔄 [Google OAuth] Redirecting to Google...")
+    return RedirectResponse(url=auth_url)
+
+
+@router.get("/google/callback")
+async def google_callback(request: Request, db: Session = Depends(get_db)):
+    """
+    Handle Google OAuth callback.
+    
+    After user authorizes the app, Google redirects here with an authorization code.
+    We exchange the code for tokens, get user info, and create/update user in database.
+    
+    Args:
+        request (Request): FastAPI request object
+        db (Session): Database session
+        
+    Returns:
+        RedirectResponse: Redirects to frontend dashboard with JWT token
+    """
+    print("\n" + "="*80)
+    print("🔵 [Google Callback] Received callback request")
+    print("="*80)
+    
+    # Get FRONTEND_URL once at the start
+    FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8080")
+    print(f"🌐 [Google Callback] Frontend URL: {FRONTEND_URL}")
+    
+    try:
+        # Get authorization code from query parameters
+        code = request.query_params.get("code")
+        
+        print(f"🔑 [Google Callback] CODE: {code[:30] if code else 'NONE'}...")
+        print(f"🔍 [Google Callback] All query params: {dict(request.query_params)}")
+        
+        if not code:
+            print("❌ [Google Callback] No authorization code received")
+            error_param = request.query_params.get("error")
+            if error_param:
+                print(f"❌ [Google Callback] Error from Google: {error_param}")
+                return RedirectResponse(url=f"{FRONTEND_URL}/login?error={error_param}")
+            else:
+                return RedirectResponse(url=f"{FRONTEND_URL}/login?error=no_authorization_code")
+        
+        print(f"✅ [Google Callback] Received authorization code: {code[:20]}...")
+        
+        # Exchange code for access token
+        GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+        GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+        GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/auth/google/callback")
+        
+        print(f"🔑 [Google Callback] Client ID: {GOOGLE_CLIENT_ID[:20] if GOOGLE_CLIENT_ID else 'NONE'}...")
+        print(f"🔑 [Google Callback] Client Secret: {'SET' if GOOGLE_CLIENT_SECRET else 'NOT SET'}")
+        print(f"🔗 [Google Callback] Redirect URI: {GOOGLE_REDIRECT_URI}")
+        
+        token_url = "https://oauth2.googleapis.com/token"
+        
+        print(f"\n🔄 [Google Callback] Exchanging code for access token...")
+        print(f"📤 [Google Callback] POST {token_url}")
+        print(f"📦 [Google Callback] Data: code={code[:20]}..., client_id={GOOGLE_CLIENT_ID[:20]}..., grant_type=authorization_code")
+        
+        async with httpx.AsyncClient() as client:
+            token_response = await client.post(
+                token_url,
+                data={
+                    "code": code,
+                    "client_id": GOOGLE_CLIENT_ID,
+                    "client_secret": GOOGLE_CLIENT_SECRET,
+                    "redirect_uri": GOOGLE_REDIRECT_URI,
+                    "grant_type": "authorization_code"
+                }
+            )
+        
+        print(f"📥 [Google Callback] TOKEN RESPONSE Status: {token_response.status_code}")
+        print(f"📥 [Google Callback] TOKEN RESPONSE Body: {token_response.text[:200]}...")
+        
+        if token_response.status_code != 200:
+            print(f"\n❌ [Google Callback] Token exchange FAILED!")
+            print(f"❌ [Google Callback] Status Code: {token_response.status_code}")
+            print(f"❌ [Google Callback] Response: {token_response.text}")
+            print(f"❌ [Google Callback] Possible causes:")
+            print(f"   1. Invalid Client ID or Secret")
+            print(f"   2. Redirect URI mismatch")
+            print(f"   3. Authorization code expired or already used")
+            return RedirectResponse(url=f"{FRONTEND_URL}/login?error=token_exchange_failed")
+        
+        print("\n✅ [Google Callback] Successfully obtained access token")
+        
+        token_data = token_response.json()
+        access_token = token_data.get("access_token")
+        
+        print(f"🎫 [Google Callback] Access Token: {access_token[:30] if access_token else 'NONE'}...")
+        
+        # Get user info from Google
+        userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
+        
+        print(f"\n🔄 [Google Callback] Fetching user info from Google...")
+        print(f"📤 [Google Callback] GET {userinfo_url}")
+        
+        async with httpx.AsyncClient() as client:
+            userinfo_response = await client.get(
+                userinfo_url,
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+        
+        print(f"📥 [Google Callback] USERINFO Status: {userinfo_response.status_code}")
+        print(f"📥 [Google Callback] USERINFO Body: {userinfo_response.text[:200]}...")
+        
+        if userinfo_response.status_code != 200:
+            print(f"\n❌ [Google Callback] User info fetch FAILED!")
+            print(f"❌ [Google Callback] Status Code: {userinfo_response.status_code}")
+            print(f"❌ [Google Callback] Response: {userinfo_response.text}")
+            return RedirectResponse(url=f"{FRONTEND_URL}/login?error=userinfo_fetch_failed")
+        
+        google_user = userinfo_response.json()
+        print(f"\n✅ [Google Callback] Received user info")
+        
+        # Extract user information
+        google_id = google_user.get("id")
+        email = google_user.get("email")
+        name = google_user.get("name", email.split("@")[0] if email else "Unknown")
+        picture = google_user.get("picture", "")
+        
+        print(f"\n👤 [Google Callback] User Details:")
+        print(f"   Name: {name}")
+        print(f"   Email: {email}")
+        print(f"   Google ID: {google_id}")
+        print(f"   Picture: {picture[:50] if picture else 'None'}...")
+        
+        if not email or not google_id:
+            print(f"\n❌ [Google Callback] Missing required user info!")
+            print(f"❌ [Google Callback] Email: {email}")
+            print(f"❌ [Google Callback] Google ID: {google_id}")
+            return RedirectResponse(url=f"{FRONTEND_URL}/login?error=missing_user_info")
+        
+        # Check if user exists (by email or google_id)
+        print(f"🔍 [Google Callback] Checking if user exists...")
+        user = db.query(User).filter(
+            (User.email == email) | (User.google_id == google_id)
+        ).first()
+        
+        if user:
+            print(f"✅ [Google Callback] Existing user found (ID: {user.id})")
+            # Update existing user with Google info if not already set
+            if not user.google_id:
+                user.google_id = google_id
+            if not user.avatar_url and picture:
+                user.avatar_url = picture
+            db.commit()
+            db.refresh(user)
+        else:
+            print(f"✨ [Google Callback] Creating new user...")
+            # Create new user from Google OAuth
+            new_user = User(
+                email=email,
+                username=name,
+                hashed_password=None,  # No password for OAuth users
+                google_id=google_id,
+                avatar_url=picture,
+                is_oauth_user=True
+            )
+            db.add(new_user)
+            db.commit()
+            db.refresh(new_user)
+            user = new_user
+            print(f"✅ [Google Callback] New user created (ID: {user.id})")
+        
+        # Create JWT token
+        print(f"🎫 [Google Callback] Generating JWT token...")
+        jwt_token = create_jwt_token({
+            "id": user.id,
+            "email": user.email,
+            "username": user.username
+        })
+        
+        # Redirect to frontend auth/success page with JWT token
+        auth_success_url = f"{FRONTEND_URL}/auth/success?token={jwt_token}"
+        
+        print(f"\n🚀 [Google Callback] Redirecting to auth success page...")
+        print(f"🔗 [Google Callback] Full URL: {auth_success_url[:100]}...")
+        print("="*80 + "\n")
+        
+        return RedirectResponse(url=auth_success_url)
+        
+    except Exception as e:
+        print(f"\n❌ [Google Callback] EXCEPTION occurred: {str(e)}")
+        import traceback
+        print(f"📋 [Google Callback] Traceback:")
+        traceback.print_exc()
+        print(f"🔙 [Google Callback] Redirecting to login with error")
+        print("="*80 + "\n")
+        return RedirectResponse(url=f"{FRONTEND_URL}/login?error=google_auth_error")

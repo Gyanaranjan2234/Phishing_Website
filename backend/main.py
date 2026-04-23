@@ -37,7 +37,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",  # Vite dev server (React)
         "http://localhost:3000",  # Alternative dev server
-        "http://localhost:8080",  # Another common port
+        "http://localhost:8080",  # Current frontend port
+        "http://localhost:8081",  # Alternative frontend port
     ],
     allow_credentials=True,
     allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Shield, LogOut, User, Globe, FileText, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -16,12 +16,42 @@ import ActivityHistory from "@/components/dashboard/ActivityHistory";
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState<"url" | "file" | "search">("url");
   const [activeNav, setActiveNav] = useState<"home" | "features" | "how" | "contact" | "dashboard">("dashboard");
   const [userName, setUserName] = useState<string>("");
   const [userId, setUserId] = useState<number | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">(() => (localStorage.getItem("apgs-theme") === "light" ? "light" : "dark"));
+
+  // Scan data states for preserving scan results across tab switches
+  const [urlScanData, setUrlScanData] = useState({ input: "", result: null as any });
+  const [fileScanData, setFileScanData] = useState({ file: null as File | null, result: null as any });
+  const [emailScanData, setEmailScanData] = useState({ input: "", result: null as any });
+  const [passwordScanData, setPasswordScanData] = useState({ input: "", result: null as any });
+
+  // Handle JWT token from Google OAuth callback
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const token = params.get("token");
+    
+    if (token) {
+      // Store token in localStorage
+      localStorage.setItem("auth_token", token);
+      
+      // Decode JWT token to get user info
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        setUserId(payload.user_id);
+        setUserName(payload.username);
+        
+        // Clean URL by removing token parameter
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } catch (error) {
+        console.error("Failed to decode JWT token:", error);
+      }
+    }
+  }, [location]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -102,18 +132,14 @@ const Dashboard = () => {
 
   const queryClient = useQueryClient();
   const refresh = useCallback(async () => {
-    console.log("🔄 Dashboard: Refreshing history and stats after clear...");
+    console.log("🔄 Dashboard: Refreshing history and stats after scan...");
     
     try {
-      // 1. Instant UI update: Clear caches immediately
-      queryClient.setQueryData(['history', userId], []);
-      queryClient.setQueryData(['stats', userId], { data: { totalScans: 0, safeScans: 0, threatScans: 0 } });
-      
-      // 2. Invalidate queries to force fresh fetch from backend
+      // 1. Invalidate queries to force fresh fetch from backend
       await queryClient.invalidateQueries({ queryKey: ['history', userId] });
       await queryClient.invalidateQueries({ queryKey: ['stats', userId] });
       
-      // 3. Perform manual refetch to ensure data is reloaded
+      // 2. Perform manual refetch to ensure data is reloaded immediately
       await Promise.all([
         refetchStats(),
         refetchHistory()
@@ -123,8 +149,6 @@ const Dashboard = () => {
       
     } catch (err) {
       console.error("Refresh error:", err);
-      // Only reload on error as fallback
-      window.location.reload(); 
     }
   }, [refetchHistory, refetchStats, queryClient, userId]);
 
@@ -252,20 +276,44 @@ const Dashboard = () => {
 
             {activeTab === "url" && (
               <div className="pt-4">
-                <UrlScanner onScanComplete={refresh} isAuthenticated={true} />
+                <UrlScanner 
+                  onScanComplete={refresh} 
+                  isAuthenticated={true} 
+                  userName={userName}
+                  scanData={urlScanData}
+                  setScanData={setUrlScanData}
+                />
               </div>
             )}
 
             {activeTab === "file" && (
               <div className="pt-4">
-                <FileScanner onScanComplete={refresh} />
+                <FileScanner 
+                  onScanComplete={refresh} 
+                  isAuthenticated={true}
+                  userName={userName}
+                  scanData={fileScanData}
+                  setScanData={setFileScanData}
+                />
               </div>
             )}
 
             {activeTab === "search" && (
               <div className="grid lg:grid-cols-2 gap-6 pt-4">
-                <EmailBreachChecker onScanComplete={refresh} />
-                <PasswordChecker onScanComplete={refresh} />
+                <EmailBreachChecker 
+                  onScanComplete={refresh} 
+                  isAuthenticated={true}
+                  userName={userName}
+                  scanData={emailScanData}
+                  setScanData={setEmailScanData}
+                />
+                <PasswordChecker 
+                  onScanComplete={refresh} 
+                  isAuthenticated={true}
+                  userName={userName}
+                  scanData={passwordScanData}
+                  setScanData={setPasswordScanData}
+                />
               </div>
             )}
           </>

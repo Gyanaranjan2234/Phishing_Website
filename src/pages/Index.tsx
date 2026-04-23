@@ -299,11 +299,25 @@ const Index = () => {
   }, [setActiveSection]);
 
   // ============= HANDLERS =============
-  // const refreshStats = () => refetchStats(); // Removed as stats are now dynamic
-  const refreshHistory = () => {
+  const refreshHistory = async () => {
+    console.log("🔄 Index: Refreshing history and stats after scan...");
+    
+    // Refetch history from backend
     refetchHistory();
+    
+    // Update guest scan count
     setGuestScanCount(getGuestScanCount());
-    // refetchStats(); // Removed
+    
+    // Refresh platform stats to get updated totalScans from backend
+    const data = await getPlatformStats();
+    if (data) {
+      setPlatformStats({
+        totalUsers: data.total_users || 0,
+        totalScans: data.total_scans || 0
+      });
+    }
+    
+    console.log("✅ Index: History and stats refreshed");
   };
 
   const handleContactSubmit = async (e: React.FormEvent) => {

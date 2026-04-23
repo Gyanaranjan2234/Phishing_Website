@@ -197,8 +197,8 @@ const Prevention = () => {
                   <span className="hidden sm:inline">{userName || "Profile"}</span>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="bg-card border border-border">
-                  <DropdownMenuItem onSelect={() => navigate("/dashboard")}>
-                    Dashboard
+                  <DropdownMenuItem onSelect={() => navigate("/")}>
+                    Home
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={handleLogout} className="text-red-400">

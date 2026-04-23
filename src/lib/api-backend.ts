@@ -90,9 +90,37 @@ export const login = async (email: string, password: string) => {
 
 /**
  * Get current user session from localStorage
+ * Checks both regular session and Google OAuth token
  * @returns Session object with user data or null
  */
 export const getSession = async () => {
+  // First, check for Google OAuth token
+  const authToken = localStorage.getItem('auth_token');
+  
+  if (authToken) {
+    try {
+      // Decode JWT token to get user info
+      const payload = JSON.parse(atob(authToken.split('.')[1]));
+      const userData = {
+        id: payload.user_id,
+        email: payload.email,
+        username: payload.username,
+      };
+      
+      // Also store in user_session for compatibility
+      localStorage.setItem('user_session', JSON.stringify(userData));
+      localStorage.setItem('username', userData.username);
+      localStorage.setItem('user_id', userData.id.toString());
+      
+      return { session: { user: userData } };
+    } catch (error) {
+      console.error('Error parsing auth token:', error);
+      // Token is invalid, clear it
+      localStorage.removeItem('auth_token');
+    }
+  }
+  
+  // Fall back to regular session
   const session = localStorage.getItem('user_session');
   
   if (session) {
@@ -114,7 +142,8 @@ export const getSession = async () => {
 export const logout = async () => {
   localStorage.removeItem('user_session');
   localStorage.removeItem('username');
-  localStorage.removeItem('user_id');  // ADDED: Clear user_id
+  localStorage.removeItem('user_id');
+  localStorage.removeItem('auth_token');  // Clear Google OAuth token
   return { success: true };
 };
 
