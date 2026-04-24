@@ -435,19 +435,25 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
       {/* Security Score & Last Login */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Security Score Card */}
-        <div className="bg-card border border-border/50 rounded-xl p-8 flex flex-col items-center justify-center relative overflow-hidden h-full shadow-sm">
-          <div className="w-full flex flex-col items-center space-y-6">
+        <div className="bg-card border border-border/50 rounded-xl p-6 flex flex-col items-center relative overflow-hidden h-full shadow-sm">
+          {/* Title Section */}
+          <div className="w-full mb-8">
+            <h3 className="text-lg font-semibold text-foreground">Security Score</h3>
+            <p className="text-xs text-muted-foreground">Overall system protection level</p>
+          </div>
+
+          <div className="w-full flex-1 flex flex-col items-center justify-center space-y-6">
             {/* Gauge SVG Section */}
-            <div className="relative w-full max-w-[280px] flex flex-col items-center">
-              {/* SVG Container with proper aspect ratio for 180° arc */}
-              <div className="w-full aspect-[1.7/1] relative flex items-center justify-center">
-                <svg className="w-full h-full overflow-visible" viewBox="0 0 100 60">
-                  {/* Gauge Background (Dim) */}
+            <div className="relative w-full max-w-[300px] flex flex-col items-center">
+              {/* SVG Container with optimal aspect ratio for the semi-circle */}
+              <div className="w-full aspect-[1.8/1] relative flex items-center justify-center">
+                <svg className="w-full h-full overflow-visible" viewBox="0 0 100 65">
+                  {/* Gauge Background (Dim) - Radius 44 */}
                   <path
-                    d="M 10 50 A 40 40 0 0 1 90 50"
+                    d="M 6 55 A 44 44 0 0 1 94 55"
                     fill="none"
                     stroke="currentColor"
-                    strokeWidth="7"
+                    strokeWidth="8"
                     strokeLinecap="round"
                     className="text-muted/10"
                   />
@@ -461,27 +467,27 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
                     </linearGradient>
                   </defs>
 
-                  {/* Active Arc (Middle Layer) */}
+                  {/* Active Arc (Radius 44) */}
                   <path
-                    d="M 10 50 A 40 40 0 0 1 90 50"
+                    d="M 6 55 A 44 44 0 0 1 94 55"
                     fill="none"
                     stroke="url(#gaugeGradient)"
-                    strokeWidth="7"
+                    strokeWidth="8"
                     strokeLinecap="round"
-                    strokeDasharray="125.66"
-                    strokeDashoffset={125.66 * (1 - calculateSecurityScore() / 100)}
+                    strokeDasharray="138.23"
+                    strokeDashoffset={138.23 * (1 - calculateSecurityScore() / 100)}
                     style={{ 
                       transition: 'stroke-dashoffset 1.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
                     }}
                   />
 
-                  {/* Pointer (Needle) (Top Layer in SVG) */}
+                  {/* Pointer (Needle) - Centered at 50, 55 */}
                   <g 
-                    transform={`rotate(${(calculateSecurityScore() / 100) * 180 - 90}, 50, 50)`}
+                    transform={`rotate(${(calculateSecurityScore() / 100) * 180 - 90}, 50, 55)`}
                     style={{ transition: 'transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
                   >
                     <line 
-                      x1="50" y1="50" x2="50" y2="24" 
+                      x1="50" y1="55" x2="50" y2="18" 
                       stroke={getRiskColor(calculateSecurityScore())} 
                       strokeWidth="1.5" 
                       strokeLinecap="round"
@@ -489,13 +495,13 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
                         filter: `drop-shadow(0 0 3px ${getRiskColor(calculateSecurityScore())}40)`,
                       }}
                     />
-                    <circle cx="50" cy="50" r="3" fill={getRiskColor(calculateSecurityScore())} />
-                    <circle cx="50" cy="50" r="1.2" fill="white" />
+                    <circle cx="50" cy="55" r="3.5" fill={getRiskColor(calculateSecurityScore())} />
+                    <circle cx="50" cy="55" r="1.5" fill="white" />
                   </g>
                 </svg>
               </div>
               
-              {/* Score Display (Positioned below the arc center point) */}
+              {/* Score Display (Positioned clearly below the arc) */}
               <div className="text-center mt-[-10px] relative z-10">
                 <div className="flex items-baseline justify-center gap-1">
                   <span className="text-5xl font-black tracking-tighter" style={{ 
@@ -506,19 +512,19 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
                   </span>
                   <span className="text-muted-foreground text-sm font-bold opacity-30">/100</span>
                 </div>
-                <p className="text-[11px] font-black tracking-[0.25em] uppercase mt-1" style={{ color: getRiskColor(calculateSecurityScore()) }}>
+                <p className="text-[10px] font-black tracking-[0.3em] uppercase mt-1" style={{ color: getRiskColor(calculateSecurityScore()) }}>
                   {getRiskLabel(calculateSecurityScore())}
                 </p>
               </div>
             </div>
 
             {/* Bottom Stats Section */}
-            <div className="w-full pt-6 border-t border-border/30 flex items-center justify-center gap-10 text-[13px] font-bold">
+            <div className="w-full pt-8 border-t border-border/30 flex items-center justify-center gap-12 text-[13px] font-bold">
               <div className="flex items-center gap-2.5">
                 <span className="text-muted-foreground/70">Safe</span>
                 <span className="text-emerald-400 text-lg">{dashboardData?.safe || 0}</span>
               </div>
-              <div className="w-px h-4 bg-border/40" />
+              <div className="w-px h-5 bg-border/60" />
               <div className="flex items-center gap-2.5">
                 <span className="text-muted-foreground/70">Threats</span>
                 <span className="text-red-400 text-lg">{dashboardData?.threats || 0}</span>
