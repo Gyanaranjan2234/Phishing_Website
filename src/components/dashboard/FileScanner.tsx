@@ -28,19 +28,21 @@ interface FileScannerProps {
   setScanData: (data: { file: File | null; result: any }) => void;
 }
 
-// Updated: Uses unified decision logic with flag priority
-// Ensures threats are never downplayed as "Safe"
-const getVerdictInfo = (score: number, flags?: RiskFlags) => {
-  const verdict = calculateFinalVerdict(score, flags || {});
-  const adjustedScore = calculateAdjustedScore(score, flags || {});
-
-  if (verdict === "safe") {
-    return { bar: "bg-primary", text: "text-primary", bg: "bg-primary/10", label: "✓ Safe", description: "Low Risk File", adjustedScore };
-  } else if (verdict === "warning") {
-    return { bar: "bg-accent", text: "text-accent", bg: "bg-accent/10", label: "⚠ Warning", description: "Medium Risk File", adjustedScore };
+const getVerdictInfo = (score: number, status: string) => {
+  if (status === "safe") {
+    return { bar: "bg-[#00ff9c]", text: "text-[#00ff9c]", bg: "bg-[#00ff9c]/10", label: "✓ Safe", description: "No Risk Detected", score };
+  } else if (status === "low" || status === "moderate") {
+    return { bar: "bg-[#ffcc00]", text: "text-[#ffcc00]", bg: "bg-[#ffcc00]/10", label: "⚠ " + (status === "low" ? "Low Risk" : "Moderate Risk"), description: "Some Risk Factors", score };
   } else {
-    return { bar: "bg-destructive", text: "text-destructive", bg: "bg-destructive/10", label: "✕ Dangerous", description: "High Risk File", adjustedScore };
+    return { bar: "bg-[#ff4d4d]", text: "text-[#ff4d4d]", bg: "bg-[#ff4d4d]/10", label: "✕ " + (status === "high" ? "High Risk" : "Dangerous"), description: "Critical Risk File", score };
   }
+};
+
+const calculateHash = async (file: File): Promise<string> => {
+  const buffer = await file.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
 const FileScanner = ({ onScanComplete, isAuthenticated = false, userName, scanData, setScanData }: FileScannerProps) => {
@@ -111,43 +113,77 @@ const handleScan = async () => {
   setScanProgress(10);
 
   try {
-    // 1. Upload file
-    console.log("File object:", file);
-    console.log("scan Data" , scanData);
-    // giving the file from scan data 
-    const analysisId = await vtApi.uploadAndScan(file!);
-    setScanProgress(40);
+    // 1. Calculate file hash
+    const fileHash = await calculateHash(file);
+    let rawResult: any = null;
 
-    // 2. Poll for completion (VT analysis is async)
-    let rawResult: VTAnalysisResponse;
-    let isCompleted = false;
-    let retryCount = 0;
-
-    while (!isCompleted && retryCount < 10) {
-      rawResult = await vtApi.getAnalysisResults(analysisId);
-      if (rawResult.data.attributes.status === "completed") {
-        isCompleted = true;
-        break;
-      }
-      retryCount++;
-      setScanProgress(40 + (retryCount * 5));
-      await new Promise(r => setTimeout(r, 2000)); // Wait 2 seconds
+    // 2. Try to get existing file report by hash
+    try {
+      rawResult = await vtApi.getFileReport(fileHash);
+    } catch (e) {
+      console.log("File not found in VT or error fetching. Will upload.");
     }
 
-    // 3. Map to UI Interface
-    // @ts-ignore - ensuring we have the result after loop
-    const formattedResult = transformVTToUI(rawResult, file.name);
+    if (rawResult) {
+      setScanProgress(100);
+    } else {
+      // 3. Upload file
+      const analysisId = await vtApi.uploadAndScan(file);
+      setScanProgress(40);
+
+      // 4. Poll for completion (VT analysis is async)
+      let isCompleted = false;
+      let retryCount = 0;
+
+      while (!isCompleted && retryCount < 15) {
+        const analysisResult = await vtApi.getAnalysisResults(analysisId);
+        if (analysisResult.data.attributes.status === "completed") {
+          isCompleted = true;
+          // VT requires the file report for full details after analysis
+          rawResult = await vtApi.getFileReport(fileHash) || analysisResult;
+          break;
+        }
+        retryCount++;
+        setScanProgress(40 + (retryCount * 4));
+        await new Promise(r => setTimeout(r, 2000)); // Wait 2 seconds
+      }
+
+      if (!isCompleted || !rawResult) {
+         throw new Error("Analysis timed out");
+      }
+    }
+
+    // Normalize rawResult for mapper (handles both file and analysis reports)
+    const normalizedResult: VTAnalysisResponse = {
+      data: {
+        type: "analysis",
+        id: rawResult.data?.id || "unknown",
+        attributes: {
+          status: "completed",
+          stats: rawResult.data?.attributes?.last_analysis_stats || rawResult.data?.attributes?.stats,
+          results: rawResult.data?.attributes?.last_analysis_results || rawResult.data?.attributes?.results
+        }
+      },
+      meta: {
+        file_info: {
+          sha256: fileHash
+        }
+      }
+    };
+
+    // 5. Map to UI Interface
+    const formattedResult = transformVTToUI(normalizedResult, file.name);
     
     // Calculate readable file size
     formattedResult.fileSize = (file.size / 1024).toFixed(2) + " KB";
 
-    // 4. Update States
+    // 6. Update States
     setResult(formattedResult);
     setScanData({ file, result: formattedResult });
     setScanProgress(100);
 
     // Success Feedback
-    if (formattedResult.status === "infected") showToast("Threat detected!", "error");
+    if (formattedResult.status === "suspicious") showToast("Warning: Potential risks identified", "error");
     else showToast("Scan completed successfully", "success");
 
   } catch (err) {
@@ -190,7 +226,7 @@ const handleGenerateReport = async () => {
     setDownloadingReport(false);
   }
 };
-  const scoreInfo = result ? getVerdictInfo(result.score, result.flags) : null;
+  const scoreInfo = result ? getVerdictInfo(result.score, result.status) : null;
   return (
     <section className="bg-card border border-border rounded-lg p-6 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
       <h2 className="font-heading font-semibold text-foreground mb-4 flex items-center gap-2">
@@ -313,10 +349,10 @@ const handleGenerateReport = async () => {
                 <div className="flex items-center justify-between mb-4">
                   <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase border shadow-sm ${
                     result.status === 'safe' ? 'bg-[#00ff9c]/25 text-[#00ff9c] border-[#00ff9c]/60 shadow-[#00ff9c]/40' :
-                    result.status === 'infected' ? 'bg-[#ff4d4d]/25 text-[#ff4d4d] border-[#ff4d4d]/60 shadow-[#ff4d4d]/40' :
-                    'bg-[#ffcc00]/25 text-[#ffcc00] border-[#ffcc00]/60 shadow-[#ffcc00]/40'
+                    (result.status === 'low' || result.status === 'moderate') ? 'bg-[#ffcc00]/25 text-[#ffcc00] border-[#ffcc00]/60 shadow-[#ffcc00]/40' :
+                    'bg-[#ff4d4d]/25 text-[#ff4d4d] border-[#ff4d4d]/60 shadow-[#ff4d4d]/40'
                   }`}>
-                    {result.status === 'safe' ? 'SAFE' : result.status === 'infected' ? 'DANGER' : 'SUSPICIOUS'}
+                    {result.status === 'safe' ? 'SAFE' : result.status === 'low' ? 'LOW RISK' : result.status === 'moderate' ? 'MODERATE' : result.status === 'high' ? 'HIGH RISK' : 'DANGEROUS'}
                   </span>
                   <span className="text-xs text-[#9ca3af]">Risk: {scoreInfo.label}</span>
                 </div>
@@ -330,17 +366,17 @@ const handleGenerateReport = async () => {
                         r="40"
                         stroke={
                           result.status === 'safe' ? '#00ff9c' :
-                          result.status === 'infected' ? '#ff4d4d' : '#ffcc00'
+                          (result.status === 'low' || result.status === 'moderate') ? '#ffcc00' : '#ff4d4d'
                         }
                         strokeWidth="8"
-                        strokeDasharray={`${(scoreInfo.adjustedScore / 100) * 251.2} 251.2`}
+                        strokeDasharray={`${(scoreInfo.score / 100) * 251.2} 251.2`}
                         strokeLinecap="round"
                         fill="none"
                         className="transition-all duration-1000 ease-out"
                       />
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-lg font-bold text-slate-100">{scoreInfo.adjustedScore}%</span>
+                      <span className="text-lg font-bold text-slate-100">{scoreInfo.score}%</span>
                     </div>
                   </div>
                   <div className="flex-1">
@@ -348,12 +384,12 @@ const handleGenerateReport = async () => {
                       <div
                         className={`h-full transition-all duration-1000 ease-out ${
                           result.status === 'safe' ? 'bg-[#00ff9c]' :
-                          result.status === 'infected' ? 'bg-[#ff4d4d]' : 'bg-[#ffcc00]'
+                          (result.status === 'low' || result.status === 'moderate') ? 'bg-[#ffcc00]' : 'bg-[#ff4d4d]'
                         }`}
-                        style={{ width: `${scoreInfo.adjustedScore}%` }}
+                        style={{ width: `${scoreInfo.score}%` }}
                       />
                     </div>
-                    <p className="text-xs text-[#9ca3af] mt-1">Security Score</p>
+                    <p className="text-xs text-[#9ca3af] mt-1">Risk Score</p>
                   </div>
                 </div>
               </div>
@@ -364,7 +400,7 @@ const handleGenerateReport = async () => {
               <RiskAnalysisReport
                 data={{
                   scanType: "file",
-                  status: result.status === 'infected' ? 'dangerous' : result.status,
+                  status: result.status,
                   score: result.score,
                   details: result.reasons.map(r => r.label).join(", "),
                   threats: result.reasons.filter(r => r.flagged).map(r => r.label),
@@ -416,28 +452,30 @@ const handleGenerateReport = async () => {
               <div className={`rounded-xl border p-5 text-center bg-[#1f2937] border-l-4 ${
                 result.status === 'safe' 
                   ? 'border-[#00ff9c] bg-[#0b2b1f] shadow-[0_0_30px_rgba(0,255,156,0.12)]' 
-                  : result.status === 'infected'
-                  ? 'border-[#ff4d4d] bg-[#2f0b0b] shadow-[0_0_30px_rgba(255,77,77,0.16)]'
-                  : 'border-[#ffcc00] bg-[#2f2b0b] shadow-[0_0_30px_rgba(255,204,0,0.15)]'
+                  : (result.status === 'low' || result.status === 'moderate')
+                  ? 'border-[#ffcc00] bg-[#2f2b0b] shadow-[0_0_30px_rgba(255,204,0,0.15)]'
+                  : 'border-[#ff4d4d] bg-[#2f0b0b] shadow-[0_0_30px_rgba(255,77,77,0.16)]'
               }`}>
                 <div className="flex items-center justify-center gap-3 mb-3">
                   <span className="text-2xl">
-                    {result.status === 'safe' ? '🛡️' : result.status === 'infected' ? '🚨' : '⚠️'}
+                    {result.status === 'safe' ? '🛡️' : (result.status === 'high' || result.status === 'dangerous') ? '🚨' : '⚠️'}
                   </span>
                   <h5 className={`text-xl font-bold ${
                     result.status === 'safe' ? 'text-[#00ff9c]' :
-                    result.status === 'infected' ? 'text-[#ff4d4d]' : 'text-[#ffcc00]'
+                    (result.status === 'low' || result.status === 'moderate') ? 'text-[#ffcc00]' : 'text-[#ff4d4d]'
                   }`}>
                     {result.status === 'safe' ? 'SAFE TO OPEN' : 
-                     result.status === 'infected' ? 'DO NOT OPEN' : 'INSPECT WITH CAUTION'}
+                     result.status === 'low' ? 'LOW RISK DETECTED' :
+                     result.status === 'moderate' ? 'INSPECT WITH CAUTION (MODERATE)' :
+                     result.status === 'high' ? 'HIGH RISK DETECTED' : 'DO NOT OPEN (DANGEROUS)'}
                   </h5>
                 </div>
                 <p className="text-sm text-slate-300">
                   {result.status === 'safe'
                     ? 'No critical threats detected. This file appears safe, but continue monitoring for new threats.'
-                    : result.status === 'infected'
-                    ? 'Dangerous file detected! Quarantine immediately and do not execute. Report to security team.'
-                    : 'Potential risks identified. Proceed with caution and verify file source before use.'}
+                    : (result.status === 'low' || result.status === 'moderate')
+                    ? 'Some risk identified. Proceed with caution and verify file source before use.'
+                    : 'Dangerous file detected! Quarantine immediately and do not execute. Report to security team.'}
                 </p>
               </div>
             </div>

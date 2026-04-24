@@ -19,7 +19,7 @@ export interface ScanReason {
 export interface FileAnalysis {
     fileName: string;
     fileSize: string;
-    status: "safe" | "infected" | "suspicious";
+    status: "safe" | "low" | "moderate" | "high" | "dangerous" | string;
     score: number;
     threats: string[];
     reasons: ScanReason[];

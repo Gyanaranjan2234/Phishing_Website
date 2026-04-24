@@ -48,5 +48,27 @@ export const vtApi = {
     }
 
     return await response.json();
+  },
+
+  /**
+   * Step 3: Get the full file report using the file hash (SHA-256)
+   */
+  async getFileReport(hash: string): Promise<any> {
+    const response = await fetch(`${BASE_URL}/files/${hash}`, {
+      method: "GET",
+      headers: {
+        "accept": "application/json",
+        "x-apikey": API_KEY!,
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null; // File not found in VT database
+      }
+      throw new Error(`Failed to fetch file report: ${response.statusText}`);
+    }
+
+    return await response.json();
   }
 };

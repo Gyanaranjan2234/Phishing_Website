@@ -24,7 +24,7 @@ import {
 
 export interface RiskAnalysisData {
   scanType: "url" | "email" | "file" | "password";
-  status: "safe" | "suspicious" | "dangerous";
+  status: string;
   score: number;
   details: string;
   threats?: string[];
@@ -57,14 +57,8 @@ const validateData = (data: RiskAnalysisData): RiskAnalysisData => {
   };
 };
 
-// Updated: Uses unified decision logic with critical flags
-// Ensures only ONE verdict is shown consistently
-const getRiskInfo = (score: number, flags?: RiskFlags) => {
-  // Calculate final verdict using unified logic
-  const verdict = calculateFinalVerdict(score, flags || {});
-  const adjustedScore = calculateAdjustedScore(score, flags || {});
-
-  const verdictConfig = {
+const getRiskInfo = (score: number, status: string) => {
+  const verdictConfig: Record<string, any> = {
     safe: {
       level:       "SAFE",
       textColor:   "text-emerald-400",
@@ -74,16 +68,40 @@ const getRiskInfo = (score: number, flags?: RiskFlags) => {
       cardBorder:  "border-emerald-500/50",
       cardBg:      "from-emerald-950/60 to-emerald-900/30",
       icon:        CheckCircle,
+      description: "No threats detected. This file/URL appears safe and legitimate."
     },
-    warning: {
-      level:       "WARNING",
-      textColor:   "text-amber-400",
-      dotColor:    "bg-amber-500",
-      barColor:    "bg-gradient-to-r from-amber-500 to-amber-400",
-      badgeBg:     "bg-gradient-to-r from-amber-500 to-amber-600",
-      cardBorder:  "border-amber-500/50",
-      cardBg:      "from-amber-950/60 to-amber-900/30",
+    low: {
+      level:       "LOW RISK",
+      textColor:   "text-yellow-400",
+      dotColor:    "bg-yellow-500",
+      barColor:    "bg-gradient-to-r from-yellow-500 to-yellow-400",
+      badgeBg:     "bg-gradient-to-r from-yellow-500 to-yellow-600",
+      cardBorder:  "border-yellow-500/50",
+      cardBg:      "from-yellow-950/60 to-yellow-900/30",
       icon:        AlertTriangle,
+      description: "Minor detections. Proceed with caution."
+    },
+    moderate: {
+      level:       "MODERATE RISK",
+      textColor:   "text-yellow-400",
+      dotColor:    "bg-yellow-500",
+      barColor:    "bg-gradient-to-r from-yellow-500 to-yellow-400",
+      badgeBg:     "bg-gradient-to-r from-yellow-500 to-yellow-600",
+      cardBorder:  "border-yellow-500/50",
+      cardBg:      "from-yellow-950/60 to-yellow-900/30",
+      icon:        AlertTriangle,
+      description: "Notable number of detections. Verify source carefully."
+    },
+    high: {
+      level:       "HIGH RISK",
+      textColor:   "text-red-400",
+      dotColor:    "bg-red-500",
+      barColor:    "bg-gradient-to-r from-red-500 to-red-400",
+      badgeBg:     "bg-gradient-to-r from-red-500 to-red-600",
+      cardBorder:  "border-red-500/50",
+      cardBg:      "from-red-950/60 to-red-900/30",
+      icon:        AlertOctagon,
+      description: "Multiple vendors flagged this target. High risk of malicious intent."
     },
     dangerous: {
       level:       "DANGEROUS",
@@ -94,15 +112,19 @@ const getRiskInfo = (score: number, flags?: RiskFlags) => {
       cardBorder:  "border-red-500/50",
       cardBg:      "from-red-950/60 to-red-900/30",
       icon:        AlertCircle,
+      description: "Malicious activity detected. Do not proceed."
     },
   };
 
-  const config = verdictConfig[verdict];
+  // Fallback for older types
+  if (status === "suspicious") status = "warning";
+  if (status === "infected") status = "dangerous";
+
+  const config = verdictConfig[status] || verdictConfig.safe;
   return {
-    verdict,
-    adjustedScore,
+    verdict: status,
+    adjustedScore: score,
     ...config,
-    description: getVerdictDescription(verdict),
   };
 };
 
@@ -127,7 +149,7 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
     );
   }
 
-  const riskInfo  = getRiskInfo(data.score, data.flags);
+  const riskInfo  = getRiskInfo(data.score, data.status);
   const RiskIcon  = riskInfo.icon;
   const formatTime = (date?: string) => date ? new Date(date).toLocaleString() : new Date().toLocaleString();
 
@@ -221,7 +243,10 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
                 <div className="flex items-center gap-3">
                   <div className={`w-4 h-4 rounded-full shadow-lg ${riskInfo.dotColor}`} />
                   <span className={`font-semibold text-lg ${riskInfo.textColor}`}>
-                    {riskInfo.verdict === "safe" ? "✓ Safe" : riskInfo.verdict === "warning" ? "⚠ Warning" : "✕ Dangerous"}
+                    {riskInfo.level === "SAFE" ? "✓ Safe" : 
+                     riskInfo.level === "LOW RISK" ? "⚠ Low Risk" : 
+                     riskInfo.level === "MODERATE RISK" ? "⚠ Moderate" : 
+                     riskInfo.level === "HIGH RISK" ? "✕ High Risk" : "✕ Dangerous"}
                   </span>
                 </div>
               </div>
@@ -272,11 +297,13 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
         </div>
 
         {/* ── Score Reference Cards ── */}
-        <div className="grid md:grid-cols-3 gap-4 pt-4 border-t border-slate-700">
+        <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4 pt-4 border-t border-slate-700">
           {[
-            { label: "Safe",      range: "0 – 30",   dot: "bg-emerald-500", border: "border-emerald-900/50", bg: "from-emerald-950/40 to-emerald-900/20", text: "emerald", desc: "Appears legitimate and secure. Safe to interact with." },
-            { label: "Warning",   range: "31 – 70",  dot: "bg-amber-500",   border: "border-amber-900/50",   bg: "from-amber-950/40 to-amber-900/20",   text: "amber",   desc: "Suspicious characteristics detected. Review before proceeding." },
-            { label: "Dangerous", range: "71 – 100", dot: "bg-red-500",     border: "border-red-900/50",     bg: "from-red-950/40 to-red-900/20",       text: "red",     desc: "Critical security threat. Avoid interaction." },
+            { label: "Safe",      range: "0",        dot: "bg-emerald-500", border: "border-emerald-900/50", bg: "from-emerald-950/40 to-emerald-900/20", text: "emerald", desc: "0 detections." },
+            { label: "Low",       range: "1 – 10",   dot: "bg-yellow-500",  border: "border-yellow-900/50",  bg: "from-yellow-950/40 to-yellow-900/20",   text: "yellow",  desc: "Minor risk." },
+            { label: "Moderate",  range: "11 – 30",  dot: "bg-yellow-500",  border: "border-yellow-900/50",  bg: "from-yellow-950/40 to-yellow-900/20",   text: "yellow",  desc: "Notable risk." },
+            { label: "High Risk", range: "31 – 70",  dot: "bg-red-500",     border: "border-red-900/50",     bg: "from-red-950/40 to-red-900/20",         text: "red",     desc: "Major threat." },
+            { label: "Dangerous", range: "71 – 100", dot: "bg-red-500",     border: "border-red-900/50",     bg: "from-red-950/40 to-red-900/20",         text: "red",     desc: "Critical threat." },
           ].map(({ label, range, dot, border, bg, text, desc }) => (
             <div key={label} className={`rounded-xl p-5 space-y-3 border ${border} bg-gradient-to-br ${bg} transition-colors shadow-lg`}>
               <div className="flex items-center gap-2">
@@ -299,7 +326,9 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
             <RiskIcon className={`w-8 h-8 mt-1 shrink-0 ${riskInfo.textColor}`} />
             <div className="space-y-3 flex-1">
               <p className={`text-2xl font-bold ${riskInfo.textColor}`}>
-                {getVerdictTitle(riskInfo.verdict)}
+                {riskInfo.level === "SAFE" ? "✓ Green Light — Safe to Proceed" :
+                 (riskInfo.level === "LOW RISK" || riskInfo.level === "MODERATE RISK") ? "⚠ Caution — Review Before Proceeding" :
+                 "✕ Red Alert — Do Not Proceed"}
               </p>
               <p className="text-sm text-slate-300 leading-relaxed">{verdictText}</p>
             </div>
@@ -345,15 +374,15 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
                 </li>
               </>
             )}
-            {riskInfo.verdict === "dangerous" && (
+            {(riskInfo.verdict === "high" || riskInfo.verdict === "dangerous") && (
               <>
                 <li className="flex gap-3 p-2 rounded hover:bg-slate-800/30 transition-colors">
                   <AlertOctagon className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
-                  <span>Do not visit or interact with this URL. Multiple vendors flagged it as malicious.</span>
+                  <span>Do not visit or interact with this target. High risk of malicious intent.</span>
                 </li>
                 <li className="flex gap-3 p-2 rounded hover:bg-slate-800/30 transition-colors">
                   <AlertOctagon className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
-                  <span>Report this URL to your security team or email provider immediately.</span>
+                  <span>Report this threat to your security team or service provider.</span>
                 </li>
                 <li className="flex gap-3 p-2 rounded hover:bg-slate-800/30 transition-colors">
                   <AlertOctagon className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />

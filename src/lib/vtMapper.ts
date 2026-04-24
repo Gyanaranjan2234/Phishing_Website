@@ -7,23 +7,27 @@ export const transformVTToUI = (vtRaw: VTAnalysisResponse, fileName: string): Fi
   const results = attributes.results;
 
   const totalEngines = stats.malicious + stats.suspicious + stats.undetected + stats.harmless;
-  const rawScore = totalEngines > 0 ? (stats.malicious / totalEngines) * 100 : 0;
-  
-  const score = stats.malicious > 0 ? Math.max(Math.round(rawScore), 20) : Math.round(rawScore);
+  const riskScore = totalEngines > 0 ? Math.round((stats.malicious / totalEngines) * 100) : 0;
 
-  let status: "safe" | "infected" | "suspicious" = "safe";
-  if (stats.malicious >= 3) status = "infected";
-  else if (stats.malicious > 0 || stats.suspicious > 0) status = "suspicious";
+  let status: "safe" | "low" | "moderate" | "high" | "dangerous" = "safe";
+  if (riskScore === 0) {
+    status = "safe";
+  } else if (riskScore <= 10) {
+    status = "low";
+  } else if (riskScore <= 30) {
+    status = "moderate";
+  } else if (riskScore <= 70) {
+    status = "high";
+  } else {
+    status = "dangerous";
+  }
 
   // Extract critical flags for unified decision logic
-  // If malicious > 0 → Dangerous
-  // Else if suspicious > 0 → Warning (never show as Safe)
-  // Else → Safe
   const flags = {
-    malwareDetected: stats.malicious > 0,  // Any malicious vendor = dangerous
-    phishingDetected: stats.malicious >= 3,  // 3+ malicious = phishing threat
+    malwareDetected: stats.malicious > 0,
+    phishingDetected: false, // File scanning usually doesn't strictly categorize as phishing
     blacklisted: false,
-    suspicious: stats.suspicious > 0,  // Any suspicious vendor = warning
+    suspicious: stats.suspicious > 0,
   };
 
   // CHANGE: Map ALL vendors instead of just 8 to allow for the scrollable list
@@ -44,7 +48,7 @@ export const transformVTToUI = (vtRaw: VTAnalysisResponse, fileName: string): Fi
     fileName: fileName,
     fileSize: "Analyzed", 
     status,
-    score: status === "infected" ? Math.max(score, 80) : score, // Boost score for danger visibility
+    score: riskScore, // Pure calculated risk score from VT stats
     threats: threats.length > 0 ? threats : ["No specific threat signatures"],
     reasons,
     flags,
