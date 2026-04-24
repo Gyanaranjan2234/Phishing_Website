@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { User as UserIcon, Lock, Mail, CheckCircle2, LogOut, Trash2 } from "lucide-react";
+import { User as UserIcon, Lock, Mail, CheckCircle2, LogOut, Trash2, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -157,52 +157,55 @@ const Profile = () => {
     <div className="min-h-screen cyber-grid py-8">
       <div className="max-w-7xl mx-auto px-4 space-y-6">
         {/* Enhanced Professional Profile Header */}
-        <div className="relative bg-gradient-to-br from-card via-card to-card/80 border border-border/50 rounded-2xl p-8 backdrop-blur-sm glass overflow-hidden">
-          {/* Decorative gradient background */}
-          <div className="absolute inset-0 opacity-5 bg-gradient-to-r from-primary via-transparent to-accent pointer-events-none rounded-2xl"></div>
+        <div className="relative bg-card/30 backdrop-blur-xl border border-white/5 rounded-2xl p-6 shadow-2xl overflow-hidden group">
+          {/* Decorative background glow */}
+          <div className="absolute -top-24 -left-24 w-64 h-64 bg-primary/5 rounded-full blur-[120px] pointer-events-none transition-all duration-1000 group-hover:bg-primary/10"></div>
           
-          {/* Main header content */}
-          <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-            {/* Left Side: User Profile Info */}
-            <div className="flex items-center gap-6 flex-1">
-              {/* User Avatar Placeholder */}
+          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-5">
+              {/* Dynamic Avatar Section */}
               <div className="relative">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-muted via-muted/80 to-muted/60 flex items-center justify-center border border-border shadow-lg">
-                  <UserIcon className="w-8 h-8 text-muted-foreground" />
+                {/* Glowing Ring */}
+                <div className="absolute -inset-1 bg-gradient-to-tr from-primary/30 to-transparent rounded-full blur opacity-40 group-hover:opacity-70 transition duration-700" />
+                
+                <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-muted/50 to-card border border-white/10 flex items-center justify-center text-2xl font-black text-primary shadow-2xl">
+                  {(user.username || 'G').charAt(0).toUpperCase()}
                 </div>
+                
+                {/* Active Status Dot */}
+                <div className="absolute bottom-0 right-1 w-4 h-4 bg-emerald-500 border-[3px] border-[#0a0a0a] rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
               </div>
 
               {/* User Info Section */}
-              <div className="flex-1">
-                {/* User Name */}
-                <h1 className="text-3xl font-semibold text-foreground mb-1">
+              <div>
+                <h1 className="text-2xl font-bold text-foreground tracking-tight">
                   {user.username || "Your Profile"}
                 </h1>
-
-                {/* User Email */}
-                <div className="flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-primary/70" />
-                  <span className="text-sm text-muted-foreground">{user.email}</span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <Mail className="w-3.5 h-3.5 text-muted-foreground/60" />
+                  <span className="text-sm text-muted-foreground font-medium opacity-80">
+                    {user.email}
+                  </span>
                 </div>
               </div>
             </div>
 
             {/* Right Side: Action Buttons */}
-            <div className="flex gap-3 w-full lg:w-auto">
-              <Button 
-                variant="secondary" 
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <button 
                 onClick={() => navigate("/")} 
-                className="flex-1 lg:flex-none text-sm font-medium transition-all duration-300 ease-in-out hover:scale-105 active:scale-98 hover:shadow-[0_0_16px_hsl(150_100%_45%_/_0.3)] hover:drop-shadow-[0_0_8px_hsl(150_100%_45%_/_0.2)] rounded-lg"
+                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 border border-white/5 text-xs font-bold text-foreground/80 hover:bg-white/10 hover:text-foreground transition-all active:scale-95"
               >
-                Return to Home
-              </Button>
-              <Button 
-                variant="outline" 
+                <Home className="w-4 h-4" />
+                <span>Return to Home</span>
+              </button>
+              <button 
                 onClick={handleLogout} 
-                className="flex-1 lg:flex-none text-sm font-medium flex items-center justify-center gap-2 transition-all duration-300 ease-in-out hover:scale-105 active:scale-98 hover:bg-red-500/10 hover:shadow-[0_0_16px_hsl(0_72%_51%_/_0.3)] hover:drop-shadow-[0_0_8px_hsl(0_72%_51%_/_0.2)] rounded-lg border-border hover:border-destructive/50"
+                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-red-500/5 border border-red-500/10 text-xs font-bold text-red-400/80 hover:bg-red-500/10 hover:text-red-400 transition-all active:scale-95"
               >
-                <LogOut className="w-4 h-4" /> Logout
-              </Button>
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
             </div>
           </div>
         </div>

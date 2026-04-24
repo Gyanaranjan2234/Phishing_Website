@@ -16,7 +16,9 @@ import {
   AlertCircle,
   Monitor,
   Star,
-  ShieldAlert
+  ShieldAlert,
+  Home,
+  LogOut
 } from "lucide-react";
 import { 
   LineChart, 
@@ -380,6 +382,8 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
+
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Scans */}
         <div className="bg-gradient-to-br from-card to-card/80 border border-border/50 rounded-xl p-5 backdrop-blur-sm hover:border-primary/50 transition-all duration-300">
@@ -727,11 +731,16 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
                 <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
                 <Tooltip 
                   contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
+                    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '8px',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+                    padding: '8px 12px',
+                    fontSize: '12px',
+                    color: '#ffffff',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
                   }}
+                  itemStyle={{ color: '#ffffff' }}
+                  cursor={{ stroke: 'rgba(255, 255, 255, 0.1)', strokeWidth: 1 }}
                 />
                 <Line 
                   type="monotone" 
@@ -793,10 +802,15 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
                   </Pie>
                   <Tooltip 
                     contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
+                      backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      color: '#ffffff',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
                     }}
+                    itemStyle={{ color: '#ffffff' }}
                   />
                 </PieChart>
               </ResponsiveContainer>
