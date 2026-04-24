@@ -16,6 +16,7 @@ import { generatePDFReport } from "@/lib/pdfReportGenerator";
 import { vtApi } from "@/lib/api-vt";
 import { transformVTToUI } from "@/lib/vtMapper";
 import { VTAnalysisResponse } from "@/lib/vt-interfaces";
+import { saveScanResult } from "@/lib/scanHistory";
 import { calculateFinalVerdict, calculateAdjustedScore, type RiskFlags } from "@/lib/riskDecisionLogic";
 //import {generatePDFReport} from "@/lib/pdfReportGenerator";
 //import { generateFilePdfReport} from "@lib/filepdfReport"
@@ -181,6 +182,19 @@ const handleScan = async () => {
     setResult(formattedResult);
     setScanData({ file, result: formattedResult });
     setScanProgress(100);
+
+    // 7. Save Scan Record
+    await saveScanResult({
+      type: "file",
+      target: file.name,
+      hash: fileHash,
+      malicious: formattedResult.vtStats?.malicious || 0,
+      suspicious: formattedResult.vtStats?.suspicious || 0,
+      harmless: formattedResult.vtStats?.harmless || 0,
+      undetected: formattedResult.vtStats?.undetected || 0,
+      risk_score: formattedResult.score,
+      status: formattedResult.status
+    });
 
     // Success Feedback
     if (formattedResult.status === "suspicious") showToast("Warning: Potential risks identified", "error");

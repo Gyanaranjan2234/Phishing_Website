@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
 import type { UrlAnalysis, ScanStatus } from "@/lib/interfaces";
 import { apiScans } from "@/lib/api-backend";  // UPDATED: Use backend API instead of mock
+import { saveScanResult } from "@/lib/scanHistory";
 import { handleScanAttempt } from "@/lib/guestAccess";  // ADDED: Guest access control
 import RiskAnalysisReport from "@/components/RiskAnalysisReport";
 import { generatePDFReport } from "@/lib/pdfReportGenerator";
@@ -113,29 +114,17 @@ const handleAnalyze = async (e: React.FormEvent) => {
 
     if (isAuthenticated) {
       try {
-        // Get user_id from localStorage for secure data isolation
-        const userId = localStorage.getItem('user_id');
-        console.log('💾 Saving URL scan - user_id:', userId, 'url:', url, 'status:', analysis.status);
-        
-        if (userId) {
-          const saveResult = await apiScans.saveScan(
-            parseInt(userId),  // Use user_id (NOT username)
-            "url",
-            url,
-            analysis.status
-          );
-          
-          console.log('✅ Scan save result:', saveResult);
-          
-          if (saveResult.status === 'success') {
-            showToast("✅ Result saved to history", "success");
-          } else {
-            console.error('❌ Failed to save scan:', saveResult.message);
-            showToast("⚠️ Scan completed but failed to save to history", "error");
-          }
-        } else {
-          console.warn('⚠️ No user_id found in localStorage - scan not saved');
-        }
+        await saveScanResult({
+          type: "url",
+          target: url,
+          malicious: vtResponse.stats.malicious,
+          suspicious: vtResponse.stats.suspicious,
+          harmless: vtResponse.stats.harmless,
+          undetected: vtResponse.stats.undetected,
+          risk_score: analysis.score,
+          status: analysis.status
+        });
+        showToast("✅ Result saved to history", "success");
       } catch (err) {
         console.error("❌ Failed to save scan:", err);
       }

@@ -10,6 +10,7 @@ import { toast } from "sonner";
 
 import zxcvbn from "zxcvbn";  // Real-world password strength library
 import { apiScans } from "@/lib/api-backend";  // UPDATED: Use backend API
+import { saveScanResult } from "@/lib/scanHistory";
 import { handleScanAttempt } from "@/lib/guestAccess";  // ADDED: Guest access control
 import confetti from "canvas-confetti"; // Import confetti
 
@@ -432,30 +433,16 @@ const PasswordChecker = ({ onScanComplete, isAuthenticated = false, scanData, se
         const userId = localStorage.getItem('user_id');
         console.log('💾 Saving password scan - user_id:', userId, 'status:', finalResult.breached ? "breached" : "safe");
         
-        if (userId) {
-          // Store only partially masked password: first 3 + *** + last 3
-          const partialMask = maskPassword(password);
-          const saveResult = await apiScans.saveScan(
-            parseInt(userId),  // Use user_id (NOT username)
-            "password",
-            partialMask,
-            finalResult.breached ? "breached" : "safe",
-            JSON.stringify(finalResult),
-            password // RAW password for backend validation (NEVER STORED PLAIN)
-          );
-          
-          console.log('✅ Scan save result:', saveResult);
-
-          if (saveResult.status === 'error' && saveResult.code === 'RATE_LIMIT_EXCEEDED') {
-            toast.error(saveResult.message);
-          } else if (saveResult.warnings && saveResult.warnings.length > 0) {
-            saveResult.warnings.forEach((warn: string) => {
-              toast.warning(`⚠️ ${warn}`);
-            });
-          }
-        } else {
-          console.warn('⚠️ No user_id found in localStorage - scan not saved');
-        }
+        // Store only partially masked password: first 3 + *** + last 3
+        const partialMask = maskPassword(password);
+        
+        await saveScanResult({
+          type: "password",
+          target: partialMask,
+          status: finalResult.breached ? "breached" : "safe",
+          risk_score: finalResult.breached ? 100 : Math.round(100 - finalResult.score), // Invert score percent? No wait, score percent is strength. Risk is 100 - strength.
+          details: JSON.stringify(finalResult)
+        });
 
       }
 

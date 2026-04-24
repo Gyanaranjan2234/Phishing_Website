@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { apiScans } from "@/lib/api-backend";  // UPDATED: Use backend API
+import { saveScanResult } from "@/lib/scanHistory";
 import { handleScanAttempt } from "@/lib/guestAccess";  // ADDED: Guest access control
 
 interface EmailBreachCheckerProps {
@@ -67,36 +68,19 @@ const EmailBreachChecker = ({ onScanComplete, isAuthenticated = false, scanData,
       setScanData({ input: email, result: finalResult });
       onScanComplete();
 
-      // 2. Save to history if authenticated
-      if (isAuthenticated) {
-        try {
-          // Get user_id from localStorage for secure data isolation
-          const userId = localStorage.getItem('user_id');
-          console.log('💾 Saving email scan - user_id:', userId, 'email:', email, 'status:', isBreached ? "breached" : "safe");
-          
-          if (userId) {
-            const saveResult = await apiScans.saveScan(
-              parseInt(userId),  // Use user_id (NOT username)
-              "email",
-              email,
-              isBreached ? "breached" : "safe"
-            );
-            
-            console.log('✅ Scan save result:', saveResult);
-            
-            if (saveResult.status === 'success') {
-              toast.success("✅ Result saved to history");
-            } else {
-              console.error('❌ Failed to save scan:', saveResult.message);
-            }
-          } else {
-            console.warn('⚠️ No user_id found in localStorage - scan not saved');
-          }
-        } catch (err) {
-          console.error("❌ Failed to save scan:", err);
-        }
+      // 2. Save to history
+      try {
+        await saveScanResult({
+          type: "email",
+          target: email,
+          status: isBreached ? "breached" : "safe",
+          risk_score: isBreached ? 100 : 0,
+          details: JSON.stringify(finalResult)
+        });
+        toast.success("✅ Result saved to history");
+      } catch (err) {
+        console.error("❌ Failed to save scan:", err);
       }
-      // REMOVED: Guest scan message (already shown above)
 
       if (isBreached) toast.error("⚠️ Security Alert: Email Found in Breaches");
       else toast.success("✅ Your email is safe!");

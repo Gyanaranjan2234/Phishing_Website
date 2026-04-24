@@ -13,6 +13,7 @@ import FileScanner from "@/components/dashboard/FileScanner";
 import EmailBreachChecker from "@/components/dashboard/EmailBreachChecker";
 import PasswordChecker from "@/components/dashboard/PasswordChecker";
 import ActivityHistory from "@/components/dashboard/ActivityHistory";
+import { getLocalStats, getLocalHistory } from "@/lib/scanHistory";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -89,13 +90,14 @@ const Dashboard = () => {
   const { data: statsResponse, refetch: refetchStats, isLoading: statsLoading } = useQuery({
     queryKey: ['stats', userId],
     queryFn: async () => {
-      if (!userId) return { data: { totalScans: 0, safeScans: 0, threatScans: 0 } };
+      if (!userId) {
+        return { data: getLocalStats() };
+      }
       console.log(`📡 Dashboard: Fetching real-time stats for user ${userId}...`);
       const res = await apiScans.getStats(userId);
       console.log("📊 Dashboard: Stats API response received:", res.data);
       return res;
     },
-    enabled: !!userId,
     staleTime: 0, // Ensure we always get fresh data
     gcTime: 0,
   });
@@ -106,7 +108,9 @@ const Dashboard = () => {
   const { data: history, refetch: refetchHistory } = useQuery({
     queryKey: ['history', userId],
     queryFn: async () => {
-      if (!userId) return [];
+      if (!userId) {
+        return getLocalHistory();
+      }
       const res = await apiScans.getHistory(userId, 1000);
       
       const rawData = res.data || [];
@@ -122,7 +126,6 @@ const Dashboard = () => {
       console.log("Transformed history for Dashboard:", transformed);
       return transformed;
     },
-    enabled: !!userId,
     staleTime: 0,
   });
 
@@ -151,6 +154,16 @@ const Dashboard = () => {
       console.error("Refresh error:", err);
     }
   }, [refetchHistory, refetchStats, queryClient, userId]);
+
+  // Handle cross-tab scan updates
+  useEffect(() => {
+    const handleUpdate = () => {
+      refetchStats();
+      refetchHistory();
+    };
+    window.addEventListener('scan_history_updated', handleUpdate);
+    return () => window.removeEventListener('scan_history_updated', handleUpdate);
+  }, [refetchStats, refetchHistory]);
 
   const goToLandingSection = (anchor: "home" | "features" | "contact") => {
     navigate(`/#${anchor}`);
@@ -225,10 +238,8 @@ const Dashboard = () => {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
-        {/* 2. Conditional Rendering: Only show the FULL Scanning Hub if userId exists */}
-        {userId && (
-          <>
-            <div className="animate-fade-in-up">
+        {/* Removed !userId restriction so the Scanning Hub is available to everyone, with History saving locally */}
+        <div className="animate-fade-in-up">
               <h1 className="text-2xl md:text-3xl font-heading font-bold text-foreground">Security Dashboard</h1>
               <p className="text-muted-foreground mt-1">Monitor threats, analyze URLs, and check for breaches</p>
             </div>
@@ -316,11 +327,8 @@ const Dashboard = () => {
                 />
               </div>
             )}
-          </>
-        )}
-
-
-        <ActivityHistory 
+            
+        <ActivityHistory  
           key={`history-list-${history?.length || 0}-${userId || 'none'}`}
           history={history || []} 
           onHistoryChange={refresh}
