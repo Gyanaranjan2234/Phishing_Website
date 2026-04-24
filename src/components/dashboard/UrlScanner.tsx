@@ -220,7 +220,7 @@ const handleAnalyze = async (e: React.FormEvent) => {
 
       {scanning && (
         <div className="mt-4 space-y-2 animate-fade-in-up">
-          <p className="text-muted-foreground text-sm font-mono">Scanning with VirusTotal — this may take 10–20 seconds...</p>
+          <p className="text-muted-foreground text-sm font-mono">Scanning with Advanced Threat Analysis Engine — this may take 10–20 seconds...</p>
           <Progress value={66} className="h-2" />
         </div>
       )}
@@ -279,7 +279,7 @@ const handleAnalyze = async (e: React.FormEvent) => {
               </div>
             </div>
 
-            {/* VirusTotal Stats */}
+            {/* Threat Stats */}
             {result.vtStats && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-border/30">
                 {[

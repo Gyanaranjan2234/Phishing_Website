@@ -92,7 +92,7 @@ const PrivacyPolicy = () => {
               <div className="bg-card/30 rounded-lg p-4 border border-border/50">
                 <h3 className="font-semibold text-foreground mb-2">Third-Party Data</h3>
                 <p className="text-base leading-relaxed">
-                  We may receive security threat data from VirusTotal and other threat intelligence providers to enhance our scanning services. This data does not include personal identifiers.
+                  We may receive security threat data from the Advanced Threat Analysis Engine and other threat intelligence providers to enhance our scanning services. This data does not include personal identifiers.
                 </p>
               </div>
             </div>
@@ -201,9 +201,9 @@ const PrivacyPolicy = () => {
             </p>
             <div className="space-y-3 bg-card/30 rounded-lg p-4 border border-border/50">
               <div>
-                <h3 className="font-semibold text-foreground mb-1">VirusTotal API</h3>
+                <h3 className="font-semibold text-foreground mb-1">Advanced Threat Analysis Engine</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  We use VirusTotal for threat scanning. Your submitted URLs/files may be analyzed by 90+ security vendors. Review their privacy policy at virustotal.com.
+                  We use an Advanced Threat Analysis Engine for threat scanning. Your submitted URLs/files may be analyzed by 90+ security vendors.
                 </p>
               </div>
               <div className="border-t border-border/30 pt-3">

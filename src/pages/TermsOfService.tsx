@@ -216,9 +216,9 @@ const TermsOfService = () => {
             </p>
             <div className="space-y-3 bg-card/30 rounded-lg p-4 border border-border/50">
               <div>
-                <h3 className="font-semibold text-foreground mb-2">VirusTotal API</h3>
+                <h3 className="font-semibold text-foreground mb-2">Advanced Threat Analysis Engine</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  We use VirusTotal for URL and file scanning. Your submitted content may be analyzed by 90+ security vendors. Review VirusTotal's privacy policy at virustotal.com. We are not responsible for how VirusTotal processes your data.
+                  We use an Advanced Threat Analysis Engine for URL and file scanning. Your submitted content may be analyzed by 90+ security vendors. We are not responsible for how these third-party engines process your data.
                 </p>
               </div>
               <div className="border-t border-border/30 pt-3">
@@ -322,7 +322,7 @@ const TermsOfService = () => {
               </li>
               <li className="flex items-start gap-3">
                 <span className="text-primary mt-1">•</span>
-                <span>Submitted URLs/files may be shared with VirusTotal and other security vendors</span>
+                <span>Submitted URLs/files may be shared with our security analysis partners</span>
               </li>
               <li className="flex items-start gap-3">
                 <span className="text-primary mt-1">•</span>

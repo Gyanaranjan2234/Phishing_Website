@@ -69,14 +69,14 @@ export const generateRiskReport = (data: RiskReportData): string => {
   Project:      APGS - Advanced Phishing Guard System
   Version:      1.0.0
   Scan Date:    ${timestamp}
-${data.userName ? `  Analyzed By:  ${data.userName}` : ""}
+  Analyzed By:  APGS Security Engine
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔍 SCAN OVERVIEW
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Scan Type:   ${scanTypeLabel[data.scanType]}
-  Purpose:     Comprehensive security analysis powered by VirusTotal
+  Purpose:     Comprehensive security analysis powered by Advanced Threat Analysis Engine
                to identify potential threats in your digital assets.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

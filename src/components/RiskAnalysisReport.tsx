@@ -144,10 +144,15 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
         <div className="space-y-4 pb-6 border-b border-slate-700">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="space-y-1">
-              <h2 className="text-4xl font-bold text-white">Risk Analysis Report</h2>
+              <h2 className="text-4xl font-bold text-white flex items-center gap-3">
+                Risk Analysis Report
+                <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium">
+                  ✔ Verified by APGS
+                </span>
+              </h2>
               <p className="text-slate-400 text-sm flex items-center gap-2">
                 <Activity className="w-4 h-4" />
-                Powered by VirusTotal — {90}+ vendor analysis
+                Powered by Advanced Threat Analysis Engine
               </p>
             </div>
             <div className={`px-5 py-3 rounded-full font-semibold text-sm flex items-center gap-2 shadow-lg text-white ${riskInfo.badgeBg}`}>
@@ -170,7 +175,7 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
               {[
                 { label: "Scan Type",       value: scanTypeLabels[data.scanType] },
                 { label: "Target",          value: data.targetItem || "Not specified" },
-                { label: "Scanned By",      value: data.userName || "Guest User" },
+                { label: "Scanned By",      value: "APGS Security Engine" },
               ].map(({ label, value }) => (
                 <div key={label} className="pb-3 border-b border-slate-600">
                   <p className="text-xs text-slate-400 uppercase font-semibold tracking-wide">{label}</p>
@@ -312,7 +317,7 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
               <>
                 <li className="flex gap-3 p-2 rounded hover:bg-slate-800/30 transition-colors">
                   <CheckCircle className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                  <span>URL verified as safe by VirusTotal. Proceed with confidence.</span>
+                  <span>URL verified as safe. Proceed with confidence.</span>
                 </li>
                 <li className="flex gap-3 p-2 rounded hover:bg-slate-800/30 transition-colors">
                   <CheckCircle className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />

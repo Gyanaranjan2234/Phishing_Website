@@ -104,7 +104,7 @@ export async function generateReport(analysis: UrlAnalysis): Promise<void> {
 
   y += 20;
 
-  // VirusTotal stats if available
+  // Advanced threat stats if available
   if (analysis.vtStats) {
     doc.setDrawColor(150, 150, 150);
     doc.setLineWidth(0.3);
@@ -114,7 +114,7 @@ export async function generateReport(analysis: UrlAnalysis): Promise<void> {
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(30, 30, 30);
-    doc.text("VIRUSTOTAL SCAN STATS", 20, y);
+    doc.text("THREAT SCAN STATISTICS", 20, y);
     y += 10;
 
     const stats = [

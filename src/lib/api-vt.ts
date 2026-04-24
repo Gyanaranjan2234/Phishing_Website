@@ -5,7 +5,7 @@ const API_KEY = import.meta.env.VITE_VIRUSTOTAL_API_KEY;
 
 export const vtApi = {
   /**
-   * Step 1: Upload the file to VirusTotal
+   * Step 1: Upload the file for analysis
    */
   async uploadAndScan(file: File): Promise<string> {
     const formData = new FormData();
@@ -23,7 +23,7 @@ export const vtApi = {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error?.message || "Upload to VirusTotal failed");
+      throw new Error(errorData.error?.message || "File analysis upload failed");
     }
 
     const json = await response.json();

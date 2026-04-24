@@ -59,7 +59,7 @@ async function pollAnalysis(
     await new Promise((r) => setTimeout(r, intervalMs));
   }
 
-  throw new Error("VirusTotal analysis timed out");
+  throw new Error("Analysis engine timed out. Please try again.");
 }
 
 // Exported: submit + poll chained

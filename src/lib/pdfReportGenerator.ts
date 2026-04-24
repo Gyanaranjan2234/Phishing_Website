@@ -125,7 +125,7 @@ export const generatePDFReport = async (data: PDFReportData): Promise<void> => {
     const details = [
       `Scan Type: ${scanTypes[data.scanType]}`,
       `Target: ${data.target}`,
-      ...(data.userName ? [`Analyzed By: ${data.userName}`] : []),
+      `Analyzed By: APGS Security Engine`,
       `Report Date: ${new Date().toLocaleString()}`,
     ];
 
@@ -181,7 +181,7 @@ export const generatePDFReport = async (data: PDFReportData): Promise<void> => {
     return y + 3;
   });
 
-  // ============ SECTION 3: VIRUSTOTAL STATS (URL/File only) ============
+  // ============ SECTION 3: THREAT ANALYSIS STATS (URL/File only) ============
   const result = data.result as any;
   if ((data.scanType === 'url' || data.scanType === 'file') && result.vtStats) {
     y = addSection('3. THREAT DETECTION SUMMARY', (doc, y) => {
