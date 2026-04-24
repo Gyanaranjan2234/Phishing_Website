@@ -100,12 +100,27 @@ const Index = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // ============= HOME PAGE STATE =============
-  const [stats, setStats] = useState({ totalScans: 0, threats: 0, safe: 0, activeUsers: 0, suspicious: 0 });
+  const [stats, setStats] = useState({ totalScans: 0, threats: 0, safe: 0, activeUsers: 0, suspicious: 0, detectionRate: 0, lastScan: null as Date | null });
   const [featureLoading, setFeatureLoading] = useState<string | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [contact, setContact] = useState({ name: "", email: "", message: "" });
   const [sent, setSent] = useState(false);
   const [contactLoading, setContactLoading] = useState(false);
+  
+  // Helper function to format relative time
+  const formatRelativeTime = (date: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
   
   // ============= STATS ANIMATION STATE =============
   const [platformStats, setPlatformStats] = useState({ totalUsers: 0, totalScans: 0 });
@@ -241,16 +256,24 @@ const Index = () => {
     const suspicious = historyList.filter((item: any) => item.status === "weak" || item.status === "medium").length;
     const total = historyList.length;
 
+    // Calculate detection rate
+    const detectionRate = total > 0 ? Math.round((threats / total) * 100) : 0;
+
+    // Get last scan timestamp
+    const lastScan = historyList.length > 0 ? historyList[0].timestamp : null;
+
     // 4. Update State
     setStats(prev => ({
       ...prev,
       safe,
       threats,
       totalScans: total,
+      detectionRate,
+      lastScan,
       // activeUsers is not part of history, keeping as is or mock
     }));
 
-    console.log("stats:", { safe, suspicious, threats, total }); // 8. Debugging
+    console.log("stats:", { safe, suspicious, threats, total, detectionRate, lastScan }); // 8. Debugging
   }, [historyList]);
 
   // ============= EFFECTS: COUNT-UP ANIMATION FOR STATS SECTION =============
@@ -426,7 +449,7 @@ const Index = () => {
     setUserName("");
     setUserId(null);
     // 6. Reset on Logout - prevent fake display
-    setStats({ safe: 0, suspicious: 0, threats: 0, totalScans: 0, activeUsers: 0 });
+    setStats({ safe: 0, suspicious: 0, threats: 0, totalScans: 0, activeUsers: 0, detectionRate: 0, lastScan: null });
     navTo("home");
   };
 
@@ -1261,7 +1284,7 @@ const Index = () => {
                 </div>
                 
                 {/* Stats Dashboard Cards */}
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Safe Scans Card */}
                   <div className="relative overflow-hidden rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-emerald-500/20 backdrop-blur-sm">
                     <div className="relative z-10 space-y-2">
@@ -1288,8 +1311,21 @@ const Index = () => {
                     </div>
                   </div>
 
+                  {/* Detection Rate Card */}
+                  <div className="relative overflow-hidden rounded-xl border border-orange-500/30 bg-orange-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-orange-500/20 backdrop-blur-sm">
+                    <div className="relative z-10 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-2xl">🎯</span>
+                      </div>
+                      <div>
+                        <p className="text-3xl font-heading font-bold text-foreground">{stats.detectionRate}%</p>
+                        <p className="text-xs text-muted-foreground font-medium mt-1">Detection Rate</p>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Total Scans Card */}
-                  <div className="relative overflow-hidden rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-cyan-500/20 backdrop-blur-sm">
+                  <div className="relative overflow-hidden rounded-xl border border-cyan-500/30 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-cyan-500/20 backdrop-blur-sm">
                     <div className="relative z-10 space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-2xl">📊</span>
