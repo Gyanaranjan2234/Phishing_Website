@@ -156,18 +156,16 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
     return score;
   };
 
-  const getSecurityScoreColor = (score: number) => {
-    if (score >= 80) return 'text-emerald-400';
-    if (score >= 60) return 'text-yellow-400';
-    if (score >= 40) return 'text-orange-400';
-    return 'text-red-400';
+  const getRiskColor = (score: number) => {
+    if (score >= 71) return '#22c55e'; // Green
+    if (score >= 41) return '#facc15'; // Yellow
+    return '#ef4444'; // Red
   };
 
-  const getSecurityScoreLabel = (score: number) => {
-    if (score >= 80) return 'Excellent';
-    if (score >= 60) return 'Good';
-    if (score >= 40) return 'Fair';
-    return 'Poor';
+  const getRiskLabel = (score: number) => {
+    if (score >= 71) return 'LOW RISK';
+    if (score >= 41) return 'MODERATE';
+    return 'HIGH RISK';
   };
 
   // Get last login info from localStorage
@@ -437,70 +435,93 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
       {/* Security Score & Last Login */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Security Score Card */}
-        <div className="bg-card border border-border rounded-xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold text-foreground">Security Score</h3>
-              <p className="text-sm text-muted-foreground">Based on your scan history</p>
-            </div>
-            <Star className="w-5 h-5 text-yellow-400/70" />
-          </div>
-          
-          <div className="flex items-center gap-6">
-            {/* Score Circle */}
-            <div className="relative w-32 h-32">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                {/* Background circle */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="45"
-                  fill="none"
-                  stroke="hsl(var(--border))"
-                  strokeWidth="8"
-                />
-                {/* Progress circle */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="45"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  strokeLinecap="round"
-                  strokeDasharray={`${calculateSecurityScore() * 2.83} 283`}
-                  className={getSecurityScoreColor(calculateSecurityScore())}
-                  style={{ transition: 'stroke-dasharray 0.5s ease' }}
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <p className={`text-4xl font-bold ${getSecurityScoreColor(calculateSecurityScore())}`}>
-                  {calculateSecurityScore()}
-                </p>
-                <p className="text-xs text-muted-foreground">/ 100</p>
-              </div>
-            </div>
-            
-            {/* Score Details */}
-            <div className="flex-1 space-y-3">
-              <div>
-                <p className={`text-2xl font-bold ${getSecurityScoreColor(calculateSecurityScore())}`}>
-                  {getSecurityScoreLabel(calculateSecurityScore())}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {dashboardData?.totalScans === 0 ? 'No scans yet' : `${dashboardData?.totalScans || 0} scans analyzed`}
-                </p>
+        <div className="bg-card border border-border/50 rounded-xl p-8 flex flex-col items-center justify-center relative overflow-hidden h-full shadow-sm">
+          <div className="w-full flex flex-col items-center space-y-6">
+            {/* Gauge SVG Section */}
+            <div className="relative w-full max-w-[280px] flex flex-col items-center">
+              {/* SVG Container with proper aspect ratio for 180° arc */}
+              <div className="w-full aspect-[1.7/1] relative flex items-center justify-center">
+                <svg className="w-full h-full overflow-visible" viewBox="0 0 100 60">
+                  {/* Gauge Background (Dim) */}
+                  <path
+                    d="M 10 50 A 40 40 0 0 1 90 50"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="7"
+                    strokeLinecap="round"
+                    className="text-muted/10"
+                  />
+                  
+                  {/* Gradient Definition */}
+                  <defs>
+                    <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#ef4444" />
+                      <stop offset="50%" stopColor="#facc15" />
+                      <stop offset="100%" stopColor="#22c55e" />
+                    </linearGradient>
+                  </defs>
+
+                  {/* Active Arc (Middle Layer) */}
+                  <path
+                    d="M 10 50 A 40 40 0 0 1 90 50"
+                    fill="none"
+                    stroke="url(#gaugeGradient)"
+                    strokeWidth="7"
+                    strokeLinecap="round"
+                    strokeDasharray="125.66"
+                    strokeDashoffset={125.66 * (1 - calculateSecurityScore() / 100)}
+                    style={{ 
+                      transition: 'stroke-dashoffset 1.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                    }}
+                  />
+
+                  {/* Pointer (Needle) (Top Layer in SVG) */}
+                  <g 
+                    transform={`rotate(${(calculateSecurityScore() / 100) * 180 - 90}, 50, 50)`}
+                    style={{ transition: 'transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
+                  >
+                    <line 
+                      x1="50" y1="50" x2="50" y2="24" 
+                      stroke={getRiskColor(calculateSecurityScore())} 
+                      strokeWidth="1.5" 
+                      strokeLinecap="round"
+                      style={{ 
+                        filter: `drop-shadow(0 0 3px ${getRiskColor(calculateSecurityScore())}40)`,
+                      }}
+                    />
+                    <circle cx="50" cy="50" r="3" fill={getRiskColor(calculateSecurityScore())} />
+                    <circle cx="50" cy="50" r="1.2" fill="white" />
+                  </g>
+                </svg>
               </div>
               
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Safe scans</span>
-                  <span className="text-emerald-400 font-semibold">{dashboardData?.safe || 0}</span>
+              {/* Score Display (Positioned below the arc center point) */}
+              <div className="text-center mt-[-10px] relative z-10">
+                <div className="flex items-baseline justify-center gap-1">
+                  <span className="text-5xl font-black tracking-tighter" style={{ 
+                    color: getRiskColor(calculateSecurityScore()),
+                    filter: `drop-shadow(0 0 10px ${getRiskColor(calculateSecurityScore())}20)`
+                  }}>
+                    {calculateSecurityScore()}
+                  </span>
+                  <span className="text-muted-foreground text-sm font-bold opacity-30">/100</span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Threats</span>
-                  <span className="text-red-400 font-semibold">{dashboardData?.threats || 0}</span>
-                </div>
+                <p className="text-[11px] font-black tracking-[0.25em] uppercase mt-1" style={{ color: getRiskColor(calculateSecurityScore()) }}>
+                  {getRiskLabel(calculateSecurityScore())}
+                </p>
+              </div>
+            </div>
+
+            {/* Bottom Stats Section */}
+            <div className="w-full pt-6 border-t border-border/30 flex items-center justify-center gap-10 text-[13px] font-bold">
+              <div className="flex items-center gap-2.5">
+                <span className="text-muted-foreground/70">Safe</span>
+                <span className="text-emerald-400 text-lg">{dashboardData?.safe || 0}</span>
+              </div>
+              <div className="w-px h-4 bg-border/40" />
+              <div className="flex items-center gap-2.5">
+                <span className="text-muted-foreground/70">Threats</span>
+                <span className="text-red-400 text-lg">{dashboardData?.threats || 0}</span>
               </div>
             </div>
           </div>
