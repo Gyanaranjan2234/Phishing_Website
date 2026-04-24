@@ -1,4 +1,4 @@
-import { CheckCircle2, AlertTriangle, XCircle, BarChart3 } from "lucide-react";
+import { CheckCircle2, XCircle, BarChart3 } from "lucide-react";
 
 interface StatsCardsProps {
   totalScans: number;
@@ -7,9 +7,6 @@ interface StatsCardsProps {
 }
 
 const StatsCards = ({ totalScans, threats, safe }: StatsCardsProps) => {
-  // Calculate suspicious as items that are neither safe nor threats
-  const suspicious = Math.max(0, totalScans - safe - threats);
-
   const cards = [
     { 
       label: "Safe Scans", 
@@ -19,15 +16,6 @@ const StatsCards = ({ totalScans, threats, safe }: StatsCardsProps) => {
       borderColor: "border-emerald-500/30",
       iconColor: "text-emerald-400",
       glowColor: "shadow-emerald-500/20",
-    },
-    { 
-      label: "Suspicious", 
-      value: suspicious, 
-      icon: AlertTriangle, 
-      bgColor: "bg-amber-500/10",
-      borderColor: "border-amber-500/30",
-      iconColor: "text-amber-400",
-      glowColor: "shadow-amber-500/20",
     },
     { 
       label: "Threats Found", 
@@ -50,7 +38,7 @@ const StatsCards = ({ totalScans, threats, safe }: StatsCardsProps) => {
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
       {cards.map((card) => (
         <div
           key={card.label}

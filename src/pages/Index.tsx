@@ -1261,7 +1261,7 @@ const Index = () => {
                 </div>
                 
                 {/* Stats Dashboard Cards */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                   {/* Safe Scans Card */}
                   <div className="relative overflow-hidden rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-emerald-500/20 backdrop-blur-sm">
                     <div className="relative z-10 space-y-2">
@@ -1271,19 +1271,6 @@ const Index = () => {
                       <div>
                         <p className="text-3xl font-heading font-bold text-foreground">{stats.safe}</p>
                         <p className="text-xs text-muted-foreground font-medium mt-1">Safe Scans</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Suspicious Card */}
-                  <div className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-amber-500/20 backdrop-blur-sm">
-                    <div className="relative z-10 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-2xl">⚠</span>
-                      </div>
-                      <div>
-                        <p className="text-3xl font-heading font-bold text-foreground">{Math.max(0, stats.totalScans - stats.safe - stats.threats)}</p>
-                        <p className="text-xs text-muted-foreground font-medium mt-1">Suspicious</p>
                       </div>
                     </div>
                   </div>
