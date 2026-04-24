@@ -6,12 +6,17 @@ import {
   CheckCircle, 
   Clock, 
   TrendingUp, 
+  TrendingDown,
   Globe, 
   Mail, 
   FileText, 
   Key,
   ExternalLink,
-  Activity
+  Activity,
+  AlertCircle,
+  Monitor,
+  Star,
+  ShieldAlert
 } from "lucide-react";
 import { 
   LineChart, 
@@ -139,6 +144,199 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
     return date.toLocaleDateString();
   };
 
+  // Calculate Security Score (0-100)
+  const calculateSecurityScore = () => {
+    if (!dashboardData || dashboardData.totalScans === 0) return 100;
+    
+    const threatRatio = dashboardData.threats / dashboardData.totalScans;
+    const suspiciousRatio = dashboardData.suspicious / dashboardData.totalScans;
+    
+    // Score calculation: 100 - (threats * 30% + suspicious * 10%)
+    const score = Math.max(0, Math.min(100, Math.round(100 - (threatRatio * 100 * 0.7 + suspiciousRatio * 100 * 0.3))));
+    return score;
+  };
+
+  const getSecurityScoreColor = (score: number) => {
+    if (score >= 80) return 'text-emerald-400';
+    if (score >= 60) return 'text-yellow-400';
+    if (score >= 40) return 'text-orange-400';
+    return 'text-red-400';
+  };
+
+  const getSecurityScoreLabel = (score: number) => {
+    if (score >= 80) return 'Excellent';
+    if (score >= 60) return 'Good';
+    if (score >= 40) return 'Fair';
+    return 'Poor';
+  };
+
+  // Get last login info from localStorage
+  const getLastLoginInfo = () => {
+    try {
+      const lastLogin = localStorage.getItem('last_login_time');
+      const lastDevice = localStorage.getItem('last_login_device');
+      
+      if (lastLogin) {
+        return {
+          time: formatTimestamp(lastLogin),
+          device: lastDevice || 'Unknown device'
+        };
+      }
+    } catch (error) {
+      console.error('Error reading last login info:', error);
+    }
+    
+    return {
+      time: 'N/A',
+      device: 'N/A'
+    };
+  };
+
+  // Calculate threat intelligence from scan data
+  const calculateThreatIntelligence = () => {
+    if (!dashboardData || dashboardData.recentScans.length === 0) {
+      return {
+        recentThreatCount: 0,
+        highestRiskType: 'N/A',
+        trend: 'stable' as 'increasing' | 'decreasing' | 'stable',
+        recommendation: 'No recent scans to analyze'
+      };
+    }
+
+    const recentScans = dashboardData.recentScans;
+    
+    // Count recent threats (last 5 scans)
+    const recentThreatCount = recentScans.filter(
+      scan => scan.status === 'phishing' || scan.status === 'breached' || 
+              scan.status === 'infected' || scan.status === 'dangerous'
+    ).length;
+
+    // Determine highest risk scan type
+    const typeThreats: Record<string, number> = {
+      url: 0,
+      email: 0,
+      file: 0,
+      password: 0
+    };
+
+    recentScans.forEach(scan => {
+      if (scan.status === 'phishing' || scan.status === 'breached' || 
+          scan.status === 'infected' || scan.status === 'dangerous' ||
+          scan.status === 'weak' || scan.status === 'very_weak') {
+        typeThreats[scan.type] = (typeThreats[scan.type] || 0) + 1;
+      }
+    });
+
+    const highestRiskType = Object.entries(typeThreats)
+      .sort((a, b) => b[1] - a[1])[0];
+
+    const typeLabels: Record<string, string> = {
+      url: 'URL',
+      email: 'Email',
+      file: 'File',
+      password: 'Password'
+    };
+
+    // Calculate trend (compare first half vs second half of recent scans)
+    const midPoint = Math.floor(recentScans.length / 2);
+    const olderScans = recentScans.slice(midPoint);
+    const newerScans = recentScans.slice(0, midPoint);
+
+    const olderThreats = olderScans.filter(
+      scan => scan.status === 'phishing' || scan.status === 'breached' || 
+              scan.status === 'infected' || scan.status === 'dangerous'
+    ).length;
+
+    const newerThreats = newerScans.filter(
+      scan => scan.status === 'phishing' || scan.status === 'breached' || 
+              scan.status === 'infected' || scan.status === 'dangerous'
+    ).length;
+
+    let trend: 'increasing' | 'decreasing' | 'stable' = 'stable';
+    if (newerThreats > olderThreats) trend = 'increasing';
+    else if (newerThreats < olderThreats) trend = 'decreasing';
+
+    // Generate smart recommendation
+    let recommendation = '';
+    const threatLevel = recentThreatCount / recentScans.length;
+
+    if (threatLevel > 0.6) {
+      recommendation = 'Critical: High threat activity detected. Review all recent scans immediately and update security protocols.';
+    } else if (threatLevel > 0.4) {
+      recommendation = 'Warning: Elevated threat levels. Consider enabling additional security measures and reviewing scan results.';
+    } else if (threatLevel > 0.2) {
+      recommendation = 'Moderate: Some threats detected. Stay vigilant and continue monitoring suspicious activities.';
+    } else if (recentThreatCount > 0) {
+      recommendation = 'Low risk: Minor threats found. Maintain current security practices and regular scanning.';
+    } else {
+      recommendation = 'Excellent: No threats detected in recent scans. Continue proactive security monitoring.';
+    }
+
+    return {
+      recentThreatCount,
+      highestRiskType: typeLabels[highestRiskType[0]] || 'N/A',
+      trend,
+      recommendation
+    };
+  };
+
+  // Generate alerts based on scan history
+  const generateAlerts = () => {
+    const alerts: Array<{ type: 'warning' | 'danger' | 'info'; message: string; timestamp?: string }> = [];
+    
+    if (!dashboardData || dashboardData.recentScans.length === 0) {
+      return alerts;
+    }
+
+    // Check for threats in recent scans
+    const recentThreats = dashboardData.recentScans.filter(
+      scan => scan.status === 'phishing' || scan.status === 'breached' || scan.status === 'infected'
+    );
+
+    if (recentThreats.length > 0) {
+      alerts.push({
+        type: 'danger',
+        message: `${recentThreats.length} threat${recentThreats.length > 1 ? 's' : ''} detected in recent scans`,
+        timestamp: recentThreats[0].timestamp
+      });
+    }
+
+    // Check for breached emails
+    const breachedScans = dashboardData.recentScans.filter(scan => scan.status === 'breached');
+    if (breachedScans.length > 0) {
+      alerts.push({
+        type: 'warning',
+        message: 'Email breach detected - Consider changing your password',
+        timestamp: breachedScans[0].timestamp
+      });
+    }
+
+    // Check for weak passwords
+    const weakPasswords = dashboardData.recentScans.filter(
+      scan => scan.status === 'weak' || scan.status === 'very_weak'
+    );
+    if (weakPasswords.length > 0) {
+      alerts.push({
+        type: 'warning',
+        message: 'Weak passwords detected - Use stronger passwords',
+        timestamp: weakPasswords[0].timestamp
+      });
+    }
+
+    // High threat ratio warning
+    if (dashboardData.totalScans > 5) {
+      const threatRatio = dashboardData.threats / dashboardData.totalScans;
+      if (threatRatio > 0.3) {
+        alerts.push({
+          type: 'info',
+          message: `High threat detection rate (${Math.round(threatRatio * 100)}%) - Stay vigilant`,
+        });
+      }
+    }
+
+    return alerts.slice(0, 5); // Limit to 5 alerts
+  };
+
   const pieData = [
     { name: 'Safe', value: dashboardData?.safe || 0, color: '#10b981' },
     { name: 'Threats', value: dashboardData?.threats || 0, color: '#ef4444' },
@@ -235,6 +433,244 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
           </p>
         </div>
       </div>
+
+      {/* Security Score & Last Login */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Security Score Card */}
+        <div className="bg-card border border-border rounded-xl p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-foreground">Security Score</h3>
+              <p className="text-sm text-muted-foreground">Based on your scan history</p>
+            </div>
+            <Star className="w-5 h-5 text-yellow-400/70" />
+          </div>
+          
+          <div className="flex items-center gap-6">
+            {/* Score Circle */}
+            <div className="relative w-32 h-32">
+              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                {/* Background circle */}
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="45"
+                  fill="none"
+                  stroke="hsl(var(--border))"
+                  strokeWidth="8"
+                />
+                {/* Progress circle */}
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="45"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  strokeDasharray={`${calculateSecurityScore() * 2.83} 283`}
+                  className={getSecurityScoreColor(calculateSecurityScore())}
+                  style={{ transition: 'stroke-dasharray 0.5s ease' }}
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <p className={`text-4xl font-bold ${getSecurityScoreColor(calculateSecurityScore())}`}>
+                  {calculateSecurityScore()}
+                </p>
+                <p className="text-xs text-muted-foreground">/ 100</p>
+              </div>
+            </div>
+            
+            {/* Score Details */}
+            <div className="flex-1 space-y-3">
+              <div>
+                <p className={`text-2xl font-bold ${getSecurityScoreColor(calculateSecurityScore())}`}>
+                  {getSecurityScoreLabel(calculateSecurityScore())}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {dashboardData?.totalScans === 0 ? 'No scans yet' : `${dashboardData?.totalScans || 0} scans analyzed`}
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Safe scans</span>
+                  <span className="text-emerald-400 font-semibold">{dashboardData?.safe || 0}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Threats</span>
+                  <span className="text-red-400 font-semibold">{dashboardData?.threats || 0}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Threat Intelligence Panel */}
+        <div className="bg-card border border-border rounded-xl p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-foreground">Threat Intelligence</h3>
+              <p className="text-sm text-muted-foreground">Real-time threat analysis</p>
+            </div>
+            <ShieldAlert className="w-5 h-5 text-red-400/70" />
+          </div>
+          
+          <div className="space-y-4">
+            {/* Recent Threat Count */}
+            <div className={`p-4 rounded-lg border ${
+              calculateThreatIntelligence().recentThreatCount > 2
+                ? 'bg-red-500/10 border-red-500/30'
+                : calculateThreatIntelligence().recentThreatCount > 0
+                ? 'bg-yellow-500/10 border-yellow-500/30'
+                : 'bg-emerald-500/10 border-emerald-500/30'
+            }`}>
+              <div className="flex items-start gap-3">
+                <AlertTriangle className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
+                  calculateThreatIntelligence().recentThreatCount > 2
+                    ? 'text-red-400'
+                    : calculateThreatIntelligence().recentThreatCount > 0
+                    ? 'text-yellow-400'
+                    : 'text-emerald-400'
+                }`} />
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground mb-1">Recent Threats (Last 5 Scans)</p>
+                  <p className={`text-3xl font-bold ${
+                    calculateThreatIntelligence().recentThreatCount > 2
+                      ? 'text-red-400'
+                      : calculateThreatIntelligence().recentThreatCount > 0
+                      ? 'text-yellow-400'
+                      : 'text-emerald-400'
+                  }`}>
+                    {calculateThreatIntelligence().recentThreatCount}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Highest Risk Type & Trend */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-4 bg-muted/30 rounded-lg border border-border/50">
+                <p className="text-xs text-muted-foreground mb-2">Highest Risk Type</p>
+                <div className="flex items-center gap-2">
+                  {calculateThreatIntelligence().highestRiskType === 'URL' && <Globe className="w-4 h-4 text-primary" />}
+                  {calculateThreatIntelligence().highestRiskType === 'Email' && <Mail className="w-4 h-4 text-primary" />}
+                  {calculateThreatIntelligence().highestRiskType === 'File' && <FileText className="w-4 h-4 text-primary" />}
+                  {calculateThreatIntelligence().highestRiskType === 'Password' && <Key className="w-4 h-4 text-primary" />}
+                  <p className="text-base font-semibold text-foreground">
+                    {calculateThreatIntelligence().highestRiskType}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="p-4 bg-muted/30 rounded-lg border border-border/50">
+                <p className="text-xs text-muted-foreground mb-2">Threat Trend</p>
+                <div className="flex items-center gap-2">
+                  {calculateThreatIntelligence().trend === 'increasing' && (
+                    <>
+                      <TrendingUp className="w-4 h-4 text-red-400" />
+                      <p className="text-base font-semibold text-red-400">Increasing</p>
+                    </>
+                  )}
+                  {calculateThreatIntelligence().trend === 'decreasing' && (
+                    <>
+                      <TrendingDown className="w-4 h-4 text-emerald-400" />
+                      <p className="text-base font-semibold text-emerald-400">Decreasing</p>
+                    </>
+                  )}
+                  {calculateThreatIntelligence().trend === 'stable' && (
+                    <>
+                      <Activity className="w-4 h-4 text-yellow-400" />
+                      <p className="text-base font-semibold text-yellow-400">Stable</p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {/* Smart Recommendation */}
+            <div className={`p-4 rounded-lg border ${
+              calculateThreatIntelligence().recentThreatCount > 2
+                ? 'bg-red-500/10 border-red-500/30'
+                : calculateThreatIntelligence().recentThreatCount > 0
+                ? 'bg-yellow-500/10 border-yellow-500/30'
+                : 'bg-emerald-500/10 border-emerald-500/30'
+            }`}>
+              <div className="flex items-start gap-3">
+                <ShieldAlert className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
+                  calculateThreatIntelligence().recentThreatCount > 2
+                    ? 'text-red-400'
+                    : calculateThreatIntelligence().recentThreatCount > 0
+                    ? 'text-yellow-400'
+                    : 'text-emerald-400'
+                }`} />
+                <div className="flex-1">
+                  <p className="text-xs font-semibold mb-1" style={{
+                    color: calculateThreatIntelligence().recentThreatCount > 2 ? '#f87171' :
+                           calculateThreatIntelligence().recentThreatCount > 0 ? '#fbbf24' : '#34d399'
+                  }}>
+                    Recommendation
+                  </p>
+                  <p className="text-sm text-foreground">
+                    {calculateThreatIntelligence().recommendation}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Alerts Section */}
+      {generateAlerts().length > 0 && (
+        <div className="bg-card border border-border rounded-xl p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-foreground">Security Alerts</h3>
+              <p className="text-sm text-muted-foreground">Important notifications</p>
+            </div>
+            <AlertCircle className="w-5 h-5 text-orange-400/70" />
+          </div>
+          
+          <div className="space-y-3">
+            {generateAlerts().map((alert, index) => (
+              <div
+                key={index}
+                className={`p-4 rounded-lg border ${
+                  alert.type === 'danger'
+                    ? 'bg-red-500/10 border-red-500/30'
+                    : alert.type === 'warning'
+                    ? 'bg-yellow-500/10 border-yellow-500/30'
+                    : 'bg-blue-500/10 border-blue-500/30'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  {alert.type === 'danger' ? (
+                    <AlertTriangle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
+                  ) : alert.type === 'warning' ? (
+                    <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                  )}
+                  <div className="flex-1">
+                    <p className={`text-sm font-medium ${
+                      alert.type === 'danger' ? 'text-red-400' :
+                      alert.type === 'warning' ? 'text-yellow-400' : 'text-blue-400'
+                    }`}>
+                      {alert.message}
+                    </p>
+                    {alert.timestamp && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatTimestamp(alert.timestamp)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -424,7 +860,7 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
         <h3 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <button
-            onClick={() => navigate('/scanning')}
+            onClick={() => navigate('/scanning?type=url')}
             className="flex flex-col items-center gap-2 p-4 bg-muted/30 rounded-lg border border-border/50 hover:border-primary/50 hover:bg-primary/10 transition-all group"
           >
             <Globe className="w-6 h-6 text-primary/70 group-hover:text-primary transition-colors" />
@@ -432,7 +868,7 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
           </button>
           
           <button
-            onClick={() => navigate('/scanning')}
+            onClick={() => navigate('/scanning?type=email')}
             className="flex flex-col items-center gap-2 p-4 bg-muted/30 rounded-lg border border-border/50 hover:border-primary/50 hover:bg-primary/10 transition-all group"
           >
             <Mail className="w-6 h-6 text-primary/70 group-hover:text-primary transition-colors" />
@@ -440,7 +876,7 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
           </button>
           
           <button
-            onClick={() => navigate('/scanning')}
+            onClick={() => navigate('/scanning?type=file')}
             className="flex flex-col items-center gap-2 p-4 bg-muted/30 rounded-lg border border-border/50 hover:border-primary/50 hover:bg-primary/10 transition-all group"
           >
             <FileText className="w-6 h-6 text-primary/70 group-hover:text-primary transition-colors" />
@@ -448,7 +884,7 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
           </button>
           
           <button
-            onClick={() => navigate('/scanning')}
+            onClick={() => navigate('/scanning?type=password')}
             className="flex flex-col items-center gap-2 p-4 bg-muted/30 rounded-lg border border-border/50 hover:border-primary/50 hover:bg-primary/10 transition-all group"
           >
             <Key className="w-6 h-6 text-primary/70 group-hover:text-primary transition-colors" />

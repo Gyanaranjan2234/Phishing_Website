@@ -41,6 +41,15 @@ const Scanning = () => {
   const [passwordScanData, setPasswordScanData] = useState({ input: "", result: null as any });
   
   const [activeTab, setActiveTab] = useState<"url" | "email" | "file" | "password">(() => {
+    // First, check for query parameter "type"
+    const params = new URLSearchParams(location.search);
+    const typeParam = params.get("type");
+    
+    if (typeParam === "url" || typeParam === "email" || typeParam === "file" || typeParam === "password") {
+      return typeParam;
+    }
+    
+    // Fallback to location state
     const state = location.state as { openTab?: string } | null;
     const tab = state?.openTab;
     if (tab === "url" || tab === "email" || tab === "file" || tab === "password") {
