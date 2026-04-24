@@ -371,7 +371,7 @@ def clear_history_new(
 ):
     """Alternative endpoint for clearing history."""
     return clear_history_legacy(user_id, db)
-@router.delete("/clear-history/{user_id}", response_model=dict)
+@router.get("/clear-history/{user_id}", response_model=dict)
 def clear_history_by_path(
     user_id: int,
     db: Session = Depends(get_db)
@@ -384,3 +384,121 @@ def clear_history_by_path(
     except Exception as e:
         db.rollback()
         return {"status": "error", "message": str(e)}
+
+
+@router.get("/dashboard", response_model=dict)
+def get_dashboard_data(
+    user_id: int = Query(..., description="User ID to fetch dashboard data for"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get comprehensive dashboard data for user profile.
+    
+    Returns:
+    - Total scans, threats, safe results
+    - Last scan timestamp
+    - Recent 5 scans
+    - Date-wise scan history for charts
+    
+    Args:
+        user_id: Unique user identifier (required)
+        db: Database session
+    
+    Returns:
+        Complete dashboard data object
+    """
+    try:
+        # Verify user exists
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return {
+                "status": "error",
+                "message": f"User with ID {user_id} not found",
+                "data": {}
+            }
+        
+        # Get all user scans
+        all_scans = (
+            db.query(ScanHistory)
+            .filter(ScanHistory.user_id == user_id)
+            .order_by(ScanHistory.timestamp.desc())
+            .all()
+        )
+        
+        # Calculate statistics
+        total_scans = len(all_scans)
+        threats = len([s for s in all_scans if s.status in ["phishing", "breached", "infected", "dangerous", "weak", "very_weak"]])
+        safe = len([s for s in all_scans if s.status in ["safe", "strong", "very_strong"]])
+        suspicious = len([s for s in all_scans if s.status == "suspicious"])
+        
+        # Get last scan
+        last_scan = None
+        if all_scans:
+            last_scan_obj = all_scans[0]
+            last_scan = {
+                "timestamp": last_scan_obj.timestamp.isoformat() + "Z" if last_scan_obj.timestamp else None,
+                "type": last_scan_obj.scan_type,
+                "status": last_scan_obj.status
+            }
+        
+        # Get recent 5 scans
+        recent_scans = []
+        for scan in all_scans[:5]:
+            recent_scans.append({
+                "id": scan.id,
+                "type": scan.scan_type,
+                "target": scan.target,
+                "status": scan.status,
+                "timestamp": scan.timestamp.isoformat() + "Z" if scan.timestamp else None
+            })
+        
+        # Prepare date-wise data for charts (last 30 days)
+        from datetime import datetime, timedelta
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        
+        date_wise_scans = defaultdict(lambda: {"total": 0, "safe": 0, "threat": 0})
+        
+        for scan in all_scans:
+            if scan.timestamp and scan.timestamp >= thirty_days_ago:
+                date_key = scan.timestamp.strftime("%Y-%m-%d")
+                date_wise_scans[date_key]["total"] += 1
+                
+                if scan.status in ["safe", "strong", "very_strong"]:
+                    date_wise_scans[date_key]["safe"] += 1
+                elif scan.status in ["phishing", "breached", "infected", "dangerous", "weak", "very_weak"]:
+                    date_wise_scans[date_key]["threat"] += 1
+        
+        # Convert to sorted list
+        chart_data = sorted([
+            {"date": date, **counts}
+            for date, counts in date_wise_scans.items()
+        ], key=lambda x: x["date"])
+        
+        # Calculate success rate
+        success_rate = 0
+        if total_scans > 0:
+            success_rate = round((safe / total_scans) * 100, 1)
+        
+        dashboard_data = {
+            "totalScans": total_scans,
+            "threats": threats,
+            "safe": safe,
+            "suspicious": suspicious,
+            "successRate": success_rate,
+            "lastScan": last_scan,
+            "recentScans": recent_scans,
+            "chartData": chart_data
+        }
+        
+        return {
+            "status": "success",
+            "message": f"Dashboard data for user {user_id}",
+            "data": dashboard_data
+        }
+    
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Failed to fetch dashboard data: {str(e)}",
+            "data": {}
+        }

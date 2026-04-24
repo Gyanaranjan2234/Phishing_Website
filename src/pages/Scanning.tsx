@@ -6,6 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { apiAuth, apiScans } from "@/lib/api-backend";  // UPDATED: Use backend API
 import { getGuestScanCount } from "@/lib/guestAccess";  // ADDED: Guest access info
+import StatsCards from "@/components/dashboard/StatsCards";
 import UrlScanner from "@/components/dashboard/UrlScanner";
 import EmailBreachChecker from "@/components/dashboard/EmailBreachChecker";
 import FileScanner from "@/components/dashboard/FileScanner";
@@ -24,6 +25,14 @@ const Scanning = () => {
   const [history, setHistory] = useState<any[]>([]);  // ADDED: Explicit state for history
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);  // ADDED: Loading state
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  // Stats state for displaying scan statistics
+  const [stats, setStats] = useState({
+    totalScans: 0,
+    safeScans: 0,
+    threatScans: 0,
+    suspiciousScans: 0
+  });
   
   // Scan state management - preserved across tab switches
   const [urlScanData, setUrlScanData] = useState({ input: "", result: null as any });
@@ -84,8 +93,10 @@ const Scanning = () => {
     console.log("userId state updated:", userId);
     if (userId) {
       fetchHistory(userId);
+      fetchStats(userId);
     } else {
       setHistory([]);
+      setStats({ totalScans: 0, safeScans: 0, threatScans: 0, suspiciousScans: 0 });
     }
   }, [userId]);
 
@@ -118,6 +129,26 @@ const Scanning = () => {
       setHistory([]);
     } finally {
       setIsLoadingHistory(false);
+    }
+  };
+
+  // Fetch scan statistics
+  const fetchStats = async (id: string) => {
+    try {
+      console.log('📊 Fetching scan stats for user_id:', id);
+      const response = await apiScans.getStats(Number(id));
+      
+      if (response.status === 'success' && response.data) {
+        setStats({
+          totalScans: response.data.totalScans || 0,
+          safeScans: response.data.safeScans || 0,
+          threatScans: response.data.threatScans || 0,
+          suspiciousScans: response.data.suspiciousScans || 0
+        });
+      }
+    } catch (err) {
+      console.error('❌ Failed to fetch stats:', err);
+      setStats({ totalScans: 0, safeScans: 0, threatScans: 0, suspiciousScans: 0 });
     }
   };
 
@@ -155,6 +186,7 @@ const Scanning = () => {
   const refreshHistory = async () => { 
     if (!userId) return;
     fetchHistory(userId);
+    fetchStats(userId); // Also refresh stats after scan
   };
 
   return (
@@ -340,6 +372,15 @@ const Scanning = () => {
               </div>
             </div>
           </section>
+        )}
+
+        {/* Stats Cards Section - Only show for authenticated users */}
+        {isAuthenticated && userId && (
+          <StatsCards 
+            totalScans={stats.totalScans || 0} 
+            threats={stats.threatScans || 0} 
+            safe={stats.safeScans || 0} 
+          />
         )}
         
         <section className="bg-card/70 rounded-xl border border-border p-6 shadow-lg">

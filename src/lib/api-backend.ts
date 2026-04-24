@@ -359,6 +359,40 @@ export const getScanStats = async (userId: number) => {
 };
 
 /**
+ * Get comprehensive dashboard data for user profile
+ * Returns stats, recent scans, and chart data
+ * @param userId - Unique user ID
+ */
+export const getDashboardData = async (userId: number) => {
+  try {
+    console.log('📡 API: Fetching dashboard data for user_id:', userId);
+    
+    const response = await fetch(`${SCAN_API_URL}/dashboard?user_id=${userId}`, { cache: 'no-store' });
+    const data = await response.json();
+    
+    console.log('📡 API: Dashboard data response:', data);
+    
+    return data;
+  } catch (error) {
+    console.error('❌ Get dashboard data error:', error);
+    return {
+      status: 'error',
+      message: 'Network error. Failed to fetch dashboard data.',
+      data: {
+        totalScans: 0,
+        threats: 0,
+        safe: 0,
+        suspicious: 0,
+        successRate: 0,
+        lastScan: null,
+        recentScans: [],
+        chartData: []
+      }
+    };
+  }
+};
+
+/**
  * Delete a scan record
  * @param scanId - Scan record ID to delete
  * @param userId - User ID for authorization

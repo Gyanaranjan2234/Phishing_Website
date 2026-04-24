@@ -14,7 +14,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { apiAuth } from "@/lib/api-backend";  // UPDATED: Changed to backend API
+import { apiAuth } from "@/lib/api-backend";
+import ProfileDashboard from "@/components/dashboard/ProfileDashboard";
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -154,7 +155,7 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen cyber-grid py-8">
-      <div className="max-w-5xl mx-auto px-4 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 space-y-6">
         {/* Enhanced Professional Profile Header */}
         <div className="relative bg-gradient-to-br from-card via-card to-card/80 border border-border/50 rounded-2xl p-8 backdrop-blur-sm glass overflow-hidden">
           {/* Decorative gradient background */}
@@ -205,6 +206,15 @@ const Profile = () => {
             </div>
           </div>
         </div>
+
+        {/* Dashboard Overview Section */}
+        <section>
+          <div className="mb-4">
+            <h2 className="text-2xl font-semibold text-foreground">Dashboard Overview</h2>
+            <p className="text-sm text-muted-foreground mt-1">Monitor your security activity and scan history</p>
+          </div>
+          <ProfileDashboard userId={parseInt(user.id)} />
+        </section>
 
         <div className="grid gap-5 lg:grid-cols-2">
           <section className="bg-card border border-border rounded-2xl p-6 glass">
