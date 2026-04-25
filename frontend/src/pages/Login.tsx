@@ -161,9 +161,9 @@ const Login = () => {
       const data = await apiAuth.forgotPassword(forgotEmail);
       if (data.status === 'success') {
         setResetSent(true);
-        toast.success("Password reset email sent!");
+        toast.success(data.message || "Reset link sent!");
       } else {
-        toast.error(data.message || "An error occurred");
+        toast.error(data.message || "Email not registered");
       }
     } catch (err: any) {
       toast.error(err.message || "An error occurred");

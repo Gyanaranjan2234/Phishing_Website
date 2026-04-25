@@ -31,7 +31,7 @@ load_dotenv()
 # Gmail configuration from .env
 GMAIL_SENDER = os.getenv("GMAIL_SENDER_EMAIL", "")
 GMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
-GMAIL_RECEIVER = os.getenv("GMAIL_RECEIVER_EMAIL", "support.apgs@gmail.com")
+GMAIL_RECEIVER = os.getenv("GMAIL_RECEIVER_EMAIL", "")
 
 # Create router for authentication endpoints
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
@@ -353,29 +353,33 @@ def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db
     try:
         user = db.query(User).filter(User.email == request.email).first()
         
-        # We don't reveal if user exists to prevent email enumeration
-        if user:
-            # Delete any existing tokens for this user
-            db.query(PasswordResetToken).filter(PasswordResetToken.user_id == user.id).delete()
-            
-            # Generate secure token
-            token = secrets.token_urlsafe(32)
-            expires_at = datetime.utcnow() + timedelta(minutes=15)
-            
-            new_token = PasswordResetToken(user_id=user.id, token=token, expires_at=expires_at)
-            db.add(new_token)
-            db.commit()
-            
-            # Construct link using frontend URL port
-            FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8080")
-            reset_link = f"{FRONTEND_URL}/reset-password?token={token}"
-            
-            # Dispatch email
-            send_password_reset_email(user.email, reset_link)
+        if not user:
+            return AuthResponse(
+                status="error",
+                message="Email not registered"
+            )
+
+        # Delete any existing tokens for this user
+        db.query(PasswordResetToken).filter(PasswordResetToken.user_id == user.id).delete()
+        
+        # Generate secure token
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(minutes=15)
+        
+        new_token = PasswordResetToken(user_id=user.id, token=token, expires_at=expires_at)
+        db.add(new_token)
+        db.commit()
+        
+        # Construct link using frontend URL port
+        FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8080")
+        reset_link = f"{FRONTEND_URL}/reset-password?token={token}"
+        
+        # Dispatch email
+        send_password_reset_email(user.email, reset_link)
 
         return AuthResponse(
             status="success",
-            message="If an account exists with that email, a reset link was sent."
+            message="Password reset link has been sent to your email."
         )
         
     except Exception as e:
