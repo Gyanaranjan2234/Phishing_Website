@@ -199,7 +199,7 @@ const handleAnalyze = async (e: React.FormEvent) => {
       }
 
       if (canShareFiles) {
-        await navigator.share({ files: [file], title: "APGS Security Report", text: "Security scan report attached" });
+        await navigator.share({ files: [file] });
         toast({ title: "✅ Shared Successfully" });
       } else {
         downloadFallback(pdfBlob);

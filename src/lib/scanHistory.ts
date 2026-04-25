@@ -29,25 +29,35 @@ export const saveScanResult = async (record: ScanRecord) => {
     let totalScans = parseInt(localStorage.getItem('total_scans') || '0');
     let safeScans = parseInt(localStorage.getItem('safe_scans') || '0');
     let threatsFound = parseInt(localStorage.getItem('threats_found') || '0');
+    let suspiciousScans = parseInt(localStorage.getItem('suspicious_scans') || '0');
+    let undetectedScans = parseInt(localStorage.getItem('undetected_scans') || '0');
     
-    totalScans += 1;
-    
-    // Determine if it's safe or a threat based on malicious count or status
-    const isSafe = 
-      record.malicious === 0 || 
-      finalRecord.status.toLowerCase() === 'safe' || 
-      finalRecord.status.toLowerCase() === 'strong' ||
-      finalRecord.status.toLowerCase() === 'clean';
+    // Determine status type
+    const statusLower = finalRecord.status.toLowerCase();
+    const isSafe = statusLower === 'safe' || statusLower === 'strong' || statusLower === 'clean';
+    const isThreat = statusLower === 'phishing' || statusLower === 'breached' || statusLower === 'infected' || statusLower === 'dangerous' || statusLower === 'threat' || (record.malicious && record.malicious > 0);
+    const isSuspicious = statusLower === 'suspicious' || statusLower === 'low risk' || statusLower === 'moderate' || (record.suspicious && record.suspicious > 0);
+    const isUndetected = statusLower === 'undetected' || statusLower === 'unknown';
 
     if (isSafe) {
        safeScans += 1;
-    } else {
+    } else if (isThreat) {
        threatsFound += 1;
+    } else if (isSuspicious) {
+       suspiciousScans += 1;
+    } else {
+       // Default to undetected if not clearly categorized
+       undetectedScans += 1;
     }
+    
+    // Total is always the sum of parts to prevent mismatch
+    totalScans = safeScans + threatsFound + suspiciousScans + undetectedScans;
     
     localStorage.setItem('total_scans', totalScans.toString());
     localStorage.setItem('safe_scans', safeScans.toString());
     localStorage.setItem('threats_found', threatsFound.toString());
+    localStorage.setItem('suspicious_scans', suspiciousScans.toString());
+    localStorage.setItem('undetected_scans', undetectedScans.toString());
 
     // 3. Try backend save if authenticated
     const userId = localStorage.getItem('user_id');
@@ -71,10 +81,17 @@ export const saveScanResult = async (record: ScanRecord) => {
 };
 
 export const getLocalStats = () => {
+  const safe = parseInt(localStorage.getItem('safe_scans') || '0');
+  const threats = parseInt(localStorage.getItem('threats_found') || '0');
+  const suspicious = parseInt(localStorage.getItem('suspicious_scans') || '0');
+  const undetected = parseInt(localStorage.getItem('undetected_scans') || '0');
+  
   return {
-    totalScans: parseInt(localStorage.getItem('total_scans') || '0'),
-    safeScans: parseInt(localStorage.getItem('safe_scans') || '0'),
-    threatScans: parseInt(localStorage.getItem('threats_found') || '0')
+    totalScans: safe + threats,
+    safeScans: safe,
+    threatScans: threats,
+    suspiciousScans: suspicious,
+    undetectedScans: undetected
   };
 };
 

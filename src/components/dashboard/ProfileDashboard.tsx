@@ -39,6 +39,7 @@ interface DashboardData {
   threats: number;
   safe: number;
   suspicious: number;
+  undetected?: number;
   successRate: number;
   lastScan: {
     timestamp: string;
@@ -148,14 +149,11 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
 
   // Calculate Security Score (0-100)
   const calculateSecurityScore = () => {
-    if (!dashboardData || dashboardData.totalScans === 0) return 100;
+    const total = (dashboardData?.safe || 0) + (dashboardData?.threats || 0);
+    if (total === 0) return 100;
     
-    const threatRatio = dashboardData.threats / dashboardData.totalScans;
-    const suspiciousRatio = dashboardData.suspicious / dashboardData.totalScans;
-    
-    // Score calculation: 100 - (threats * 30% + suspicious * 10%)
-    const score = Math.max(0, Math.min(100, Math.round(100 - (threatRatio * 100 * 0.7 + suspiciousRatio * 100 * 0.3))));
-    return score;
+    // Score calculation: (Safe / Total) * 100
+    return Math.round((dashboardData.safe / total) * 100);
   };
 
   const getRiskColor = (score: number) => {
@@ -339,8 +337,7 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
 
   const pieData = [
     { name: 'Safe', value: dashboardData?.safe || 0, color: '#10b981' },
-    { name: 'Threats', value: dashboardData?.threats || 0, color: '#ef4444' },
-    { name: 'Suspicious', value: dashboardData?.suspicious || 0, color: '#f59e0b' }
+    { name: 'Threats', value: (dashboardData?.threats || 0) + (dashboardData?.suspicious || 0), color: '#ef4444' }
   ].filter(item => item.value > 0);
 
   if (loading) {
@@ -392,7 +389,7 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
             <Shield className="w-5 h-5 text-primary/70" />
           </div>
           <p className="text-3xl font-bold text-foreground mb-1">
-            {dashboardData?.totalScans || 0}
+            {(dashboardData?.safe || 0) + (dashboardData?.threats || 0)}
           </p>
           <p className="text-xs text-muted-foreground">All time</p>
         </div>
@@ -421,18 +418,18 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
           <p className="text-xs text-muted-foreground">Clean results</p>
         </div>
 
-        {/* Last Scan */}
+        {/* Detection Rate */}
         <div className="bg-gradient-to-br from-card to-card/80 border border-border/50 rounded-xl p-5 backdrop-blur-sm hover:border-blue-500/50 transition-all duration-300">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm text-muted-foreground font-medium">Last Scan</p>
-            <Clock className="w-5 h-5 text-blue-400/70" />
+            <p className="text-sm text-muted-foreground font-medium">Detection Rate</p>
+            <Activity className="w-5 h-5 text-blue-400/70" />
           </div>
-          <p className="text-lg font-bold text-foreground mb-1">
-            {dashboardData?.lastScan ? formatTimestamp(dashboardData.lastScan.timestamp) : 'N/A'}
+          <p className="text-3xl font-bold text-foreground mb-1">
+            {dashboardData && (dashboardData.safe + dashboardData.threats) > 0 
+              ? Math.round((dashboardData.threats / (dashboardData.safe + dashboardData.threats)) * 100) 
+              : 0}%
           </p>
-          <p className="text-xs text-muted-foreground capitalize">
-            {dashboardData?.lastScan?.type || 'No scans yet'}
-          </p>
+          <p className="text-xs text-muted-foreground">Threat ratio</p>
         </div>
       </div>
 

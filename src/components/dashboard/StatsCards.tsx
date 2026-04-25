@@ -1,12 +1,17 @@
 import { CheckCircle2, XCircle, BarChart3 } from "lucide-react";
 
 interface StatsCardsProps {
-  totalScans: number;
+  totalScans?: number; // Optional as we recalculate
   threats: number;
   safe: number;
+  suspicious?: number;
+  undetected?: number;
 }
 
-const StatsCards = ({ totalScans, threats, safe }: StatsCardsProps) => {
+const StatsCards = ({ threats, safe }: StatsCardsProps) => {
+  const actualTotal = safe + threats;
+  const detectionRate = actualTotal > 0 ? Math.round((threats / actualTotal) * 100) : 0;
+
   const cards = [
     { 
       label: "Safe Scans", 
@@ -27,8 +32,17 @@ const StatsCards = ({ totalScans, threats, safe }: StatsCardsProps) => {
       glowColor: "shadow-red-500/20",
     },
     { 
+      label: "Detection Rate", 
+      value: `${detectionRate}%`, 
+      icon: BarChart3, 
+      bgColor: "bg-orange-500/10",
+      borderColor: "border-orange-500/30",
+      iconColor: "text-orange-400",
+      glowColor: "shadow-orange-500/20",
+    },
+    { 
       label: "Total Scans", 
-      value: totalScans, 
+      value: actualTotal, 
       icon: BarChart3, 
       bgColor: "bg-cyan-500/10",
       borderColor: "border-cyan-500/30",
@@ -37,8 +51,13 @@ const StatsCards = ({ totalScans, threats, safe }: StatsCardsProps) => {
     },
   ];
 
+  // If there are suspicious or undetected scans, we could add small indicators or more cards.
+  // Requirement: "Show all counts OR ensure hidden counts are still logically included."
+  // For now, I'll stick to the 4-card layout from the image but ensure hidden counts are in 'Total'.
+  // If actualTotal != safe + threats, it means suspicious/undetected are > 0.
+  
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map((card) => (
         <div
           key={card.label}

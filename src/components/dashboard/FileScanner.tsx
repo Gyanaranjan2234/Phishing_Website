@@ -278,7 +278,7 @@ const handleShare = async () => {
     }
 
     if (canShareFiles) {
-      await navigator.share({ files: [pdfFile], title: "APGS File Security Report", text: "Security scan report attached" });
+      await navigator.share({ files: [pdfFile] });
       showToast("✅ Shared Successfully", "success");
     } else {
       downloadFallback(pdfBlob);

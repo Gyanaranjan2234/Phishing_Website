@@ -14,6 +14,7 @@ import FileScanner from "@/components/dashboard/FileScanner";
 import PasswordChecker from "@/components/dashboard/PasswordChecker";
 import ActivityHistory from "@/components/dashboard/ActivityHistory";
 import SecurityQuizComponent from "@/components/dashboard/SecurityQuiz";
+import StatsCards from "@/components/dashboard/StatsCards";
 
 /**
  * FaqItem Component
@@ -248,13 +249,23 @@ const Index = () => {
   useEffect(() => {
     if (!historyList) return;
     
-    console.log("history:", historyList); // 8. Debugging
+    // Categorize every item as either Safe or Threat
+    const safeItems = historyList.filter((item: any) => {
+      const status = item.status.toLowerCase();
+      // Safe categories
+      return status === "safe" || status === "strong" || status === "clean" || status === "secure";
+    });
     
-    // Dynamic calculation mapping status fields
-    const safe = historyList.filter((item: any) => item.status === "safe" || item.status === "strong").length;
-    const threats = historyList.filter((item: any) => item.status === "phishing" || item.status === "breached").length;
-    const suspicious = historyList.filter((item: any) => item.status === "weak" || item.status === "medium").length;
-    const total = historyList.length;
+    const threatItems = historyList.filter((item: any) => {
+      const status = item.status.toLowerCase();
+      // Threat categories (everything else)
+      // This includes phishing, breached, infected, dangerous, threat, weak, malicious, low, moderate, high
+      return !["safe", "strong", "clean", "secure"].includes(status);
+    });
+
+    const safe = safeItems.length;
+    const threats = threatItems.length;
+    const total = safe + threats;
 
     // Calculate detection rate
     const detectionRate = total > 0 ? Math.round((threats / total) * 100) : 0;
@@ -270,10 +281,9 @@ const Index = () => {
       totalScans: total,
       detectionRate,
       lastScan,
-      // activeUsers is not part of history, keeping as is or mock
     }));
 
-    console.log("stats:", { safe, suspicious, threats, total, detectionRate, lastScan }); // 8. Debugging
+    console.log("stats updated dynamically from history:", { safe, threats, total, detectionRate });
   }, [historyList]);
 
   // ============= EFFECTS: COUNT-UP ANIMATION FOR STATS SECTION =============
@@ -1284,59 +1294,10 @@ const Index = () => {
                 </div>
                 
                 {/* Stats Dashboard Cards */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Safe Scans Card */}
-                  <div className="relative overflow-hidden rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-emerald-500/20 backdrop-blur-sm">
-                    <div className="relative z-10 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-2xl">✔</span>
-                      </div>
-                      <div>
-                        <p className="text-3xl font-heading font-bold text-foreground">{stats.safe}</p>
-                        <p className="text-xs text-muted-foreground font-medium mt-1">Safe Scans</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Threats Found Card */}
-                  <div className="relative overflow-hidden rounded-xl border border-red-500/30 bg-red-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-red-500/20 backdrop-blur-sm">
-                    <div className="relative z-10 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-2xl">❌</span>
-                      </div>
-                      <div>
-                        <p className="text-3xl font-heading font-bold text-foreground">{stats.threats}</p>
-                        <p className="text-xs text-muted-foreground font-medium mt-1">Threats Found</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Detection Rate Card */}
-                  <div className="relative overflow-hidden rounded-xl border border-orange-500/30 bg-orange-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-orange-500/20 backdrop-blur-sm">
-                    <div className="relative z-10 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-2xl">🎯</span>
-                      </div>
-                      <div>
-                        <p className="text-3xl font-heading font-bold text-foreground">{stats.detectionRate}%</p>
-                        <p className="text-xs text-muted-foreground font-medium mt-1">Detection Rate</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Total Scans Card */}
-                  <div className="relative overflow-hidden rounded-xl border border-cyan-500/30 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 p-4 transition-all duration-300 group hover:shadow-lg hover:shadow-cyan-500/20 backdrop-blur-sm">
-                    <div className="relative z-10 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-2xl">📊</span>
-                      </div>
-                      <div>
-                        <p className="text-3xl font-heading font-bold text-foreground">{stats.totalScans}</p>
-                        <p className="text-xs text-muted-foreground font-medium mt-1">Total Scans</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <StatsCards 
+                  threats={stats.threats}
+                  safe={stats.safe}
+                />
               </section>
 
               {/* Tab Selection */}

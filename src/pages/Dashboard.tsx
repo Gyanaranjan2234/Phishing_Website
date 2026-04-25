@@ -102,7 +102,7 @@ const Dashboard = () => {
     gcTime: 0,
   });
 
-  const stats = statsResponse?.data || { totalScans: 0, safeScans: 0, threatScans: 0 };
+  const stats = statsResponse?.data || { totalScans: 0, safeScans: 0, threatScans: 0, suspiciousScans: 0, undetectedScans: 0 };
 
 
   const { data: history, refetch: refetchHistory } = useQuery({
@@ -129,9 +129,30 @@ const Dashboard = () => {
     staleTime: 0,
   });
 
+  // Calculate stats dynamically from history
+  const stats = useMemo(() => {
+    if (!history) return { safe: 0, threats: 0, total: 0 };
+    
+    const safeItems = history.filter((item: any) => {
+      const status = item.status.toLowerCase();
+      return status === "safe" || status === "strong" || status === "clean" || status === "secure";
+    });
+    
+    const threatItems = history.filter((item: any) => {
+      const status = item.status.toLowerCase();
+      return !["safe", "strong", "clean", "secure"].includes(status);
+    });
+
+    const safe = safeItems.length;
+    const threats = threatItems.length;
+    const total = safe + threats;
+
+    return { safe, threats, total };
+  }, [history]);
+
   // 6. Debugging
   console.log("history from API:", history);
-  console.log("stats from API:", stats);
+  console.log("dynamically calculated stats:", stats);
 
   const queryClient = useQueryClient();
   const refresh = useCallback(async () => {
@@ -245,9 +266,8 @@ const Dashboard = () => {
             </div>
 
             <StatsCards 
-              totalScans={stats.totalScans || 0} 
-              threats={stats.threatScans || 0} 
-              safe={stats.safeScans || 0} 
+              threats={stats.threats} 
+              safe={stats.safe} 
             />
 
             <div className="border border-border rounded-lg overflow-hidden bg-card/40 backdrop-blur-sm">

@@ -31,7 +31,8 @@ const Scanning = () => {
     totalScans: 0,
     safeScans: 0,
     threatScans: 0,
-    suspiciousScans: 0
+    suspiciousScans: 0,
+    undetectedScans: 0
   });
   
   // Scan state management - preserved across tab switches
@@ -105,7 +106,7 @@ const Scanning = () => {
       fetchStats(userId);
     } else {
       setHistory([]);
-      setStats({ totalScans: 0, safeScans: 0, threatScans: 0, suspiciousScans: 0 });
+      setStats({ totalScans: 0, safeScans: 0, threatScans: 0, suspiciousScans: 0, undetectedScans: 0 });
     }
   }, [userId]);
 
@@ -117,7 +118,7 @@ const Scanning = () => {
     try {
       // Using existing apiScans helper but ensuring it uses the passed ID
       const response = await apiScans.getHistory(Number(id));
-      console.log('history:', response.data); // Debugging: Log history data
+      console.log('history response:', response.data); // Debugging
       
       // Transform and set history
       if (response.data && Array.isArray(response.data)) {
@@ -125,7 +126,7 @@ const Scanning = () => {
           id: scan.id.toString(),
           type: scan.scan_type as "url" | "file" | "email" | "password",
           target: scan.target,
-          status: scan.status as "safe" | "phishing" | "breached" | "weak" | "medium" | "strong",
+          status: scan.status as string,
           timestamp: new Date(scan.timestamp)
         }));
         
@@ -141,6 +142,35 @@ const Scanning = () => {
     }
   };
 
+  // Calculate stats dynamically from history
+  useEffect(() => {
+    if (!history) return;
+    
+    const safeItems = history.filter((item: any) => {
+      const status = item.status.toLowerCase();
+      return status === "safe" || status === "strong" || status === "clean" || status === "secure";
+    });
+    
+    const threatItems = history.filter((item: any) => {
+      const status = item.status.toLowerCase();
+      return !["safe", "strong", "clean", "secure"].includes(status);
+    });
+
+    const safe = safeItems.length;
+    const threats = threatItems.length;
+    const total = safe + threats;
+
+    setStats({
+      totalScans: total,
+      safeScans: safe,
+      threatScans: threats,
+      suspiciousScans: 0,
+      undetectedScans: 0
+    });
+    
+    console.log("Scanning stats updated dynamically:", { safe, threats, total });
+  }, [history]);
+
   // Fetch scan statistics
   const fetchStats = async (id: string) => {
     try {
@@ -152,12 +182,13 @@ const Scanning = () => {
           totalScans: response.data.totalScans || 0,
           safeScans: response.data.safeScans || 0,
           threatScans: response.data.threatScans || 0,
-          suspiciousScans: response.data.suspiciousScans || 0
+          suspiciousScans: response.data.suspiciousScans || 0,
+          undetectedScans: response.data.undetectedScans || 0
         });
       }
     } catch (err) {
       console.error('❌ Failed to fetch stats:', err);
-      setStats({ totalScans: 0, safeScans: 0, threatScans: 0, suspiciousScans: 0 });
+      setStats({ totalScans: 0, safeScans: 0, threatScans: 0, suspiciousScans: 0, undetectedScans: 0 });
     }
   };
 
@@ -386,9 +417,8 @@ const Scanning = () => {
         {/* Stats Cards Section - Only show for authenticated users */}
         {isAuthenticated && userId && (
           <StatsCards 
-            totalScans={stats.totalScans || 0} 
-            threats={stats.threatScans || 0} 
-            safe={stats.safeScans || 0} 
+            threats={stats.threatScans} 
+            safe={stats.safeScans} 
           />
         )}
         
