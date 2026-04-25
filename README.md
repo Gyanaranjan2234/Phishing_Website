@@ -1,146 +1,139 @@
 # 🔐 APGS - Authentication Protocol Gateway Secure
 
-## 🚀 Project Overview
+[![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
-APGS (Authentication Protocol Gateway Secure) is a cybersecurity web application designed to detect phishing threats and data breaches in real-time.
-It helps users analyze URLs, emails, passwords, and files to ensure digital safety.
-
----
-
-## ✨ Features
-
-* 🔍 **URL Phishing Detection**
-* 📧 **Email Breach Checker**
-* 🔑 **Password Leak Detection**
-* 📂 **File Safety Scanner (Basic)**
-* 📊 **Risk Score & Detailed Analysis**
-* 📄 **Downloadable Risk Report (PDF)**
-* 🔐 **User Authentication System (JWT)**
-* 🌙 **Dark/Light Mode UI**
+**APGS** is a sophisticated cybersecurity platform designed to empower users with real-time threat intelligence. From detecting malicious URLs to checking if your data has been leaked in a breach, APGS provides a centralized gateway for digital security.
 
 ---
 
-## 🧠 Tech Stack
+## 🚀 Key Features
 
-### 🌐 Frontend
-
-* HTML
-* CSS
-* JavaScript
-
-### ⚙️ Backend
-
-* Python (FastAPI)
-
-### 🤖 Machine Learning
-
-* Scikit-learn
-
-### 🗄️ Database
-
-* MongoDB
-
-### 🔐 Security & APIs
-
-* Google Safe Browsing API
-* Have I Been Pwned API
+- **🔍 URL Phishing Detection**: Instant analysis of suspicious links using the VirusTotal API and security heuristics.
+- **📧 Email Breach Checker**: Verify if your email address has been compromised in known historical data breaches.
+- **🔑 Password Security Hub**: Evaluate password strength and check against databases of leaked credentials.
+- **📂 File Integrity Scanner**: Scan files for potential threats before opening them.
+- **📊 Interactive Dashboard**: Visualize your security posture with real-time analytics, trend charts, and risk scores.
+- **📄 Professional Reports**: Generate and download detailed security reports in PDF format.
+- **🔐 Secure Authentication**: Robust user management with JWT-based sessions and Google OAuth integration.
+- **🌓 Dynamic UI**: A premium, glassmorphism-inspired design with full Dark/Light mode support.
 
 ---
 
-## 🧭 Workflow
+## 🛠️ Tech Stack
 
-1. User enters URL / Email / Password / File
-2. Request goes to FastAPI backend
-3. ML model analyzes input (phishing detection)
-4. External APIs validate results
-5. Risk score is generated
-6. Data stored in database
-7. Result displayed with report
+### Frontend
+- **Framework**: React 18 with Vite
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS & Shadcn/UI
+- **Icons**: Lucide React
+- **Charts**: Recharts
+- **State Management**: TanStack Query (React Query)
 
----
+### Backend
+- **Framework**: FastAPI (Python)
+- **Database**: SQLite (SQLAlchemy ORM)
+- **Security**: Bcrypt (Hashing), Jose/JWT (Tokens)
+- **API Clients**: HTTPX
 
-## 📁 Project Structure
-
-```
-APGS/
-│
-├── frontend/
-├── backend/
-│   ├── app/
-│   ├── models/
-│   ├── routes/
-│   ├── services/
-│   └── utils/
-│
-├── database/
-├── README.md
-```
+### External Integrations
+- VirusTotal API (Threat Intelligence)
+- Have I Been Pwned (Breach Detection)
+- Google Safe Browsing
 
 ---
 
-## ⚙️ Installation & Setup
+## ⚙️ Setup & Installation
 
-### 1️⃣ Clone the Repository
+### Prerequisites
+- **Node.js** (v18+)
+- **Python** (v3.9+)
+- **Git**
 
-```
+### 1. Clone the Repository
+```bash
 git clone https://github.com/Gyanaranjan2234/Phishing-_Website.git
 cd Phishing-_Website
 ```
 
----
+### 2. Backend Setup
+```bash
+# Navigate to backend directory
+cd backend
 
-### 2️⃣ Install Backend Dependencies
+# Create a virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-```
+# Install dependencies
 pip install -r requirements.txt
+
+# Start the FastAPI server
+uvicorn main:app --reload
+```
+The backend will be running at `http://localhost:8000`.
+
+### 3. Frontend Setup
+```bash
+# Return to the root directory
+cd ..
+
+# Install dependencies
+npm install
+
+# Start the development server
+npm run dev
+```
+The frontend will be running at `http://localhost:5173`.
+
+---
+
+## 🔑 Environment Variables
+
+To run this project, you will need to add the following environment variables to your `.env` and `.env.local` files in the root directory.
+
+### `.env`
+```env
+VITE_VIRUSTOTAL_API_KEY=your_virustotal_api_key
+# If using Supabase for any features:
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_key
+```
+
+### `backend/.env`
+```env
+# Backend specific configurations
+SECRET_KEY=your_jwt_secret_key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
 
 ---
 
-### 3️⃣ Run Backend Server
+## 📊 Usage
 
-```
-uvicorn app.main:app --reload
-```
-
----
-
-### 4️⃣ Open Frontend
-
-Simply open `index.html` in your browser
+1. **Register/Login**: Create an account or use Google OAuth to access the dashboard.
+2. **Scanning**: Navigate to the "Scanning Hub" to check URLs, Emails, or Files.
+3. **Dashboard**: View your scan history and security trends on the profile page.
+4. **Reports**: Click on any scan result to view details and download a PDF report.
 
 ---
 
-## 📸 Screenshots
+## 📌 Notes & Disclaimer
 
-*(Add your UI screenshots here)*
-
----
-
-## 🎯 Future Enhancements
-
-* Advanced AI-based detection
-* Browser Extension
-* Real-time threat intelligence
-* File malware scanning integration
+- **Educational Purpose**: This project was developed as part of a cybersecurity awareness initiative.
+- **Accuracy**: While we use industry-standard APIs, no tool can guarantee 100% detection of all threats. Always practice safe browsing.
 
 ---
 
-## 👨‍💻 Team
+## 👨‍💻 Developed By
 
-* Gyana Ranjan Behera
-* (Add your teammates)
-
----
-
-## 📌 Note
-
-This project is developed for educational and cybersecurity awareness purposes.
+- **Gyana Ranjan Behera** - *Lead Developer*
 
 ---
 
 ## ⭐ Support
 
-If you like this project, give it a ⭐ on GitHub!
-
----
+If you find this project helpful, please consider giving it a ⭐ on [GitHub](https://github.com/Gyanaranjan2234/Phishing-_Website)!
