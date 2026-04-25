@@ -167,23 +167,31 @@ export const updateProfile = async (data: { username: string }) => {
 };
 
 /**
- * Update password
- * Note: This would need a backend endpoint to be implemented
- * For now, returns success (not functional without backend support)
+ * Update password (Authenticated)
+ * @param data Object containing user_id, current_password, and new_password
  */
-export const updatePassword = async (data: { password: string }) => {
-  const session = localStorage.getItem('user_session');
-  if (!session) {
-    throw new Error('Unauthorized');
-  }
+export const updatePassword = async (data: { user_id: number, current_password: string, new_password: string }) => {
+  try {
+    const response = await fetch(`${AUTH_API_URL}/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
 
-  if (!data.password || data.password.length < 6) {
-    throw new Error('Password must be at least 6 characters');
+    const result = await response.json();
+    return {
+      success: result.status === 'success',
+      message: result.message
+    };
+  } catch (error) {
+    console.error('Update password error:', error);
+    return {
+      success: false,
+      message: 'Network error. Please try again later.'
+    };
   }
-
-  // Note: This doesn't actually update the backend password
-  // You would need a backend endpoint for this
-  return { success: true };
 };
 
 /**

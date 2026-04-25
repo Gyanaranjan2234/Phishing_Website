@@ -50,6 +50,16 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 
+class ChangePasswordRequest(BaseModel):
+    """
+    Schema for authenticated user to change password.
+    Requires current password for verification.
+    """
+    user_id: int
+    current_password: str
+    new_password: str
+
+
 # ============ Response Schemas ============
 
 class UserResponse(BaseModel):

@@ -21,7 +21,7 @@ from database.db import get_db
 from models.user_model import User
 from models.contact_model import ContactMessage
 from models.token_model import PasswordResetToken
-from schemas.auth_schema import UserSignup, UserLogin, UserResponse, AuthResponse, ForgotPasswordRequest, ResetPasswordRequest
+from schemas.auth_schema import UserSignup, UserLogin, UserResponse, AuthResponse, ForgotPasswordRequest, ResetPasswordRequest, ChangePasswordRequest
 from schemas.contact_schema import ContactCreate, ContactResponse
 from utils.security import hash_password, verify_password
 
@@ -427,6 +427,44 @@ def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db))
         return AuthResponse(
             status="error",
             message="Failed to reset password."
+        )
+
+
+@router.post("/change-password", response_model=AuthResponse)
+def change_password(request: ChangePasswordRequest, db: Session = Depends(get_db)):
+    """
+    Authenticated password change.
+    Verifies old password before allowing update.
+    """
+    try:
+        user = db.query(User).filter(User.id == request.user_id).first()
+        if not user:
+            return AuthResponse(status="error", message="User not found.")
+
+        # If user has a password (not just OAuth)
+        if user.hashed_password:
+            # Verify current password
+            if not verify_password(request.current_password, user.hashed_password):
+                return AuthResponse(
+                    status="error",
+                    message="Incorrect current password."
+                )
+        
+        # Update with new hashed password
+        user.hashed_password = hash_password(request.new_password)
+        db.add(user)
+        db.commit()
+
+        return AuthResponse(
+            status="success",
+            message="Password updated successfully."
+        )
+
+    except Exception as e:
+        db.rollback()
+        return AuthResponse(
+            status="error",
+            message="Failed to update password."
         )
 
 

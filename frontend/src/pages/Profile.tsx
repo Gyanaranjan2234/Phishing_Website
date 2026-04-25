@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { User as UserIcon, Lock, Mail, CheckCircle2, LogOut, Trash2, Home } from "lucide-react";
+import { User as UserIcon, Lock, Mail, CheckCircle2, LogOut, Trash2, Home, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -27,6 +27,11 @@ const Profile = () => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
+  
+  // Password visibility states
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -79,7 +84,7 @@ const Profile = () => {
 
   const changePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!passwordForm.newPassword || !passwordForm.confirmPassword) {
+    if (!passwordForm.oldPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
       return toast.error("Fill all password fields");
     }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
@@ -92,12 +97,16 @@ const Profile = () => {
     setLoading(true);
     try {
       const data = await apiAuth.updatePassword({
-        password: passwordForm.newPassword
+        user_id: parseInt(user.id),
+        current_password: passwordForm.oldPassword,
+        new_password: passwordForm.newPassword
       });
 
       if (data.success) {
         setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
         toast.success("Password updated successfully");
+      } else {
+        toast.error(data.message || "Failed to update password");
       }
     } catch (err: any) {
       toast.error(err.message || "An error occurred while updating password");
@@ -246,26 +255,56 @@ const Profile = () => {
             <h2 className="text-lg font-semibold text-foreground mb-4">Change Password</h2>
             <form onSubmit={changePassword} className="space-y-3">
               <label className="block text-sm text-muted-foreground">Current Password</label>
-              <Input
-                type="password"
-                value={passwordForm.oldPassword}
-                onChange={(e) => setPasswordForm((prev) => ({ ...prev, oldPassword: e.target.value }))}
-                className="bg-muted border-border text-foreground"
-              />
+              <div className="relative">
+                <Input
+                  type={showOldPassword ? "text" : "password"}
+                  value={passwordForm.oldPassword}
+                  onChange={(e) => setPasswordForm((prev) => ({ ...prev, oldPassword: e.target.value }))}
+                  className="bg-muted border-border text-foreground pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowOldPassword(!showOldPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showOldPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+
               <label className="block text-sm text-muted-foreground">New Password</label>
-              <Input
-                type="password"
-                value={passwordForm.newPassword}
-                onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
-                className="bg-muted border-border text-foreground"
-              />
+              <div className="relative">
+                <Input
+                  type={showNewPassword ? "text" : "password"}
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
+                  className="bg-muted border-border text-foreground pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+
               <label className="block text-sm text-muted-foreground">Confirm Password</label>
-              <Input
-                type="password"
-                value={passwordForm.confirmPassword}
-                onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-                className="bg-muted border-border text-foreground"
-              />
+              <div className="relative">
+                <Input
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                  className="bg-muted border-border text-foreground pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Updating..." : "Change Password"}
               </Button>
