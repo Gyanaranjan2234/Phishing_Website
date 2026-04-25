@@ -12,7 +12,7 @@ import { handleScanAttempt } from "@/lib/guestAccess";  // ADDED: Guest access c
 import RiskAnalysisReport from "@/components/RiskAnalysisReport";
 import { generateFileReport } from "@/lib/generateReport";
 import { generateRiskReport } from "@/lib/reportGenerator";
-import { generatePDFReport } from "@/lib/pdfReportGenerator";
+import { generatePDFReport, generatePDFBlob } from "@/lib/pdfReportGenerator";
 import { vtApi } from "@/lib/api-vt";
 import { transformVTToUI } from "@/lib/vtMapper";
 import { VTAnalysisResponse } from "@/lib/vt-interfaces";
@@ -53,6 +53,7 @@ const FileScanner = ({ onScanComplete, isAuthenticated = false, userName, scanDa
   const [result, setResult] = useState<FileAnalysis | null>(scanData.result || null);
   const [scanProgress, setScanProgress] = useState(0);
   const [downloadingReport, setDownloadingReport] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   const handleFileDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -210,8 +211,7 @@ const handleScan = async () => {
   }
 };
 const handleGenerateReport = async () => {
-  // Priority: Use local 'result' (the actual VT mapped data)
-  const reportResult =  scanData || result;
+  const reportResult = result || scanData.result;
 
   if (!reportResult) {
     showToast("❌ No Scan Result Found. Please scan the file again.", "error");
@@ -220,24 +220,87 @@ const handleGenerateReport = async () => {
 
   setDownloadingReport(true);
   try {
-    // Ensure we are treating this strictly as FileAnalysis
     const fileData = reportResult as FileAnalysis;
-
-    // Use the specific file generator we discussed
-    // This ensures 'infected' status flows into the PDF
     await generatePDFReport({
       scanType: "file",
       target: fileData.fileName,
       result: fileData,
       userName: userName,
-    } );  
-
+    });
     showToast("✅ Security Report Downloaded", "success");
   } catch (error) {
     console.error("PDF Generation Error:", error);
     showToast("❌ Failed to generate PDF report", "error");
   } finally {
     setDownloadingReport(false);
+  }
+};
+
+const handleShare = async () => {
+  const reportResult = result || scanData.result;
+  if (!reportResult) {
+    showToast("❌ No Scan Result. Please scan a file first.", "error");
+    return;
+  }
+
+  setSharing(true);
+
+  // Helper: download PDF as fallback
+  const downloadFallback = (blob: Blob) => {
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "APGS_Report.pdf";
+    link.click();
+    URL.revokeObjectURL(link.href);
+    showToast("⬇️ Download started — Sharing not supported on this device", "info");
+  };
+
+  try {
+    const fileData = reportResult as FileAnalysis;
+
+    // 1. Generate PDF Blob
+    const pdfBlob = await generatePDFBlob({
+      scanType: "file",
+      target: fileData.fileName,
+      result: fileData,
+      userName: userName,
+    });
+
+    // 2. Convert to File
+    const pdfFile = new File([pdfBlob], "APGS_Report.pdf", { type: "application/pdf" });
+
+    // 3. Check file-share support (canShare can itself throw on some browsers)
+    let canShareFiles = false;
+    try {
+      canShareFiles = !!(navigator.canShare && navigator.canShare({ files: [pdfFile] }));
+    } catch {
+      canShareFiles = false;
+    }
+
+    if (canShareFiles) {
+      await navigator.share({ files: [pdfFile], title: "APGS File Security Report", text: "Security scan report attached" });
+      showToast("✅ Shared Successfully", "success");
+    } else {
+      downloadFallback(pdfBlob);
+    }
+  } catch (err: any) {
+    // User cancelled the share sheet — silent
+    if (err?.name === "AbortError") return;
+    // Device/browser doesn't support sharing — fallback to download
+    if (err?.name === "NotAllowedError" || err?.name === "NotSupportedError" || err instanceof TypeError) {
+      try {
+        const fileData = (result || scanData.result) as FileAnalysis;
+        const blob = await generatePDFBlob({ scanType: "file", target: fileData.fileName, result: fileData, userName });
+        downloadFallback(blob);
+      } catch {
+        showToast("❌ Failed to generate report", "error");
+      }
+      return;
+    }
+    // Genuine share failure
+    showToast("❌ Share Failed", "error");
+  } finally {
+    setSharing(false);
   }
 };
   const scoreInfo = result ? getVerdictInfo(result.score, result.status) : null;
@@ -494,17 +557,30 @@ const handleGenerateReport = async () => {
               </div>
             </div>
 
-            {/* Download Button */}
-            <div className="mt-6 flex justify-center">
+            {/* Download & Share Buttons */}
+            <div className="mt-6 grid grid-cols-2 gap-3">
               <Button
+                id="file-download-report-btn"
                 onClick={handleGenerateReport}
-                disabled={downloadingReport}
-                className="flex items-center gap-2 px-6 py-3"
+                disabled={downloadingReport || sharing}
+                className="flex items-center justify-center gap-2 font-heading hover:shadow-[0_0_20px_hsl(150_100%_45%/0.4)] transition-all duration-300"
               >
                 {downloadingReport ? (
-                  <><Loader2 className="w-5 h-5 animate-spin" /> Generating...</>
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
                 ) : (
-                  <><Download className="w-5 h-5" /> Download Full PDF Report</>
+                  <><Download className="w-4 h-4" /> Download</>
+                )}
+              </Button>
+              <Button
+                id="file-share-report-btn"
+                onClick={handleShare}
+                disabled={sharing || downloadingReport}
+                className="flex items-center justify-center gap-2 font-heading hover:shadow-[0_0_20px_hsl(150_100%_45%/0.4)] transition-all duration-300"
+              >
+                {sharing ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Sharing...</>
+                ) : (
+                  <><span className="text-base leading-none">📤</span> Share</>
                 )}
               </Button>
             </div>

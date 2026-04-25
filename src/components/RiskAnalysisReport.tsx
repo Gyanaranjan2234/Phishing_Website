@@ -34,6 +34,9 @@ export interface RiskAnalysisData {
   analysisItems?: string[];
   // Critical flags for final decision
   flags?: RiskFlags;
+  // Detection info from VT stats (dynamic from API)
+  detectionCount?: number;
+  totalVendors?: number;
 }
 
 const sanitizeString = (value: unknown): string => {
@@ -68,7 +71,7 @@ const getRiskInfo = (score: number, status: string) => {
       cardBorder:  "border-emerald-500/50",
       cardBg:      "from-emerald-950/60 to-emerald-900/30",
       icon:        CheckCircle,
-      description: "No threats detected. This file/URL appears safe and legitimate."
+      description: "No threats detected. This URL appears safe and legitimate."
     },
     low: {
       level:       "LOW RISK",
@@ -79,7 +82,7 @@ const getRiskInfo = (score: number, status: string) => {
       cardBorder:  "border-yellow-500/50",
       cardBg:      "from-yellow-950/60 to-yellow-900/30",
       icon:        AlertTriangle,
-      description: "Minor detections. Proceed with caution."
+      description: "Some security vendors flagged this URL. Proceed with caution."
     },
     moderate: {
       level:       "MODERATE RISK",
@@ -112,17 +115,21 @@ const getRiskInfo = (score: number, status: string) => {
       cardBorder:  "border-red-500/50",
       cardBg:      "from-red-950/60 to-red-900/30",
       icon:        AlertCircle,
-      description: "Malicious activity detected. Do not proceed."
+      description: "Widespread malicious detections. Do NOT proceed."
     },
   };
 
-  // Fallback for older types
-  if (status === "suspicious") status = "warning";
-  if (status === "infected") status = "dangerous";
+  // Normalize legacy status values to current tier keys
+  const normalized =
+    status === "suspicious" ? "low" :
+    status === "phishing"   ? "high" :
+    status === "infected"   ? "dangerous" :
+    status === "warning"    ? "low" :
+    status;
 
-  const config = verdictConfig[status] || verdictConfig.safe;
+  const config = verdictConfig[normalized] || verdictConfig.safe;
   return {
-    verdict: status,
+    verdict: normalized,
     adjustedScore: score,
     ...config,
   };
@@ -243,13 +250,25 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
                 <div className="flex items-center gap-3">
                   <div className={`w-4 h-4 rounded-full shadow-lg ${riskInfo.dotColor}`} />
                   <span className={`font-semibold text-lg ${riskInfo.textColor}`}>
-                    {riskInfo.level === "SAFE" ? "✓ Safe" : 
-                     riskInfo.level === "LOW RISK" ? "⚠ Low Risk" : 
-                     riskInfo.level === "MODERATE RISK" ? "⚠ Moderate" : 
-                     riskInfo.level === "HIGH RISK" ? "✕ High Risk" : "✕ Dangerous"}
+                    {riskInfo.level === "SAFE" ? "✓ No threats detected" :
+                     riskInfo.level === "LOW RISK" ? "⚠ Some security vendors flagged this URL" :
+                     riskInfo.level === "MODERATE RISK" ? "⚠ Multiple vendors flagged this URL" :
+                     riskInfo.level === "HIGH RISK" ? "✕ High number of detections" : "✕ Widespread malicious detections"}
                   </span>
                 </div>
               </div>
+
+              {/* Detection count — dynamic from API */}
+              {data.detectionCount != null && data.totalVendors != null && (
+                <div className="pt-2 border-t border-slate-600">
+                  <p className="text-xs text-slate-400 uppercase font-semibold tracking-wide mb-1">Detection Info</p>
+                  <p className={`text-sm font-semibold ${data.detectionCount > 0 ? riskInfo.textColor : "text-emerald-400"}`}>
+                    {data.detectionCount === 0
+                      ? `✓ 0 / ${data.totalVendors} security vendors detected any threat`
+                      : `⚠ Detected by ${data.detectionCount} / ${data.totalVendors} security vendors`}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -326,9 +345,11 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
             <RiskIcon className={`w-8 h-8 mt-1 shrink-0 ${riskInfo.textColor}`} />
             <div className="space-y-3 flex-1">
               <p className={`text-2xl font-bold ${riskInfo.textColor}`}>
-                {riskInfo.level === "SAFE" ? "✓ Green Light — Safe to Proceed" :
-                 (riskInfo.level === "LOW RISK" || riskInfo.level === "MODERATE RISK") ? "⚠ Caution — Review Before Proceeding" :
-                 "✕ Red Alert — Do Not Proceed"}
+                {riskInfo.verdict === "safe"
+                  ? "✓ Green Light — Safe to Proceed"
+                  : (riskInfo.verdict === "low" || riskInfo.verdict === "moderate")
+                  ? "⚠ Proceed with Caution"
+                  : "✕ Red Alert — Do Not Proceed"}
               </p>
               <p className="text-sm text-slate-300 leading-relaxed">{verdictText}</p>
             </div>
@@ -358,7 +379,7 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
                 </li>
               </>
             )}
-            {riskInfo.verdict === "warning" && (
+            {(riskInfo.verdict === "low" || riskInfo.verdict === "moderate") && (
               <>
                 <li className="flex gap-3 p-2 rounded hover:bg-slate-800/30 transition-colors">
                   <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />

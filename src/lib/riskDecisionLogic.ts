@@ -17,70 +17,42 @@ export interface RiskFlags {
   suspicious?: boolean;
 }
 
-export type FinalVerdict = "safe" | "warning" | "dangerous";
-export type SeverityLevel = "LOW" | "MEDIUM" | "HIGH";
+export type FinalVerdict = "safe" | "low" | "moderate" | "high" | "dangerous";
+export type SeverityLevel = "NONE" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 /**
- * Calculate final verdict based on critical flags and score
- * Critical flags ALWAYS override score-based logic
- * 
- * Priority:
- * 1. If malicious/phishing/blacklist detected → DANGEROUS
- * 2. Else if suspicious detected → WARNING
- * 3. Else use score thresholds → SAFE/WARNING/DANGEROUS
+ * Calculate final verdict based on risk_score (0–100).
+ * risk_score = Math.round((malicious / total) * 100)
+ *
+ * Tiers:
+ *   0        → safe
+ *   1–10     → low
+ *   11–30    → moderate
+ *   31–70    → high
+ *   71–100   → dangerous
+ *
+ * Flags are NOT used to override the score — they are informational only.
  */
 export function calculateFinalVerdict(
   score: number,
   flags: RiskFlags
 ): FinalVerdict {
-  // Priority 1: Malicious/Phishing/Blacklist = DANGEROUS
-  if (flags.malwareDetected || flags.phishingDetected || flags.blacklisted) {
-    return "dangerous";
-  }
-
-  // Priority 2: Suspicious detections = WARNING (never show as Safe)
-  if (flags.suspicious) {
-    return "warning";
-  }
-
-  // Priority 3: Score-based thresholds
-  if (score <= 30) return "safe";
-  if (score <= 70) return "warning";
+  if (score === 0)  return "safe";
+  if (score <= 10)  return "low";
+  if (score <= 30)  return "moderate";
+  if (score <= 70)  return "high";
   return "dangerous";
 }
 
 /**
- * Calculate adjusted score based on detected threats
- * Blacklist +90, Malware +80, Phishing +70, Suspicious +40 (capped at 100)
+ * The risk_score from mapVTResult IS the display score — no inflation needed.
+ * This function is kept for API compatibility but is now a passthrough.
  */
 export function calculateAdjustedScore(
   baseScore: number,
   flags: RiskFlags
 ): number {
-  let adjustedScore = baseScore;
-
-  // Threat severity hierarchy
-  if (flags.blacklisted) {
-    adjustedScore = Math.min(adjustedScore + 90, 100);
-  } else if (flags.malwareDetected) {
-    adjustedScore = Math.min(adjustedScore + 80, 100);
-  } else if (flags.phishingDetected) {
-    adjustedScore = Math.min(adjustedScore + 70, 100);
-  } else if (flags.suspicious) {
-    adjustedScore = Math.min(adjustedScore + 40, 100);
-  }
-
-  // Ensure dangerous flags always show high risk score (minimum 75)
-  if (flags.malwareDetected || flags.phishingDetected || flags.blacklisted) {
-    return Math.max(adjustedScore, 75);
-  }
-
-  // Ensure suspicious shows medium risk (minimum 40)
-  if (flags.suspicious) {
-    return Math.max(adjustedScore, 40);
-  }
-
-  return adjustedScore;
+  return baseScore;
 }
 
 /**
@@ -88,12 +60,11 @@ export function calculateAdjustedScore(
  */
 export function verdictToSeverity(verdict: FinalVerdict): SeverityLevel {
   switch (verdict) {
-    case "safe":
-      return "LOW";
-    case "warning":
-      return "MEDIUM";
-    case "dangerous":
-      return "HIGH";
+    case "safe":     return "NONE";
+    case "low":      return "LOW";
+    case "moderate": return "MEDIUM";
+    case "high":     return "HIGH";
+    case "dangerous":return "CRITICAL";
   }
 }
 
@@ -102,9 +73,11 @@ export function verdictToSeverity(verdict: FinalVerdict): SeverityLevel {
  */
 export function getVerdictDescription(verdict: FinalVerdict): string {
   const descriptions: Record<FinalVerdict, string> = {
-    safe: "No threats detected. This URL appears safe and legitimate.",
-    warning: "Some vendors flagged this URL as suspicious. Proceed with caution and verify before proceeding.",
-    dangerous: "Malicious activity detected. Do not proceed. This URL poses a security threat.",
+    safe:      "No threats detected. This URL appears safe and legitimate.",
+    low:       "Minimal detections (1–10%). A small number of vendors flagged this URL. Proceed with care.",
+    moderate:  "Some vendors flagged this URL as suspicious (11–30%). Verify before interacting.",
+    high:      "Multiple vendors flagged this URL (31–70%). High risk — avoid unless verified.",
+    dangerous: "Widespread malicious detections (71–100%). Do NOT proceed with this URL.",
   };
   return descriptions[verdict];
 }
@@ -114,8 +87,10 @@ export function getVerdictDescription(verdict: FinalVerdict): string {
  */
 export function getVerdictTitle(verdict: FinalVerdict): string {
   const titles: Record<FinalVerdict, string> = {
-    safe: "✓ Green Light — Safe to Proceed",
-    warning: "⚠ Caution — Review Before Proceeding",
+    safe:      "✓ Green Light — Safe to Proceed",
+    low:       "⚠ Low Risk — Proceed with Awareness",
+    moderate:  "⚠ Moderate Risk — Verify Before Proceeding",
+    high:      "✕ High Risk — Avoid If Possible",
     dangerous: "✕ Red Alert — Do Not Proceed",
   };
   return titles[verdict];
@@ -126,8 +101,10 @@ export function getVerdictTitle(verdict: FinalVerdict): string {
  */
 export function getVerdictLabel(verdict: FinalVerdict): string {
   const labels: Record<FinalVerdict, string> = {
-    safe: "Safe",
-    warning: "Warning",
+    safe:      "Safe",
+    low:       "Low Risk",
+    moderate:  "Moderate Risk",
+    high:      "High Risk",
     dangerous: "Dangerous",
   };
   return labels[verdict];
@@ -138,12 +115,11 @@ export function getVerdictLabel(verdict: FinalVerdict): string {
  */
 export function verdictToStatus(verdict: FinalVerdict): "safe" | "suspicious" | "dangerous" {
   switch (verdict) {
-    case "safe":
-      return "safe";
-    case "warning":
-      return "suspicious";
-    case "dangerous":
-      return "dangerous";
+    case "safe":      return "safe";
+    case "low":       return "suspicious";
+    case "moderate":  return "suspicious";
+    case "high":      return "dangerous";
+    case "dangerous": return "dangerous";
   }
 }
 
@@ -151,34 +127,40 @@ export function verdictToStatus(verdict: FinalVerdict): "safe" | "suspicious" | 
  * Determine if a verdict indicates danger
  */
 export function isDangerous(verdict: FinalVerdict): boolean {
-  return verdict === "dangerous";
+  return verdict === "dangerous" || verdict === "high";
 }
 
-/**
- * Determine if a verdict requires caution
- */
 export function requiresCaution(verdict: FinalVerdict): boolean {
-  return verdict === "warning" || verdict === "dangerous";
+  return verdict !== "safe";
 }
 
 /**
  * Get recommendations based on verdict and scan type
  */
 export function getRecommendations(verdict: FinalVerdict, scanType: string): string[] {
-  const baseRecommendations = {
+  const baseRecommendations: Record<FinalVerdict, string[]> = {
     safe: [
       "✓ This target appears to be secure and legitimate",
       "• Standard browsing security precautions still apply",
       "• Keep your browser and security tools updated",
       "• Enable two-factor authentication on important accounts",
-      "• Regularly backup your important data",
     ],
-    warning: [
-      "⚠ Exercise caution when interacting with this target",
-      "• Verify the legitimacy of the sender or source",
-      "• Do not enter sensitive information without verification",
+    low: [
+      "⚠ Minimal risk detected — a small number of vendors flagged this target",
+      "• Verify the source before sharing personal information",
+      "• Use caution if prompted to download files or enter credentials",
+    ],
+    moderate: [
+      "⚠ Moderate risk — some vendors flagged this target as suspicious",
+      "• Do not enter sensitive information without further verification",
       "• Consider using additional security tools for confirmation",
       "• Monitor your accounts for suspicious activity",
+    ],
+    high: [
+      "✕ High risk detected — multiple vendors flagged this target",
+      "• Avoid interacting with this URL unless you are certain of its legitimacy",
+      "• Do NOT enter credentials or personal information",
+      "• Report to your IT or security team",
     ],
     dangerous: [
       "🚨 Do NOT interact with this target",
@@ -187,10 +169,8 @@ export function getRecommendations(verdict: FinalVerdict, scanType: string): str
       "• Report this threat to the appropriate authorities",
       "• Check your accounts for unauthorized access",
       "• Run a security scan on your device",
-      "• Consider changing passwords for important accounts",
     ],
   };
-
   return baseRecommendations[verdict] || baseRecommendations.safe;
 }
 

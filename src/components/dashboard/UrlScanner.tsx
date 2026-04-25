@@ -9,10 +9,10 @@ import { apiScans } from "@/lib/api-backend";  // UPDATED: Use backend API inste
 import { saveScanResult } from "@/lib/scanHistory";
 import { handleScanAttempt } from "@/lib/guestAccess";  // ADDED: Guest access control
 import RiskAnalysisReport from "@/components/RiskAnalysisReport";
-import { generatePDFReport } from "@/lib/pdfReportGenerator";
+import { generatePDFReport, generatePDFBlob } from "@/lib/pdfReportGenerator";
 import { scanUrlWithVT } from "@/lib/virustotal";
 import { mapVTToUrlAnalysis } from "@/lib/mapVTResult";
-import { calculateFinalVerdict, calculateAdjustedScore, type RiskFlags } from "@/lib/riskDecisionLogic";
+import { calculateFinalVerdict, type RiskFlags } from "@/lib/riskDecisionLogic";
 
 interface UrlScannerProps {
   onScanComplete: () => void;
@@ -22,39 +22,21 @@ interface UrlScannerProps {
   setScanData: (data: { input: string; result: any }) => void;
 }
 
-// Updated: Uses unified decision logic with flag priority
-// Ensures threats are never downplayed as "Safe"
+// 5-tier verdict display — driven purely by risk_score (malicious/total * 100)
 const getVerdictInfo = (score: number, flags?: RiskFlags) => {
   const verdict = calculateFinalVerdict(score, flags || {});
-  const adjustedScore = calculateAdjustedScore(score, flags || {});
 
-  if (verdict === "safe") {
-    return { 
-      bar: "bg-[#00ff9c]", 
-      text: "text-[#00ff9c]", 
-      bg: "bg-[#00ff9c]/10", 
-      label: "✓ Safe", 
-      description: "Low Risk URL",
-      adjustedScore
-    };
-  } else if (verdict === "warning") {
-    return { 
-      bar: "bg-[#ffcc00]", 
-      text: "text-[#ffcc00]", 
-      bg: "bg-[#ffcc00]/10", 
-      label: "⚠ Warning", 
-      description: "Medium Risk URL",
-      adjustedScore
-    };
-  } else {
-    return { 
-      bar: "bg-[#ff4d4d]", 
-      text: "text-[#ff4d4d]", 
-      bg: "bg-[#ff4d4d]/10", 
-      label: "✕ Dangerous", 
-      description: "High Risk URL",
-      adjustedScore
-    };
+  switch (verdict) {
+    case "safe":
+      return { bar: "bg-[#00ff9c]", text: "text-[#00ff9c]", bg: "bg-[#00ff9c]/10", label: "✓ Safe", description: "Risk Score: 0 — No threats detected", verdict };
+    case "low":
+      return { bar: "bg-[#ffcc00]", text: "text-[#ffcc00]", bg: "bg-[#ffcc00]/10", label: "⚠ Low Risk", description: "Risk Score: 1–10 — Minimal detections", verdict };
+    case "moderate":
+      return { bar: "bg-[#ffcc00]", text: "text-[#ffcc00]", bg: "bg-[#ffcc00]/10", label: "⚠ Moderate Risk", description: "Risk Score: 11–30 — Some vendors flagged", verdict };
+    case "high":
+      return { bar: "bg-[#ff4d4d]", text: "text-[#ff4d4d]", bg: "bg-[#ff4d4d]/10", label: "✕ High Risk", description: "Risk Score: 31–70 — Multiple detections", verdict };
+    default: // dangerous
+      return { bar: "bg-[#ff4d4d]", text: "text-[#ff4d4d]", bg: "bg-[#ff4d4d]/10", label: "✕ Dangerous", description: "Risk Score: 71–100 — Widespread detections", verdict };
   }
 };
 
@@ -63,6 +45,7 @@ const UrlScanner = ({ onScanComplete, isAuthenticated = false, userName, scanDat
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<UrlAnalysis | null>(scanData.result || null);
   const [downloadingReport, setDownloadingReport] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
     toast({
@@ -174,6 +157,75 @@ const handleAnalyze = async (e: React.FormEvent) => {
     }
   };
 
+  const handleShare = async () => {
+    const reportResult = result || scanData.result;
+    if (!reportResult) {
+      toast({ title: "❌ No Scan Result", description: "Please scan a URL first", variant: "destructive" });
+      return;
+    }
+
+    setSharing(true);
+
+    // Helper: download PDF as fallback
+    const downloadFallback = (blob: Blob) => {
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "APGS_Report.pdf";
+      link.click();
+      URL.revokeObjectURL(link.href);
+      toast({ title: "⬇️ Download started", description: "Sharing not supported on this device" });
+    };
+
+    try {
+      const urlData = reportResult as UrlAnalysis;
+
+      // 1. Generate PDF Blob
+      const pdfBlob = await generatePDFBlob({
+        scanType: "url",
+        target: urlData.url,
+        result: urlData,
+        userName: userName,
+      });
+
+      // 2. Convert to File
+      const file = new File([pdfBlob], "APGS_Report.pdf", { type: "application/pdf" });
+
+      // 3. Check file-share support (canShare can itself throw on some browsers)
+      let canShareFiles = false;
+      try {
+        canShareFiles = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+      } catch {
+        canShareFiles = false;
+      }
+
+      if (canShareFiles) {
+        await navigator.share({ files: [file], title: "APGS Security Report", text: "Security scan report attached" });
+        toast({ title: "✅ Shared Successfully" });
+      } else {
+        downloadFallback(pdfBlob);
+      }
+    } catch (err: any) {
+      // User cancelled the share sheet — silent
+      if (err?.name === "AbortError") return;
+      // Device/browser doesn't support sharing — fallback to download
+      if (err?.name === "NotAllowedError" || err?.name === "NotSupportedError" || err instanceof TypeError) {
+        // pdfBlob may not exist if generation failed; re-generate for fallback
+        try {
+          const urlData = (result || scanData.result) as UrlAnalysis;
+          const blob = await generatePDFBlob({ scanType: "url", target: urlData.url, result: urlData, userName });
+          downloadFallback(blob);
+        } catch {
+          toast({ title: "❌ Failed to generate report", variant: "destructive" });
+        }
+        return;
+      }
+      // Genuine share failure
+      toast({ title: "❌ Share Failed", description: "Could not share report", variant: "destructive" });
+    } finally {
+      setSharing(false);
+    }
+  };
+
   return (
     <section className="bg-card border border-border rounded-lg p-6 animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
       <h2 className="font-heading font-semibold text-foreground mb-4 flex items-center gap-2">
@@ -219,22 +271,26 @@ const handleAnalyze = async (e: React.FormEvent) => {
 
           {/* Status Banner */}
           <div className={`p-4 rounded-lg border-2 flex items-center gap-3 transition-all duration-500 ${
-            result.status === "safe"
+            scoreInfo.verdict === "safe"
               ? "bg-primary/10 border-primary/40 shadow-[0_0_20px_hsl(150_100%_45%/0.2)]"
+              : (scoreInfo.verdict === "low" || scoreInfo.verdict === "moderate")
+              ? "bg-yellow-500/10 border-yellow-500/40 shadow-[0_0_20px_rgba(255,204,0,0.2)]"
               : "bg-destructive/10 border-destructive/40 shadow-[0_0_20px_hsl(0_72%_51%/0.2)]"
           }`}>
-            {result.status === "safe" ? (
+            {scoreInfo.verdict === "safe" ? (
               <CheckCircle className="w-6 h-6 text-primary shrink-0" />
             ) : (
-              <AlertTriangle className="w-6 h-6 text-destructive shrink-0" />
+              <AlertTriangle className={`w-6 h-6 shrink-0 ${
+                (scoreInfo.verdict === "low" || scoreInfo.verdict === "moderate") ? "text-[#ffcc00]" : "text-destructive"
+              }`} />
             )}
             <div className="flex-1 min-w-0">
-              <p className={`font-heading font-bold text-sm ${result.status === "safe" ? "text-primary" : "text-destructive"}`}>
-                {result.status === "safe"
-                  ? "✓ URL Appears Safe"
-                  : result.status === "suspicious"
-                  ? "⚠ Suspicious URL Detected"
-                  : "⚠ Phishing Threat Detected"}
+              <p className={`font-heading font-bold text-sm ${
+                scoreInfo.verdict === "safe" ? "text-primary"
+                : (scoreInfo.verdict === "low" || scoreInfo.verdict === "moderate") ? "text-[#ffcc00]"
+                : "text-destructive"
+              }`}>
+                {scoreInfo.label}
               </p>
               <p className="text-muted-foreground text-xs truncate font-mono">{result.url}</p>
             </div>
@@ -246,7 +302,7 @@ const handleAnalyze = async (e: React.FormEvent) => {
               <div>
                 <p className="text-xs font-heading text-muted-foreground uppercase tracking-wide">Risk Score</p>
                 <p className={`font-heading font-bold text-3xl ${scoreInfo.text} drop-shadow-[0_0_8px_currentColor/0.3]`}>
-                  {scoreInfo.adjustedScore}
+                  {result.score}
                 </p>
               </div>
               <div className="text-right">
@@ -258,7 +314,7 @@ const handleAnalyze = async (e: React.FormEvent) => {
               <div className="relative h-4 w-full overflow-hidden rounded-full bg-secondary/50 border border-border">
                 <div
                   className={`h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_12px_currentColor/0.5] ${scoreInfo.bar}`}
-                  style={{ width: `${scoreInfo.adjustedScore}%` }}
+                  style={{ width: `${result.score}%` }}
                 />
               </div>
               <div className="flex justify-between text-xs text-muted-foreground font-mono">
@@ -291,12 +347,7 @@ const handleAnalyze = async (e: React.FormEvent) => {
             <RiskAnalysisReport
               data={{
                 scanType: "url",
-                status:
-                  result.status === "safe"
-                    ? "safe"
-                    : result.status === "suspicious"
-                    ? "suspicious"
-                    : "dangerous",
+                status: scoreInfo.verdict,
                 score: result.score,
                 details: result.reasons.map((r) => r.label).join(", "),
                 threats: result.reasons
@@ -306,6 +357,10 @@ const handleAnalyze = async (e: React.FormEvent) => {
                 userName: userName,
                 targetItem: result.url,
                 flags: result.flags,
+                detectionCount: result.vtStats?.malicious,
+                totalVendors: result.vtStats
+                  ? result.vtStats.malicious + result.vtStats.suspicious + result.vtStats.harmless + result.vtStats.undetected
+                  : undefined,
               }}
             />
           </div>
@@ -346,20 +401,20 @@ const handleAnalyze = async (e: React.FormEvent) => {
             </div>
           </div>
 
-          {/* PDF Report Download */}
+          {/* Download & Share Report */}
           <div className="rounded-lg border border-border/50 bg-gradient-to-br from-purple-500/5 to-cyan-500/5 p-5 space-y-4 animate-fade-in-up shadow-[0_0_15px_hsl(150_100%_45%/0.1)]">
             <div className="flex items-center gap-2 text-foreground font-heading text-sm">
               <FileText className="w-5 h-5 text-primary drop-shadow-[0_0_6px_currentColor/0.4]" />
-              <span>PDF Report Ready</span>
+              <span>Report Ready</span>
             </div>
 
             <div className="bg-muted/50 rounded border border-border p-3 space-y-2 text-xs font-mono">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Report Type:</span>
-                <span className="text-foreground font-semibold">APGS Security Risk Report</span>
+                <span className="text-muted-foreground">Scan Type:</span>
+                <span className="text-foreground font-semibold">URL Phishing Detection</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">URL Analyzed:</span>
+                <span className="text-muted-foreground">URL:</span>
                 <span className="text-foreground font-semibold truncate max-w-xs">
                   {result.url.length > 30 ? result.url.substring(0, 30) + "..." : result.url}
                 </span>
@@ -367,38 +422,45 @@ const handleAnalyze = async (e: React.FormEvent) => {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Result:</span>
                 <span className={result.status === "safe" ? "text-primary font-semibold" : "text-destructive font-semibold"}>
-                  {result.status === "safe" ? "✓ SAFE" : result.status === "suspicious" ? "⚠ SUSPICIOUS" : "⚠ PHISHING"}
+                  {scoreInfo.label.toUpperCase()}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Risk Score:</span>
                 <span className={`${scoreInfo.text} font-semibold`}>{result.score}/100</span>
               </div>
-              {result.vtStats && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Malicious Vendors:</span>
-                  <span className={`font-semibold ${result.vtStats.malicious > 0 ? "text-destructive" : "text-primary"}`}>
-                    {result.vtStats.malicious} / {result.vtStats.malicious + result.vtStats.suspicious + result.vtStats.harmless + result.vtStats.undetected}
-                  </span>
-                </div>
-              )}
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Analysis Points:</span>
-                <span className="text-foreground font-semibold">{result.reasons.length} factors</span>
+                <span className="text-muted-foreground">Date & Time:</span>
+                <span className="text-foreground font-semibold">{new Date().toLocaleString()}</span>
               </div>
             </div>
 
-            <Button
-              onClick={handleGenerateReport}
-              disabled={downloadingReport}
-              className="w-full font-heading hover:shadow-[0_0_20px_hsl(150_100%_45%/0.4)] transition-all duration-300"
-            >
-              {downloadingReport ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
-              ) : (
-                <><Download className="w-4 h-4 mr-2" /> Download Risk Report</>
-              )}
-            </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                id="url-download-report-btn"
+                onClick={handleGenerateReport}
+                disabled={downloadingReport || sharing}
+                className="font-heading hover:shadow-[0_0_20px_hsl(150_100%_45%/0.4)] transition-all duration-300"
+              >
+                {downloadingReport ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
+                ) : (
+                  <><Download className="w-4 h-4 mr-1.5" /> Download</>
+                )}
+              </Button>
+              <Button
+                id="url-share-report-btn"
+                onClick={handleShare}
+                disabled={sharing || downloadingReport}
+                className="font-heading hover:shadow-[0_0_20px_hsl(150_100%_45%/0.4)] transition-all duration-300"
+              >
+                {sharing ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sharing...</>
+                ) : (
+                  <><span className="mr-1.5 text-base leading-none">📤</span> Share</>
+                )}
+              </Button>
+            </div>
           </div>
 
         </div>
