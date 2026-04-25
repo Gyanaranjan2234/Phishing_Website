@@ -31,11 +31,11 @@ interface FileScannerProps {
 
 const getVerdictInfo = (score: number, status: string) => {
   if (status === "safe") {
-    return { bar: "bg-[#00ff9c]", text: "text-[#00ff9c]", bg: "bg-[#00ff9c]/10", label: "✓ Safe", description: "No Risk Detected", score };
+    return { bar: "bg-[#00ff9c]", text: "text-[#00ff9c]", bg: "bg-[#00ff9c]/10", label: "✓ Safe", description: "Risk Score (0–100): No threats detected", score };
   } else if (status === "low" || status === "moderate") {
-    return { bar: "bg-[#ffcc00]", text: "text-[#ffcc00]", bg: "bg-[#ffcc00]/10", label: "⚠ " + (status === "low" ? "Low Risk" : "Moderate Risk"), description: "Some Risk Factors", score };
+    return { bar: "bg-[#ffcc00]", text: "text-[#ffcc00]", bg: "bg-[#ffcc00]/10", label: "⚠ " + (status === "low" ? "Low Risk" : "Moderate Risk"), description: "Risk Score (0–100): Based on detected threats", score };
   } else {
-    return { bar: "bg-[#ff4d4d]", text: "text-[#ff4d4d]", bg: "bg-[#ff4d4d]/10", label: "✕ " + (status === "high" ? "High Risk" : "Dangerous"), description: "Critical Risk File", score };
+    return { bar: "bg-[#ff4d4d]", text: "text-[#ff4d4d]", bg: "bg-[#ff4d4d]/10", label: "✕ " + (status === "high" ? "High Risk" : "Dangerous"), description: "Risk Score (0–100): Widespread malicious detections", score };
   }
 };
 

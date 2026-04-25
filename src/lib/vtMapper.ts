@@ -7,7 +7,7 @@ export const transformVTToUI = (vtRaw: VTAnalysisResponse, fileName: string): Fi
   const results = attributes.results;
 
   const totalEngines = stats.malicious + stats.suspicious + stats.undetected + stats.harmless;
-  const riskScore = totalEngines > 0 ? Math.round((stats.malicious / totalEngines) * 100) : 0;
+  const riskScore = totalEngines > 0 ? Math.round(((stats.malicious + stats.suspicious) / totalEngines) * 100) : 0;
 
   let status: "safe" | "low" | "moderate" | "high" | "dangerous" = "safe";
   if (riskScore === 0) {

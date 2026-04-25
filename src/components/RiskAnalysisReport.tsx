@@ -230,7 +230,7 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
               <div>
                 <div className="flex justify-between items-center mb-3">
                   <p className="text-xs text-slate-400 uppercase font-semibold tracking-wide">Risk Score</p>
-                  <span className={`text-3xl font-bold ${riskInfo.textColor}`}>{riskInfo.adjustedScore}</span>
+                  <span className={`text-3xl font-bold ${riskInfo.textColor}`}>{riskInfo.adjustedScore}%</span>
                 </div>
                 <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden border border-slate-600">
                   <div
@@ -240,7 +240,7 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
                 </div>
                 <div className="flex justify-between text-xs text-slate-400 mt-2 font-medium">
                   <span>0 — Safe</span>
-                  <span>50</span>
+                  <span>50 — Medium Risk</span>
                   <span>100 — Danger</span>
                 </div>
               </div>

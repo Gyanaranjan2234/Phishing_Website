@@ -28,15 +28,15 @@ const getVerdictInfo = (score: number, flags?: RiskFlags) => {
 
   switch (verdict) {
     case "safe":
-      return { bar: "bg-[#00ff9c]", text: "text-[#00ff9c]", bg: "bg-[#00ff9c]/10", label: "✓ Safe", description: "Risk Score: 0 — No threats detected", verdict };
+      return { bar: "bg-[#00ff9c]", text: "text-[#00ff9c]", bg: "bg-[#00ff9c]/10", label: "✓ Safe",          description: "Risk Score (0–100): No threats detected",            verdict };
     case "low":
-      return { bar: "bg-[#ffcc00]", text: "text-[#ffcc00]", bg: "bg-[#ffcc00]/10", label: "⚠ Low Risk", description: "Risk Score: 1–10 — Minimal detections", verdict };
+      return { bar: "bg-[#ffcc00]", text: "text-[#ffcc00]", bg: "bg-[#ffcc00]/10", label: "⚠ Low Risk",      description: "Risk Score (0–100): Based on detected threats",      verdict };
     case "moderate":
-      return { bar: "bg-[#ffcc00]", text: "text-[#ffcc00]", bg: "bg-[#ffcc00]/10", label: "⚠ Moderate Risk", description: "Risk Score: 11–30 — Some vendors flagged", verdict };
+      return { bar: "bg-[#ffcc00]", text: "text-[#ffcc00]", bg: "bg-[#ffcc00]/10", label: "⚠ Moderate Risk", description: "Risk Score (0–100): Based on detected threats",      verdict };
     case "high":
-      return { bar: "bg-[#ff4d4d]", text: "text-[#ff4d4d]", bg: "bg-[#ff4d4d]/10", label: "✕ High Risk", description: "Risk Score: 31–70 — Multiple detections", verdict };
+      return { bar: "bg-[#ff4d4d]", text: "text-[#ff4d4d]", bg: "bg-[#ff4d4d]/10", label: "✕ High Risk",     description: "Risk Score (0–100): Based on detected threats",      verdict };
     default: // dangerous
-      return { bar: "bg-[#ff4d4d]", text: "text-[#ff4d4d]", bg: "bg-[#ff4d4d]/10", label: "✕ Dangerous", description: "Risk Score: 71–100 — Widespread detections", verdict };
+      return { bar: "bg-[#ff4d4d]", text: "text-[#ff4d4d]", bg: "bg-[#ff4d4d]/10", label: "✕ Dangerous",     description: "Risk Score (0–100): Widespread malicious detections", verdict };
   }
 };
 
@@ -302,7 +302,7 @@ const handleAnalyze = async (e: React.FormEvent) => {
               <div>
                 <p className="text-xs font-heading text-muted-foreground uppercase tracking-wide">Risk Score</p>
                 <p className={`font-heading font-bold text-3xl ${scoreInfo.text} drop-shadow-[0_0_8px_currentColor/0.3]`}>
-                  {result.score}
+                  {result.score}%
                 </p>
               </div>
               <div className="text-right">
@@ -318,9 +318,9 @@ const handleAnalyze = async (e: React.FormEvent) => {
                 />
               </div>
               <div className="flex justify-between text-xs text-muted-foreground font-mono">
-                <span>0 - Safe</span>
-                <span>50 - Neutral</span>
-                <span>100 - Danger</span>
+                <span>Low</span>
+                <span>Medium Risk</span>
+                <span>High</span>
               </div>
             </div>
 

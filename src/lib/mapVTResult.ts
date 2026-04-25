@@ -16,7 +16,7 @@ export function mapVTToUrlAnalysis(
   // risk_score = malicious / total  (0–100)
   // Suspicious vendors do NOT inflate the score.
   const total = (stats.malicious + stats.suspicious + stats.harmless + stats.undetected) || 1;
-  const risk_score = Math.round((stats.malicious / total) * 100);
+  const risk_score = Math.round(((stats.malicious + stats.suspicious) / total) * 100);
 
   // Status: based on raw malicious count, not adjusted score
   const status: ScanStatus =
