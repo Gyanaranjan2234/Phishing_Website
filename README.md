@@ -77,8 +77,8 @@ The backend will be running at `http://localhost:8000`.
 
 ### 3. Frontend Setup
 ```bash
-# Return to the root directory
-cd ..
+# Navigate to frontend directory
+cd frontend
 
 # Install dependencies
 npm install
@@ -86,20 +86,40 @@ npm install
 # Start the development server
 npm run dev
 ```
-The frontend will be running at `http://localhost:5173`.
+The frontend will be running at `http://localhost:8080` (or `5173` depending on config).
+
+## 📁 Project Structure
+
+```text
+Phishing_Website/ (Root)
+├── backend/                # FastAPI Python Backend
+│   ├── database/           # DB Session & Connection
+│   ├── models/             # SQLAlchemy Models
+│   ├── routes/             # API Endpoints
+│   ├── schemas/            # Pydantic Validation
+│   ├── utils/              # Hashing & Security
+│   ├── main.py             # App Entry Point
+│   ├── requirements.txt    # Python Deps
+│   └── .env                # Backend Env Vars
+├── frontend/               # React TypeScript Frontend
+│   ├── src/                # Source Code
+│   ├── public/             # Static Assets
+│   ├── package.json        # Frontend Deps
+│   ├── vite.config.ts      # Vite Config
+│   └── .env                # Frontend Env Vars (VITE_...)
+├── .gitignore              # Global Ignore File
+└── README.md               # Main Project Docs
+```
 
 ---
 
 ## 🔑 Environment Variables
 
-To run this project, you will need to add the following environment variables to your `.env` and `.env.local` files in the root directory.
+To run this project, you will need to add the following environment variables.
 
-### `.env`
+### `frontend/.env`
 ```env
 VITE_VIRUSTOTAL_API_KEY=your_virustotal_api_key
-# If using Supabase for any features:
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_key
 ```
 
 ### `backend/.env`
