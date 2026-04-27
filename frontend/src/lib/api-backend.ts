@@ -267,6 +267,27 @@ export const apiAuth = {
   resetPassword,
 };
 
+/**
+ * Analyze a URL for phishing using backend AI and VT
+ * @param url - The URL to analyze
+ * @param mode - Scan mode: 'quick' or 'deep'
+ * @param userId - Optional user ID for history saving
+ */
+export const analyzeUrl = async (url: string, mode: string = 'quick', userId?: number) => {
+  try {
+    console.log(`📡 API: Analyzing URL (${mode} mode)...`, url);
+    const response = await fetch(`${SCAN_API_URL}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, mode, user_id: userId }),
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Analyze URL error:', error);
+    throw error;
+  }
+};
+
 // ============ SCAN HISTORY API FUNCTIONS ============
 
 /**
@@ -476,6 +497,7 @@ export const apiContacts = {
 
 // Export as apiScans object for compatibility with existing code
 export const apiScans = {
+  analyzeUrl,
   saveScan,
   getHistory: getScanHistory,
   getStats: getScanStats,

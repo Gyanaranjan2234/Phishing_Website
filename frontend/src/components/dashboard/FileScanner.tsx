@@ -485,6 +485,12 @@ const handleShare = async () => {
                   userName: userName,
                   targetItem: file?.name || "Unknown file",
                   flags: result.flags,
+                  scanMode: "deep", // File scan is effectively deep
+                  maliciousCount: result.vtStats?.malicious,
+                  suspiciousCount: result.vtStats?.suspicious,
+                  detectionCount: result.vtStats?.malicious,
+                  totalVendors: result.vtStats ? (result.vtStats.malicious + result.vtStats.suspicious + result.vtStats.harmless + result.vtStats.undetected) : undefined,
+                  maliciousEngines: result.maliciousEngines,
                 }}
               />
             </div>

@@ -34,9 +34,16 @@ export interface RiskAnalysisData {
   analysisItems?: string[];
   // Critical flags for final decision
   flags?: RiskFlags;
-  // Detection info from VT stats (dynamic from API)
+  // Detection info from VT stats (dynamic from API — deep scan only)
   detectionCount?: number;
   totalVendors?: number;
+  scanMode?: "quick" | "deep";
+  // Source of the analysis result
+  source?: string;         // "AI_MODEL" | "AI_MODEL + API"
+  apiUnavailable?: boolean; // true when deep scan but API failed
+  maliciousEngines?: string[]; // list of engines that flagged it (deep only)
+  maliciousCount?: number;
+  suspiciousCount?: number;
 }
 
 const sanitizeString = (value: unknown): string => {
@@ -47,16 +54,24 @@ const sanitizeString = (value: unknown): string => {
 const validateData = (data: RiskAnalysisData): RiskAnalysisData => {
   if (!data) throw new Error("Report data is required");
   return {
-    scanType:      data.scanType || "url",
-    status:        data.status || "safe",
-    score:         typeof data.score === "number" ? Math.min(100, Math.max(0, data.score)) : 0,
-    details:       sanitizeString(data.details) || "No details available",
-    threats:       Array.isArray(data.threats) ? data.threats.map(sanitizeString).filter(Boolean) : [],
-    timestamp:     typeof data.timestamp === "string" ? data.timestamp : undefined,
-    userName:      sanitizeString(data.userName) || "Guest User",
-    targetItem:    sanitizeString(data.targetItem) || "Not specified",
-    analysisItems: Array.isArray(data.analysisItems) ? data.analysisItems.map(sanitizeString).filter(Boolean) : [],
-    flags:         data.flags || {},
+    scanType:         data.scanType || "url",
+    status:           data.status || "safe",
+    score:            typeof data.score === "number" ? Math.min(100, Math.max(0, data.score)) : 0,
+    details:          sanitizeString(data.details) || "No details available",
+    threats:          Array.isArray(data.threats) ? data.threats.map(sanitizeString).filter(Boolean) : [],
+    timestamp:        typeof data.timestamp === "string" ? data.timestamp : undefined,
+    userName:         sanitizeString(data.userName) || "Guest User",
+    targetItem:       sanitizeString(data.targetItem) || "Not specified",
+    analysisItems:    Array.isArray(data.analysisItems) ? data.analysisItems.map(sanitizeString).filter(Boolean) : [],
+    flags:            data.flags || {},
+    scanMode:         data.scanMode,
+    detectionCount:   data.detectionCount,
+    totalVendors:     data.totalVendors,
+    source:           data.source,
+    apiUnavailable:   data.apiUnavailable,
+    maliciousEngines: Array.isArray(data.maliciousEngines) ? data.maliciousEngines.map(sanitizeString).filter(Boolean) : [],
+    maliciousCount:   data.maliciousCount,
+    suspiciousCount:  data.suspiciousCount,
   };
 };
 
@@ -71,7 +86,7 @@ const getRiskInfo = (score: number, status: string) => {
       cardBorder:  "border-emerald-500/50",
       cardBg:      "from-emerald-950/60 to-emerald-900/30",
       icon:        CheckCircle,
-      description: "No threats detected. This URL appears safe and legitimate."
+      description: "URL verified as safe."
     },
     low: {
       level:       "LOW RISK",
@@ -82,7 +97,7 @@ const getRiskInfo = (score: number, status: string) => {
       cardBorder:  "border-yellow-500/50",
       cardBg:      "from-yellow-950/60 to-yellow-900/30",
       icon:        AlertTriangle,
-      description: "Some security vendors flagged this URL. Proceed with caution."
+      description: "Low-level risk indicators found."
     },
     moderate: {
       level:       "MODERATE RISK",
@@ -93,7 +108,7 @@ const getRiskInfo = (score: number, status: string) => {
       cardBorder:  "border-yellow-500/50",
       cardBg:      "from-yellow-950/60 to-yellow-900/30",
       icon:        AlertTriangle,
-      description: "Notable number of detections. Verify source carefully."
+      description: "Moderate-level risk indicators found."
     },
     high: {
       level:       "HIGH RISK",
@@ -104,7 +119,7 @@ const getRiskInfo = (score: number, status: string) => {
       cardBorder:  "border-red-500/50",
       cardBg:      "from-red-950/60 to-red-900/30",
       icon:        AlertOctagon,
-      description: "Multiple vendors flagged this target. High risk of malicious intent."
+      description: "Significant risk indicators found."
     },
     dangerous: {
       level:       "DANGEROUS",
@@ -115,7 +130,7 @@ const getRiskInfo = (score: number, status: string) => {
       cardBorder:  "border-red-500/50",
       cardBg:      "from-red-950/60 to-red-900/30",
       icon:        AlertCircle,
-      description: "Widespread malicious detections. Do NOT proceed."
+      description: "Critical security threat detected."
     },
   };
 
@@ -173,11 +188,22 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
         <div className="space-y-4 pb-6 border-b border-slate-700">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="space-y-1">
-              <h2 className="text-4xl font-bold text-white flex items-center gap-3">
+              <h2 className="text-4xl font-bold text-white flex items-center gap-3 flex-wrap">
                 Risk Analysis Report
-                <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium">
-                  ✔ Verified by APGS
-                </span>
+                <div className="flex gap-2">
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium">
+                    ✔ Verified by APGS
+                  </span>
+                  {data.scanMode && (
+                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider border ${
+                      data.scanMode === "quick" 
+                        ? "bg-cyan-500/20 text-cyan-400 border-cyan-500/30 shadow-[0_0_10px_rgba(34,211,238,0.2)]" 
+                        : "bg-purple-500/20 text-purple-400 border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.2)]"
+                    }`}>
+                  {data.scanMode === "quick" ? "Quick Scan" : "Deep Scan"}
+                    </span>
+                  )}
+                </div>
               </h2>
               <p className="text-slate-400 text-sm flex items-center gap-2">
                 <Activity className="w-4 h-4" />
@@ -189,7 +215,13 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
               {riskInfo.level}
             </div>
           </div>
-          <p className="text-slate-300 text-base font-medium">{riskInfo.description}</p>
+          <p className="text-slate-300 text-base font-medium">
+            {data.scanMode === "deep" && !data.apiUnavailable ? (
+              (data.maliciousCount || 0) >= 3 ? "Multiple security vendors confirmed this URL is malicious" :
+              (data.maliciousCount || 0) >= 1 ? "Some vendors flagged this URL as suspicious" :
+              "No vendor detections found"
+            ) : riskInfo.description}
+          </p>
         </div>
 
         {/* ── Scan Info + Risk Summary ── */}
@@ -202,9 +234,9 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
             </h3>
             <div className="space-y-4">
               {[
-                { label: "Scan Type",       value: scanTypeLabels[data.scanType] },
-                { label: "Target",          value: data.targetItem || "Not specified" },
-                { label: "Scanned By",      value: "APGS Security Engine" },
+                { label: "Scan Type",  value: scanTypeLabels[data.scanType] },
+                { label: "Target",     value: data.targetItem || "Not specified" },
+                { label: "Scanned By", value: "APGS Security Engine" },
               ].map(({ label, value }) => (
                 <div key={label} className="pb-3 border-b border-slate-600">
                   <p className="text-xs text-slate-400 uppercase font-semibold tracking-wide">{label}</p>
@@ -250,23 +282,32 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
                 <div className="flex items-center gap-3">
                   <div className={`w-4 h-4 rounded-full shadow-lg ${riskInfo.dotColor}`} />
                   <span className={`font-semibold text-lg ${riskInfo.textColor}`}>
-                    {riskInfo.level === "SAFE" ? "✓ No threats detected" :
-                     riskInfo.level === "LOW RISK" ? "⚠ Some security vendors flagged this URL" :
-                     riskInfo.level === "MODERATE RISK" ? "⚠ Multiple vendors flagged this URL" :
-                     riskInfo.level === "HIGH RISK" ? "✕ High number of detections" : "✕ Widespread malicious detections"}
+                    {riskInfo.verdict === "safe" ? "✔ Safe" :
+                     riskInfo.verdict === "low" ? "⚠ Low Risk" :
+                     riskInfo.verdict === "moderate" ? "⚠ Moderate Risk" :
+                     riskInfo.verdict === "high" ? "❌ High Risk" : "🚨 Dangerous"}
                   </span>
                 </div>
               </div>
 
-              {/* Detection count — dynamic from API */}
-              {data.detectionCount != null && data.totalVendors != null && (
+              {/* Detection count — deep scan only, from VirusTotal API */}
+              {data.scanMode === "deep" && data.apiUnavailable && (
                 <div className="pt-2 border-t border-slate-600">
-                  <p className="text-xs text-slate-400 uppercase font-semibold tracking-wide mb-1">Detection Info</p>
-                  <p className={`text-sm font-semibold ${data.detectionCount > 0 ? riskInfo.textColor : "text-emerald-400"}`}>
-                    {data.detectionCount === 0
-                      ? `✓ 0 / ${data.totalVendors} security vendors detected any threat`
-                      : `⚠ Detected by ${data.detectionCount} / ${data.totalVendors} security vendors`}
+                  <p className="text-xs text-slate-400 uppercase font-semibold tracking-wide mb-1">Vendor Detection</p>
+                  <p className="text-sm font-semibold text-amber-400">
+                    ⚠ Analysis Data Unavailable
                   </p>
+                  <p className="text-xs text-slate-500 mt-1">Vendor database could not be reached. Score is based on primary analysis only.</p>
+                </div>
+              )}
+              {data.scanMode === "deep" && !data.apiUnavailable && data.totalVendors != null && (
+                <div className="pt-2 border-t border-slate-600 space-y-3">
+                  <div>
+                    <p className="text-xs text-slate-400 uppercase font-semibold tracking-wide mb-1">Vendor Detection</p>
+                    <p className={`text-lg font-bold ${ (data.detectionCount || 0) > 0 ? riskInfo.textColor : "text-emerald-400"}`}>
+                      {data.detectionCount || 0} / {data.totalVendors} vendors detected threats
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -280,8 +321,28 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
             Analysis Details
           </h3>
 
-          <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-600/50">
-            <p className="text-sm text-slate-300 leading-relaxed">{data.details}</p>
+          <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-600/50 space-y-4">
+            <div className="space-y-1">
+              <p className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">Analysis Overview</p>
+              <p className="text-sm text-slate-300 leading-relaxed">{data.details}</p>
+            </div>
+            
+            {data.scanMode === "deep" && !data.apiUnavailable && (
+              <div className="pt-3 border-t border-slate-700 space-y-2">
+                <p className="text-[10px] text-purple-400 font-bold uppercase tracking-wider">Security Evidence</p>
+                {data.maliciousEngines && data.maliciousEngines.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {data.maliciousEngines.map((engine, i) => (
+                      <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-300 border border-red-500/20">
+                        {engine}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 italic">No malicious signatures detected by security vendors.</p>
+                )}
+              </div>
+            )}
           </div>
 
           {data.analysisItems && data.analysisItems.length > 0 && (
@@ -301,7 +362,7 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
           {data.threats && data.threats.length > 0 && (
             <div className="space-y-3 pt-2 border-t border-slate-600">
               <p className="text-xs text-slate-400 uppercase font-semibold tracking-wide">
-                Flagged by {data.threats.length} Vendor(s)
+                Flagged by Security Vendors ({data.threats.length})
               </p>
               <div className="space-y-2">
                 {data.threats.map((threat, i) => (
@@ -309,6 +370,25 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
                     <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
                     <span className="text-sm text-red-200">{threat}</span>
                   </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Malicious Engines — deep scan only */}
+          {data.scanMode === "deep" && data.maliciousEngines && data.maliciousEngines.length > 0 && (
+            <div className="space-y-3 pt-2 border-t border-slate-600">
+              <p className="text-xs text-red-400 uppercase font-semibold tracking-wide">
+                🔴 Malicious Engines ({data.maliciousEngines.length})
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {data.maliciousEngines.map((engine, i) => (
+                  <span
+                    key={i}
+                    className="text-xs font-mono px-2 py-1 rounded bg-red-950/50 border border-red-700/50 text-red-300"
+                  >
+                    {engine}
+                  </span>
                 ))}
               </div>
             </div>
@@ -345,13 +425,15 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
             <RiskIcon className={`w-8 h-8 mt-1 shrink-0 ${riskInfo.textColor}`} />
             <div className="space-y-3 flex-1">
               <p className={`text-2xl font-bold ${riskInfo.textColor}`}>
+                {data.scanMode === "deep" ? "Verified by multiple security vendors" : "Standard scan results"}
+              </p>
+              <p className="text-sm text-slate-300 leading-relaxed">
                 {riskInfo.verdict === "safe"
                   ? "✓ Green Light — Safe to Proceed"
                   : (riskInfo.verdict === "low" || riskInfo.verdict === "moderate")
                   ? "⚠ Proceed with Caution"
                   : "✕ Red Alert — Do Not Proceed"}
               </p>
-              <p className="text-sm text-slate-300 leading-relaxed">{verdictText}</p>
             </div>
           </div>
         </div>

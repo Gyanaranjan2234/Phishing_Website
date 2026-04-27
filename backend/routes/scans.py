@@ -12,6 +12,8 @@ from models.scan_model import ScanHistory
 from models.scan_stats_model import ScanStats
 from models.user_model import User
 from schemas.scan_schema import ScanCreate, ScanHistoryResponse, ScanStatsResponse
+from services.scan_service import run_full_scan
+from pydantic import BaseModel
 from typing import Optional, List, Dict
 import hashlib
 import time
@@ -19,6 +21,11 @@ from collections import defaultdict
 from datetime import datetime
 
 router = APIRouter(prefix="/api/scans", tags=["scans"])
+
+class URLAnalyzeRequest(BaseModel):
+    url: str
+    mode: str = "quick"
+    user_id: Optional[int] = None
 
 
 # In-memory rate limiter: {user_id: [timestamp1, timestamp2, ...]}
@@ -38,6 +45,49 @@ def is_rate_limited(user_id: int) -> bool:
     # Record current request
     rate_limit_data[user_id].append(now)
     return False
+
+
+@router.post("/analyze")
+async def analyze_url_endpoint(request: URLAnalyzeRequest, db: Session = Depends(get_db)):
+    """
+    Analyzes a URL for phishing using AI (BERT) and VirusTotal.
+    Returns structured results and optionally saves to history.
+    """
+    try:
+        # Perform the scan
+        result = await run_full_scan(request.url, request.mode)
+        
+        # If user_id is provided, auto-save to history
+        if request.user_id:
+            try:
+                # Prepare data for save_scan logic
+                status_map = {
+                    "SAFE": "safe",
+                    "LOW": "safe",
+                    "MODERATE": "suspicious",
+                    "HIGH RISK": "phishing",
+                    "DANGEROUS": "phishing"
+                }
+                
+                db_status = status_map.get(result["risk"], "suspicious")
+                
+                new_scan = ScanHistory(
+                    user_id=request.user_id,
+                    scan_type="url",
+                    target=request.url,
+                    status=db_status,
+                    result_details=result["message"]
+                )
+                db.add(new_scan)
+                db.commit()
+            except Exception as save_err:
+                # Log but don't fail the analysis response
+                print(f"Warning: Failed to auto-save scan: {save_err}")
+                db.rollback()
+
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 def get_password_hash(password: str) -> str:

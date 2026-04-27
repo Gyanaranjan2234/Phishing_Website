@@ -29,3 +29,10 @@ httpx==0.27.0
 
 # JWT tokens (already included, but ensuring version)
 PyJWT==2.8.0
+
+# Machine Learning & AI
+torch
+transformers
+lime
+numpy
+scikit-learn

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Loader2, CheckCircle, AlertTriangle, Shield, FileText, Lock, Download, AlertCircle, Check, RotateCcw, Link, Type } from "lucide-react";
+import { Search, Loader2, CheckCircle, AlertTriangle, Shield, FileText, Lock, Download, AlertCircle, Check, RotateCcw, Link, Type, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -46,6 +46,7 @@ const UrlScanner = ({ onScanComplete, isAuthenticated = false, userName, scanDat
   const [result, setResult] = useState<UrlAnalysis | null>(scanData.result || null);
   const [downloadingReport, setDownloadingReport] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [scanMode, setScanMode] = useState<"quick" | "deep">("quick");
 
   const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
     toast({
@@ -68,12 +69,10 @@ const handleAnalyze = async (e: React.FormEvent) => {
   // GUEST ACCESS CHECK: Verify scan limit before proceeding
   const scanAccess = handleScanAttempt();
   if (!scanAccess.success) {
-    // Guest limit reached - block scan and show message
     showToast(scanAccess.message, "error");
     return;
   }
 
-  // Show guest scan info (only for guests)
   if (!isAuthenticated) {
     showToast(`📝 ${scanAccess.message}`, "info");
   }
@@ -82,44 +81,93 @@ const handleAnalyze = async (e: React.FormEvent) => {
   setResult(null);
 
   try {
-    const vtResponse = await scanUrlWithVT(url);
+    const userId = localStorage.getItem('user_id');
 
-    const analysis = mapVTToUrlAnalysis(
-      vtResponse.url || url,
-      vtResponse.analysisId,
-      vtResponse.stats,
-      vtResponse.results
-    );
+    // Required console logs
+    if (scanMode === "quick") {
+      console.log("MODE: QUICK → AI ONLY");
+    } else {
+      console.log("MODE: DEEP → AI + API");
+    }
+
+    const response = await apiScans.analyzeUrl(url, scanMode, userId ? parseInt(userId) : undefined);
+
+    if (response.status === 'error') {
+      throw new Error(response.message);
+    }
+
+    console.log("[UrlScanner] Response:", { mode: response.mode, risk: response.risk, score: response.score, source: response.source });
+    const isDeep  = scanMode === "deep";
+    const apiData = response.api_analysis;
+    const apiOk   = isDeep && apiData && !("error" in apiData);
+    const apiErr  = isDeep && (!apiData || "error" in apiData);
+
+    // Map all 5 risk tiers to frontend status
+    const riskLower = (response.risk || "").toLowerCase();
+    const status: "safe" | "suspicious" | "phishing" =
+      riskLower === "safe" || riskLower === "low" ? "safe" :
+      riskLower === "moderate"                    ? "suspicious" :
+      "phishing"; // HIGH or DANGEROUS
+
+    const reasons = [
+      { label: "Scan Result",   value: response.model_analysis.prediction.toUpperCase(), flagged: response.model_analysis.prediction === 'phishing' },
+      { label: "Confidence",    value: `${Math.round(response.model_analysis.confidence * 100)}%`, flagged: false },
+      { label: "Scan Mode",     value: isDeep ? "Deep Scan" : "Quick Scan", flagged: false },
+      // Deep scan: show vendor count prominently
+      ...(isDeep && apiOk ? [{ label: "Vendor Detection", value: `${apiData.malicious} / ${apiData.total} vendors flagged`, flagged: apiData.malicious > 0 }] : []),
+      ...(isDeep && apiErr ? [{ label: "Security Vendors", value: "⚠ Analysis Data Unavailable", flagged: false }] : []),
+      // Only show feature/keyword analysis in Deep Scan to keep Quick Scan clean
+      ...(isDeep ? [
+        ...Object.entries(response.model_analysis.features).map(([k, v]) => ({
+          label: k.replace(/_/g, ' ').toUpperCase(),
+          value: v ? "Detected" : "None",
+          flagged: !!v && k !== 'has_https'
+        })),
+        ...(response.model_analysis.explanations || []).map((exp: any) => ({
+          label: `Keyword: ${exp.word}`,
+          value: `Impact: ${exp.score.toFixed(4)}`,
+          flagged: exp.score > 0
+        }))
+      ] : [])
+    ];
+
+    const analysis: UrlAnalysis = {
+      url: url,
+      status,
+      score: response.score,
+      reasons,
+      vtStats: apiOk ? {
+        malicious:  apiData.malicious,
+        suspicious: apiData.suspicious,
+        harmless:   apiData.harmless,
+        undetected: apiData.undetected,
+        timeout:    0
+      } : null,
+      vtVendors: {},
+      analysisId: `backend_${Date.now()}`,
+      mode: response.mode as "quick" | "deep",
+      flags: {
+        phishingDetected: response.risk === 'HIGH' || response.risk === 'DANGEROUS',
+        suspicious: response.risk === 'MODERATE'
+      },
+      source:           response.source || (isDeep ? "Deep Scan" : "Quick Scan"),
+      apiUnavailable:   apiErr,
+      maliciousEngines: apiOk ? (apiData.malicious_engines || []) : [],
+    };
 
     setResult(analysis);
     setScanData({ input: url, result: analysis });
     onScanComplete();
 
-    if (isAuthenticated) {
-      try {
-        await saveScanResult({
-          type: "url",
-          target: url,
-          malicious: vtResponse.stats.malicious,
-          suspicious: vtResponse.stats.suspicious,
-          harmless: vtResponse.stats.harmless,
-          undetected: vtResponse.stats.undetected,
-          risk_score: analysis.score,
-          status: analysis.status
-        });
-        showToast("✅ Result saved to history", "success");
-      } catch (err) {
-        console.error("❌ Failed to save scan:", err);
-      }
-    }
-    // REMOVED: Guest scan message (already shown above)
+    if (isAuthenticated) showToast("✅ Result saved to history", "success");
 
-    if (analysis.status === "phishing")        showToast("⚠️ Phishing threat detected!", "error");
-    else if (analysis.status === "suspicious") showToast("⚠️ Suspicious URL detected!", "error");
-    else                                        showToast("✅ URL appears safe", "success");
+    const riskLabel = response.risk || "UNKNOWN";
+    if (status === "phishing")        showToast(`⚠️ ${riskLabel} risk detected!`, "error");
+    else if (status === "suspicious") showToast("⚠️ Suspicious URL detected!", "error");
+    else                              showToast("✅ URL appears safe", "success");
 
   } catch (err) {
-    console.error(err);
+    console.error("[UrlScanner] Scan error:", err);
     showToast(`❌ ${err instanceof Error ? err.message : "Scan failed"}`, "error");
   } finally {
     setScanning(false);
@@ -246,6 +294,35 @@ const handleAnalyze = async (e: React.FormEvent) => {
           onChange={(e) => setUrl(e.target.value)}
           className="flex-1 bg-muted border-border text-foreground placeholder:text-muted-foreground focus:shadow-[0_0_12px_hsl(150_100%_45%/0.2)]"
         />
+        
+        {/* Scan Mode Selector */}
+        <div className="flex bg-slate-900/50 rounded-full p-1 border border-slate-700 shrink-0 self-center shadow-inner">
+          <button
+            type="button"
+            onClick={() => setScanMode("quick")}
+            className={`flex items-center gap-1.5 px-4 py-1.5 text-[11px] tracking-[0.05em] font-semibold rounded-full transition-all duration-300 ${
+              scanMode === "quick" 
+                ? "bg-gradient-to-r from-emerald-500 to-teal-400 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-105 z-10" 
+                : "text-slate-400 hover:text-slate-200 opacity-70 hover:opacity-100"
+            }`}
+          >
+            <Zap className={`w-3.5 h-3.5 ${scanMode === "quick" ? "animate-pulse" : ""}`} />
+            Quick
+          </button>
+          <button
+            type="button"
+            onClick={() => setScanMode("deep")}
+            className={`flex items-center gap-1.5 px-4 py-1.5 text-[11px] tracking-[0.05em] font-semibold rounded-full transition-all duration-300 ${
+              scanMode === "deep" 
+                ? "bg-gradient-to-r from-emerald-500 to-teal-400 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-105 z-10" 
+                : "text-slate-400 hover:text-slate-200 opacity-70 hover:opacity-100"
+            }`}
+          >
+            <Search className="w-3.5 h-3.5" />
+            Deep
+          </button>
+        </div>
+
         <div className="flex gap-2">
           <Button type="submit" disabled={scanning} className="font-heading shrink-0 hover:shadow-[0_0_16px_hsl(150_100%_45%/0.3)] transition-shadow">
             {scanning ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Scanning...</> : "Analyze URL"}
@@ -261,7 +338,11 @@ const handleAnalyze = async (e: React.FormEvent) => {
 
       {scanning && (
         <div className="mt-4 space-y-2 animate-fade-in-up">
-          <p className="text-muted-foreground text-sm font-mono">Scanning with Advanced Threat Analysis Engine — this may take 10–20 seconds...</p>
+          <p className="text-muted-foreground text-sm font-mono">
+            {scanMode === "quick"
+              ? "Quick Scan — Analyzing URL..."
+              : "Deep Scan — Performing comprehensive multi-vendor analysis..."}
+          </p>
           <Progress value={66} className="h-2" />
         </div>
       )}
@@ -324,20 +405,12 @@ const handleAnalyze = async (e: React.FormEvent) => {
               </div>
             </div>
 
-            {/* Threat Stats */}
-            {result.vtStats && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-border/30">
-                {[
-                  { label: "Malicious",  value: result.vtStats.malicious,  color: "text-[#ff4d4d]" },
-                  { label: "Suspicious", value: result.vtStats.suspicious, color: "text-[#ffcc00]" },
-                  { label: "Harmless",   value: result.vtStats.harmless,   color: "text-[#00ff9c]" },
-                  { label: "Undetected", value: result.vtStats.undetected, color: "text-muted-foreground" },
-                ].map(({ label, value, color }) => (
-                  <div key={label} className="text-center">
-                    <p className={`font-heading font-bold text-xl ${color}`}>{value}</p>
-                    <p className="text-xs text-muted-foreground font-mono">{label}</p>
-                  </div>
-                ))}
+            {/* API unavailable notice — deep scan only */}
+            {result.mode === "deep" && result.apiUnavailable && (
+              <div className="pt-2 border-t border-border/30">
+                <p className="text-xs font-mono text-amber-400">
+                  ⚠ Analysis data unavailable — score based on primary analysis only
+                </p>
               </div>
             )}
           </div>
@@ -357,10 +430,21 @@ const handleAnalyze = async (e: React.FormEvent) => {
                 userName: userName,
                 targetItem: result.url,
                 flags: result.flags,
-                detectionCount: result.vtStats?.malicious,
-                totalVendors: result.vtStats
-                  ? result.vtStats.malicious + result.vtStats.suspicious + result.vtStats.harmless + result.vtStats.undetected
-                  : undefined,
+                scanMode: result.mode,
+                // Deep scan only: vendor counts, source, api status, engines
+                ...(result.mode === "deep" ? {
+                  maliciousEngines: result.maliciousEngines,
+                  maliciousCount:   result.vtStats?.malicious,
+                  suspiciousCount:  result.vtStats?.suspicious,
+                } : {
+                  source:           "Quick Scan",
+                  apiUnavailable:   false,
+                  detectionCount:   undefined,
+                  totalVendors:     undefined,
+                  maliciousEngines: [],
+                  maliciousCount:   undefined,
+                  suspiciousCount:  undefined,
+                }),
               }}
             />
           </div>

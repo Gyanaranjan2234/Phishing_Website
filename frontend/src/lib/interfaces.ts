@@ -89,7 +89,9 @@ export interface VTAnalysisStats {
   suspicious: number;
   harmless: number;
   undetected: number;
+  total: number;
   timeout: number;
+  malicious_engines?: string[];
 }
 
 export interface VTVendorResult {
@@ -103,15 +105,20 @@ export type ScanStatus = "safe" | "phishing" | "suspicious";
 export interface UrlAnalysis {
   url: string;
   status: ScanStatus;
-  score: number;                          // 0–100 mapped from VT stats
+  score: number;                              // 0–100 combined score
   reasons: { label: string; value: string; flagged: boolean }[];
-  vtStats: VTAnalysisStats;               // raw VT stats
-  vtVendors: Record<string, VTVendorResult>; // raw vendor results
+  vtStats: VTAnalysisStats | null;            // null for quick scans (no API call)
+  vtVendors: Record<string, VTVendorResult>;
   analysisId: string;
-  flags?: {                               // critical flags for unified decision logic
+  mode: "quick" | "deep";
+  flags?: {                                   // critical flags for unified decision logic
     phishingDetected?: boolean;
     malwareDetected?: boolean;
     blacklisted?: boolean;
     suspicious?: boolean;
   };
+  // Extended fields (populated by backend response)
+  source?: string;                            // "AI_MODEL" | "AI_MODEL + API"
+  apiUnavailable?: boolean;                   // true when deep scan but API failed
+  maliciousEngines?: string[];                // list of engines (deep scan only)
 }
