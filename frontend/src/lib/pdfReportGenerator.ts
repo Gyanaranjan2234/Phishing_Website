@@ -17,6 +17,8 @@ const C = {
   white:        [255, 255, 255] as [number, number, number],
   accent:       [37,  99, 235]  as [number, number, number],
   accentLight:  [219, 234, 254] as [number, number, number],
+  brandDark:    [30,  58, 138]  as [number, number, number], // #1E3A8A - Professional dark blue
+  brandLight:   [234, 242, 255] as [number, number, number], // #EAF2FF - Light blue
   danger:       [220,  38,  38]  as [number, number, number],
   dangerLight:  [254, 226, 226] as [number, number, number],
   warning:      [180,  83,   9]  as [number, number, number],
@@ -38,43 +40,81 @@ const getRiskLevel = (score: number) => {
 
 // ── 1. REPORT HEADER ──────────────────────────────────────────
 const drawHeader = (doc: any, pageW: number, margin: number) => {
-  // Dark Blue Header Banner
+  // Dark Blue Header Banner with gradient effect
+  doc.setFillColor(...C.brandDark);
+  doc.rect(0, 0, pageW, 35, 'F');
+  
+  // Add subtle lighter accent line at bottom
   doc.setFillColor(...C.accent);
-  doc.rect(0, 0, pageW, 30, 'F');
+  doc.rect(0, 33, pageW, 2, 'F');
   
-  // Logo Circle at top-left
-  const logoX = margin + 10;
-  const logoY = 15;
-  const logoR = 9;
-  doc.setFillColor(...C.white);
-  doc.circle(logoX, logoY, logoR, 'F');
-  
-  // Logo Text
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...C.accent);
-  doc.text('APGS', logoX, logoY + 1.5, { align: 'center' });
-  
-  // Header Text - aligned with logo
-  const textX = logoX + logoR + 6;
-  doc.setFontSize(13);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...C.white);
-  doc.text('APGS - Advanced Phishing Guard System', textX, 12);
-  
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Professional Security Audit Report', textX, 18);
-  
-  // Divider line
-  doc.setDrawColor(...C.white);
-  doc.setLineWidth(0.3);
-  doc.line(textX, 21, pageW - margin, 21);
-  
-  // Report ID on right side
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Report ID: ${Math.random().toString(36).substring(2, 9).toUpperCase()}`, pageW - margin, 18, { align: 'right' });
+  try {
+    // Load and add APGS logo image
+    const logoUrl = '/apgs-logo.png';
+    const logoWidth = 18;
+    const logoHeight = 18;
+    const logoX = margin + 5;
+    const logoY = 8.5;
+    
+    // Add logo image (will use placeholder circle if image fails)
+    doc.addImage(logoUrl, 'PNG', logoX, logoY, logoWidth, logoHeight);
+    
+    // Header Text - positioned after logo
+    const textX = logoX + logoWidth + 8;
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...C.white);
+    doc.text('APGS - Advanced Phishing Guard System', textX, 14);
+    
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(200, 220, 255); // Light blue-tinted white
+    doc.text('Professional Security Audit Report', textX, 21);
+    
+    // Divider line
+    doc.setDrawColor(150, 180, 220);
+    doc.setLineWidth(0.3);
+    doc.line(textX, 24, pageW - margin, 24);
+    
+    // Report ID on right side
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(200, 220, 255);
+    doc.text(`Report ID: ${Math.random().toString(36).substring(2, 9).toUpperCase()}`, pageW - margin, 21, { align: 'right' });
+  } catch (error) {
+    // Fallback to circle logo if image fails to load
+    console.warn('Logo image not found, using fallback');
+    const logoX = margin + 10;
+    const logoY = 17.5;
+    const logoR = 9;
+    doc.setFillColor(...C.white);
+    doc.circle(logoX, logoY, logoR, 'F');
+    
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...C.brandDark);
+    doc.text('APGS', logoX, logoY + 1.5, { align: 'center' });
+    
+    const textX = logoX + logoR + 6;
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...C.white);
+    doc.text('APGS - Advanced Phishing Guard System', textX, 14);
+    
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(200, 220, 255);
+    doc.text('Professional Security Audit Report', textX, 21);
+    
+    doc.setDrawColor(150, 180, 220);
+    doc.setLineWidth(0.3);
+    doc.line(textX, 24, pageW - margin, 24);
+    
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(200, 220, 255);
+    doc.text(`Report ID: ${Math.random().toString(36).substring(2, 9).toUpperCase()}`, pageW - margin, 21, { align: 'right' });
+  }
 };
 
 // ── 9. FOOTER ─────────────────────────────────────────────────
@@ -83,30 +123,31 @@ const drawFooters = (doc: any, pageW: number, pageH: number, margin: number) => 
   for (let i = 1; i <= total; i++) {
     doc.setPage(i);
     
-    // Footer background bar
-    const footerY = pageH - 22;
-    doc.setFillColor(240, 245, 250); // Light blue-grey background
-    doc.rect(0, footerY, pageW, 22, 'F');
+    // Footer background bar - Professional dark blue (#1E3A8A)
+    const footerY = pageH - 20;
+    doc.setFillColor(...C.brandDark);
+    doc.rect(0, footerY, pageW, 20, 'F');
     
-    // Top border line
+    // Top accent border - lighter blue
     doc.setDrawColor(...C.accent);
-    doc.setLineWidth(0.4);
+    doc.setLineWidth(0.5);
     doc.line(0, footerY, pageW, footerY);
     
-    // Footer text
-    doc.setFontSize(8);
+    // Footer text - Left side
+    doc.setFontSize(8.5);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...C.accent);
+    doc.setTextColor(...C.white);
     doc.text('APGS — Confidential Security Intelligence', margin, footerY + 7);
     
+    // Footer text - Right side (Page numbers)
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...C.midGrey);
+    doc.setTextColor(200, 220, 255); // Light blue-tinted white
     doc.text(`Page ${i} of ${total}`, pageW - margin, footerY + 7, { align: 'right' });
     
-    // Disclaimer in smaller font
-    doc.setFontSize(6.5);
+    // Disclaimer in smaller font below
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'italic');
-    doc.setTextColor(...C.midGrey);
+    doc.setTextColor(180, 200, 230); // Muted blue-grey
     doc.text('DISCLAIMER: Automated probability-based risk assessment. Results should be verified by a security professional.', margin, footerY + 14);
   }
 };
@@ -122,7 +163,7 @@ const sectionHeader = (doc: any, title: string, x: number, y: number, w: number)
   doc.rect(x, y, 3, 10, 'F');
   
   // Section title
-  doc.setFontSize(10);
+  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...C.accent);
   doc.text(title.toUpperCase(), x + 7, y + 7);
@@ -133,8 +174,9 @@ const sectionHeader = (doc: any, title: string, x: number, y: number, w: number)
 const checkPage = (doc: any, y: number, pageH: number, margin: number, pageW: number) => {
   if (y > pageH - 35) {
     doc.addPage();
+    // Redraw the header on new page
     drawHeader(doc, pageW, margin);
-    return 40;
+    return 45;
   }
   return y;
 };
@@ -168,7 +210,6 @@ const buildURLReport = async (data: PDFReportData) => {
     ['Audit Type', 'URL Threat Detection'],
     ['Analysis Mode', mode === 'deep' ? 'Deep Scan (API + External)' : 'Quick Scan'],
     ['Target Resource', url],
-    ['Detection Engine', res.source || 'APGS Security Engine'],
     ['Scan By', 'APGS Security Engine'],
     ['Timestamp', new Date().toLocaleString()],
   ];
@@ -188,7 +229,7 @@ const buildURLReport = async (data: PDFReportData) => {
     }
     
     // Label (bold)
-    doc.setFontSize(9);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...C.darkGrey);
     doc.text(k, margin + 4, y);
@@ -219,14 +260,14 @@ const buildURLReport = async (data: PDFReportData) => {
   doc.roundedRect(margin, y, cw, 28, 2, 2, 'S');
   
   // Risk Level label and value
-  doc.setFontSize(9);
+  doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...sCol);
   doc.text('RISK LEVEL', margin + 10, y + 9);
   
-  doc.setFontSize(18);
+  doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
-  doc.text(sLab, margin + 10, y + 20);
+  doc.text(sLab, margin + 10, y + 21);
   
   // Centered Score Box on right side
   const bx = pW - margin - 40;
@@ -236,16 +277,16 @@ const buildURLReport = async (data: PDFReportData) => {
   doc.setFillColor(...sCol);
   doc.roundedRect(bx, by, bw, bh, 2, 2, 'F');
   doc.setTextColor(...C.white); 
-  doc.setFontSize(13);
+  doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
   doc.text(`${score}`, bx + bw/2, by + 9, { align: 'center' });
-  doc.setFontSize(7);
+  doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.text('/ 100', bx + bw/2, by + 15, { align: 'center' });
   
   // Vendor info for deep scan
   if (mode === 'deep' && res.vtStats) {
-    doc.setFontSize(7.5);
+    doc.setFontSize(8.5);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...sCol);
     doc.text(`${res.vtStats.malicious}/${res.vtStats.total || 90} vendors`, bx + bw/2, y + 27, { align: 'center' });
@@ -273,7 +314,7 @@ const buildURLReport = async (data: PDFReportData) => {
       }
       
       // Indicator label (bold)
-      doc.setFontSize(9);
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...C.darkGrey);
       doc.text(`• ${k}`, margin + 6, y + 1);
@@ -291,7 +332,7 @@ const buildURLReport = async (data: PDFReportData) => {
     const keywords = (res.modelAnalysis?.explanations || []).filter(e => e.score > 0.05);
     if (keywords.length > 0) {
       y += 5;
-      doc.setFontSize(9);
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...C.accent);
       doc.text('Keyword Analysis:', margin + 4, y);
@@ -303,10 +344,12 @@ const buildURLReport = async (data: PDFReportData) => {
         // Keyword label
         doc.setTextColor(...C.darkGrey);
         doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9.5);
         doc.text(`• Keyword: "${sanitize(kw.word)}"`, margin + 10, y);
         
         // Status
         doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
         doc.setTextColor(...C.danger);
         doc.text('FLAGGED', pW - margin - 6, y, { align: 'right' });
         doc.setFont('helvetica', 'normal');
@@ -340,7 +383,7 @@ const buildURLReport = async (data: PDFReportData) => {
       }
       
       // Label (bold)
-      doc.setFontSize(9);
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...C.darkGrey);
       doc.text(`• ${k}`, margin + 6, y);
@@ -349,6 +392,7 @@ const buildURLReport = async (data: PDFReportData) => {
       doc.setFont('helvetica', 'bold');
       const isMalicious = (k as string).includes('Malicious') && stats.malicious > 0;
       doc.setTextColor(...(isMalicious ? C.danger : C.black));
+      doc.setFontSize(10);
       doc.text(`${v}`, pW - margin - 6, y, { align: 'right' });
       doc.setFont('helvetica', 'normal');
       y += 8;
@@ -360,7 +404,7 @@ const buildURLReport = async (data: PDFReportData) => {
   y = checkPage(doc, y, pH, margin, pW);
   y = sectionHeader(doc, 'Risk Interpretation', margin, y, cw);
   
-  doc.setFontSize(9);
+  doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...C.darkGrey);
   
@@ -430,12 +474,12 @@ const buildURLReport = async (data: PDFReportData) => {
       doc.rect(margin, y - 4, cw, 8, 'F');
     }
     
-    doc.setFontSize(9);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...C.darkGrey);
     const lr = doc.splitTextToSize(`${i + 1}. ${r}`, cw - 14);
     doc.text(lr, margin + 7, y);
-    y += (lr.length * 5.5) + 3;
+    y += (lr.length * 6) + 3;
   });
 
   drawFooters(doc, pW, pH, margin);
