@@ -47,7 +47,7 @@ const RiskAnalysisDemo = () => {
     scanType: "url" as const,
     status: "dangerous" as const,
     score: 92,
-    details: "This URL has been identified as a known phishing site with high confidence. Strong indicators of malicious intent detected across multiple security parameters.",
+    details: "This URL has been identified as a known phishing site. Strong indicators of malicious intent detected across multiple security parameters.",
     threats: [
       "Known phishing domain",
       "Matches credential harvesting patterns",

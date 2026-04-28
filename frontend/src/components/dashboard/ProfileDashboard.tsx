@@ -18,7 +18,9 @@ import {
   Star,
   ShieldAlert,
   Home,
-  LogOut
+  LogOut,
+  Target,
+  Database
 } from "lucide-react";
 import { 
   LineChart, 
@@ -386,7 +388,7 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
         <div className="bg-gradient-to-br from-card to-card/80 border border-border/50 rounded-xl p-5 backdrop-blur-sm hover:border-primary/50 transition-all duration-300">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm text-muted-foreground font-medium">Total Scans</p>
-            <Shield className="w-5 h-5 text-primary/70" />
+            <Database className="w-5 h-5 text-primary/70" />
           </div>
           <p className="text-3xl font-bold text-foreground mb-1">
             {(dashboardData?.safe || 0) + (dashboardData?.threats || 0)}
@@ -422,7 +424,7 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
         <div className="bg-gradient-to-br from-card to-card/80 border border-border/50 rounded-xl p-5 backdrop-blur-sm hover:border-blue-500/50 transition-all duration-300">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm text-muted-foreground font-medium">Detection Rate</p>
-            <Activity className="w-5 h-5 text-blue-400/70" />
+            <Target className="w-5 h-5 text-blue-400/70" />
           </div>
           <p className="text-3xl font-bold text-foreground mb-1">
             {dashboardData && (dashboardData.safe + dashboardData.threats) > 0 

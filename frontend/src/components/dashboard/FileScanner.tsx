@@ -10,17 +10,12 @@ import { scanFile } from "@/lib/fileUtils";
 import { apiScans } from "@/lib/api-backend";  // UPDATED: Use backend API
 import { handleScanAttempt } from "@/lib/guestAccess";  // ADDED: Guest access control
 import RiskAnalysisReport from "@/components/RiskAnalysisReport";
-import { generateFileReport } from "@/lib/generateReport";
-import { generateRiskReport } from "@/lib/reportGenerator";
 import { generatePDFReport, generatePDFBlob } from "@/lib/pdfReportGenerator";
 import { vtApi } from "@/lib/api-vt";
 import { transformVTToUI } from "@/lib/vtMapper";
 import { VTAnalysisResponse } from "@/lib/vt-interfaces";
 import { saveScanResult } from "@/lib/scanHistory";
 import { calculateFinalVerdict, calculateAdjustedScore, type RiskFlags } from "@/lib/riskDecisionLogic";
-//import {generatePDFReport} from "@/lib/pdfReportGenerator";
-//import { generateFilePdfReport} from "@lib/filepdfReport"
-//import { generateFilePdfReport } from "@/lib/filepdfReport";
 interface FileScannerProps {
   onScanComplete: () => void;
   isAuthenticated?: boolean;

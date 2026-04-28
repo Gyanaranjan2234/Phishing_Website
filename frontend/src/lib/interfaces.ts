@@ -37,6 +37,10 @@ export interface FileAnalysis {
       blacklisted?: boolean;
       suspicious?: boolean;
     };
+    modelAnalysis?: {
+      prediction: string;
+      confidence: number;
+    };
 }
 export interface UrlAnalysis {
     status: ScanStatus;
@@ -121,4 +125,10 @@ export interface UrlAnalysis {
   source?: string;                            // "AI_MODEL" | "AI_MODEL + API"
   apiUnavailable?: boolean;                   // true when deep scan but API failed
   maliciousEngines?: string[];                // list of engines (deep scan only)
+  modelAnalysis?: {
+    prediction: string;
+    confidence: number;
+    features?: Record<string, boolean>;
+    explanations?: { word: string; score: number }[];
+  };
 }

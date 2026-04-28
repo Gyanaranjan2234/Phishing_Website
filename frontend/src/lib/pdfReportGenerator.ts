@@ -1,308 +1,390 @@
-import type { UrlAnalysis, FileAnalysis, PasswordResult, BreachResult } from './interfaces';
-import {
-  calculateFinalVerdict,
-  calculateAdjustedScore,
-  getVerdictDescription,
-  getRecommendations,
-  verdictToSeverity,
-  type RiskFlags,
-  type FinalVerdict,
-} from './riskDecisionLogic';
+import type { UrlAnalysis, FileAnalysis } from './interfaces';
 
 export interface PDFReportData {
-  scanType: 'url' | 'file' | 'password' | 'email';
+  scanType: 'url' | 'file';
   target: string;
-  result: UrlAnalysis | FileAnalysis | PasswordResult | BreachResult;
+  result: UrlAnalysis | FileAnalysis;
   userName?: string;
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Professional Color Palette ────────────────────────────────
+const C = {
+  black:        [15,  23,  42]  as [number, number, number],
+  darkGrey:     [51,  65,  85]  as [number, number, number],
+  midGrey:      [100, 116, 139] as [number, number, number],
+  lightGrey:    [226, 232, 240] as [number, number, number],
+  veryLight:    [248, 250, 252] as [number, number, number],
+  white:        [255, 255, 255] as [number, number, number],
+  accent:       [37,  99, 235]  as [number, number, number],
+  accentLight:  [219, 234, 254] as [number, number, number],
+  danger:       [220,  38,  38]  as [number, number, number],
+  dangerLight:  [254, 226, 226] as [number, number, number],
+  warning:      [180,  83,   9]  as [number, number, number],
+  warningLight: [254, 243, 199] as [number, number, number],
+  safe:         [21, 128,  61]  as [number, number, number],
+  safeLight:    [220, 252, 231] as [number, number, number],
+};
 
-/** Map all 5 verdict tiers to RGB colors */
-function getVerdictColors(verdict: FinalVerdict): { r: number; g: number; b: number } {
-  switch (verdict) {
-    case 'safe':     return { r: 0,   g: 230, b: 118 }; // Emerald green
-    case 'low':      return { r: 255, g: 204, b: 0   }; // Amber
-    case 'moderate': return { r: 255, g: 204, b: 0   }; // Amber
-    case 'high':     return { r: 255, g: 77,  b: 77  }; // Red
-    case 'dangerous':return { r: 255, g: 77,  b: 77  }; // Red
-    default:         return { r: 200, g: 200, b: 200 }; // Fallback grey
+// ── Helper: Sanitize & Format ───────────────────�const getRiskLevel = (score: number) => {
+  if (score === 0) return "SAFE";
+  if (score <= 10) return "LOW RISK";
+  if (score <= 30) return "MODERATE";
+  if (score <= 70) return "HIGH RISK";
+  return "DANGEROUS";
+};
+
+// ── 1. REPORT HEADER ──────────────────────────────────────────
+const drawHeader = (doc: any, pageW: number, margin: number) => {
+  // Dark Blue Header Banner
+  doc.setFillColor(...C.accent);
+  doc.rect(0, 0, pageW, 25, 'F');
+  
+  // Logo
+  doc.setFillColor(...C.white);
+  doc.circle(margin + 8, 12.5, 7, 'F');
+  doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.accent);
+  doc.text('APGS', margin + 8, 13.5, { align: 'center' });
+  
+  // Header Text
+  doc.setFontSize(12); doc.setTextColor(...C.white);
+  doc.text('APGS - Advanced Phishing Guard System', margin + 18, 11);
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.white);
+  doc.text('Security Audit Report', margin + 18, 17);
+  
+  // Divider
+  doc.setDrawColor(...C.white);
+  doc.setLineWidth(0.1);
+  doc.line(margin + 18, 19, pageW - margin, 19);
+  
+  doc.setFontSize(8);
+  doc.text(`ID: ${Math.random().toString(36).substring(2, 9).toUpperCase()}`, pageW - margin, 17, { align: 'right' });
+};
+
+// ── 9. FOOTER ─────────────────────────────────────────────────
+const drawFooters = (doc: any, pageW: number, pageH: number, margin: number) => {
+  const total = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= total; i++) {
+    doc.setPage(i);
+    // Divider
+    doc.setDrawColor(...C.lightGrey); doc.line(margin, pageH - 18, pageW - margin, pageH - 18);
+    
+    doc.setFontSize(8); doc.setTextColor(...C.midGrey);
+    doc.text('APGS — Confidential Security Intelligence', margin, pageH - 12);
+    doc.text(`Page ${i} of ${total}`, pageW - margin, pageH - 12, { align: 'right' });
+    
+    doc.setFontSize(7);
+    doc.text('DISCLAIMER: Automated probability-based risk assessment. Results should be verified by a security professional.', margin, pageH - 7);
   }
-}
+};
 
-/** Map all 5 verdict tiers to prefix emoji */
-function getVerdictEmoji(verdict: FinalVerdict): string {
-  switch (verdict) {
-    case 'safe':     return '✓';
-    case 'low':      return '⚠';
-    case 'moderate': return '⚠';
-    case 'high':     return '✕';
-    case 'dangerous':return '✕';
-    default:         return '?';
+// ── Layout Helpers ────────────────────────────────────────────
+const sectionHeader = (doc: any, title: string, x: number, y: number, w: number) => {
+  doc.setFillColor(...C.veryLight); doc.rect(x, y, w, 9, 'F');
+  doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.accent);
+  doc.text(title.toUpperCase(), x + 4, y + 6);
+  return y + 14;
+};
+
+const checkPage = (doc: any, y: number, pageH: number, margin: number, pageW: number) => {
+  if (y > pageH - 35) {
+    doc.addPage();
+    drawHeader(doc, pageW, margin);
+    return 40;
   }
-}
+  return y;
+};
 
-/** Safely coerce any unknown verdict string to a valid FinalVerdict */
-function normalizeVerdict(raw: string): FinalVerdict {
-  const valid: FinalVerdict[] = ['safe', 'low', 'moderate', 'high', 'dangerous'];
-  return valid.includes(raw as FinalVerdict) ? (raw as FinalVerdict) : 'safe';
-}
-
-// ── Validate input ────────────────────────────────────────────────────────────
-
-function validateInput(data: PDFReportData): void {
-  if (!data || !data.result) {
-    throw new Error('PDF generation failed: No scan result provided.');
-  }
-  const r = data.result as any;
-  if (r.score === undefined || r.score === null) {
-    throw new Error('PDF generation failed: Missing risk score in scan result.');
-  }
-  if (!data.target || data.target.trim() === '') {
-    throw new Error('PDF generation failed: Missing target (URL or filename).');
-  }
-}
-
-// ── Core PDF builder ─────────────────────────────────────────────────────────
-
-/** Internal: builds the jsPDF document and returns it without saving */
-const buildPDFDoc = async (data: PDFReportData) => {
-  // Validate first — throws with a clear message if data is bad
-  validateInput(data);
-
+// ════════════════════════════════════════════════════════════
+//  BUILDER: URL REPORT
+// ════════════════════════════════════════════════════════════
+const buildURLReport = async (data: PDFReportData) => {
   const { default: jsPDF } = await import('jspdf');
   const doc = new jsPDF();
-  const pageWidth  = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin       = 15;
-  const contentWidth = pageWidth - margin * 2;
+  const pW = doc.internal.pageSize.getWidth(), pH = doc.internal.pageSize.getHeight();
+  const margin = 20, cw = pW - margin * 2;
 
-  const result   = data.result as any;
-  const flags: RiskFlags = result.flags || {};
-  const baseScore        = typeof result.score === 'number' ? result.score : 0;
+  const res = data.result as UrlAnalysis;
+  const score = res.score ?? 0;
+  const mode = res.mode || 'quick';
+  const url = res.url;
 
-  // ── Verdict calculation ──
-  const rawVerdict    = calculateFinalVerdict(baseScore, flags);
-  const verdict       = normalizeVerdict(rawVerdict);
-  const adjustedScore = Math.min(100, Math.max(0, calculateAdjustedScore(baseScore, flags)));
-  const severity      = verdictToSeverity(verdict) ?? 'NONE';
-  const verdictDesc   = getVerdictDescription(verdict) ?? 'No description available.';
-  const recommendations = getRecommendations(verdict, data.scanType) ?? [];
-  const colors        = getVerdictColors(verdict);   // always defined
-  const emoji         = getVerdictEmoji(verdict);    // always defined
+  const sLab = getRiskLevel(score);
+  let sCol = C.safe, sBg = C.safeLight;
+  if (score > 70) { sCol = C.danger; sBg = C.dangerLight; }
+  else if (score > 10) { sCol = C.warning; sBg = C.warningLight; }
 
-  let y = margin;
+  drawHeader(doc, pW, margin);
+  let y = 38;
 
-  // ── HEADER ───────────────────────────────────────────────────────────────
-  doc.setFillColor(15, 23, 42);
-  doc.rect(0, 0, pageWidth, 55, 'F');
+  // 2. SCAN INFORMATION
+  y = sectionHeader(doc, 'Scan Information', margin, y, cw);
+  const info = [
+    ['Audit Type', 'URL Threat Detection'],
+    ['Analysis Mode', mode === 'deep' ? 'Deep Scan (API + AI)' : 'Quick Scan (AI Only)'],
+    ['Target Resource', url],
+    ['Detection Engine', res.source || 'APGS Neural-X Engine'],
+    ['Timestamp', new Date().toLocaleString()],
+  ];
 
-  doc.setFontSize(24);
-  doc.setTextColor(colors.r, colors.g, colors.b);
-  doc.setFont('helvetica', 'bold');
-  doc.text('APGS', margin, 20);
+  const labelWidth = 45;
+  info.forEach(([k, v], i) => {
+    y = checkPage(doc, y, pH, margin, pW);
+    if (i % 2 === 0) { doc.setFillColor(...C.veryLight); doc.rect(margin, y - 5, cw, 8, 'F'); }
+    
+    doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.midGrey);
+    doc.text(`${k}`, margin + 3, y + 1);
+    doc.text(':', margin + labelWidth - 5, y + 1);
+    
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.darkGrey);
+    const sv = doc.splitTextToSize(sanitize(v), cw - labelWidth - 5);
+    doc.text(sv, margin + labelWidth, y + 1);
+    y += (sv.length * 5) + 3;
+  });
+  y += 5;
 
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Advanced Phishing Guard System', margin, 28);
+  // 3. RISK SUMMARY
+  y = sectionHeader(doc, 'Risk Summary', margin, y, cw);
+  doc.setFillColor(...sBg); doc.roundedRect(margin, y, cw, 30, 2, 2, 'F');
+  doc.setDrawColor(...sCol); doc.setLineWidth(0.5); doc.roundedRect(margin, y, cw, 30, 2, 2, 'S');
+  
+  doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(...sCol);
+  doc.text('SECURITY VERDICT', margin + 10, y + 10);
+  doc.setFontSize(20); doc.text(sLab, margin + 10, y + 21);
+  
+  // Centered Score Box on right side
+  const bx = pW - margin - 35, by = y + 5, bw = 25, bh = 20;
+  doc.setFillColor(...sCol); doc.roundedRect(bx, by, bw, bh, 1, 1, 'F');
+  doc.setTextColor(...C.white); 
+  doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+  doc.text(`${score} / 100`, bx + bw/2, by + 12, { align: 'center' });
+  
+  if (mode === 'deep' && res.vtStats) {
+    doc.setFontSize(8); doc.setTextColor(...sCol);
+    doc.text(`${res.vtStats.malicious} / ${res.vtStats.total || 90} vendors flagged`, pW - margin - 22.5, y + 28, { align: 'center' });
+  }
+  y += 40;
 
-  doc.setFontSize(9);
-  doc.setTextColor(180, 190, 200);
-  doc.text(`Security Report • ${new Date().toLocaleString()}`, margin, 36);
-
-  y = 65;
-
-  // ── Section helper ────────────────────────────────────────────────────────
-  const addSection = (title: string, content: (doc: any, y: number) => number): number => {
-    if (y > pageHeight - 40) { doc.addPage(); y = margin; }
-    doc.setFontSize(13);
-    doc.setTextColor(colors.r, colors.g, colors.b);
-    doc.setFont('helvetica', 'bold');
-    doc.text(title, margin, y);
-    y += 2;
-    doc.setDrawColor(colors.r, colors.g, colors.b);
-    doc.setLineWidth(0.5);
-    doc.line(margin, y + 3, pageWidth - margin, y + 3);
-    y += 10;
-    return content(doc, y);
-  };
-
-  // ── SECTION 1: OVERVIEW ──────────────────────────────────────────────────
-  y = addSection('1. SCAN OVERVIEW', (_doc, y) => {
-    const scanTypeLabel: Record<string, string> = {
-      url: 'URL Phishing Detection',
-      file: 'File Malware Analysis',
-      password: 'Password Security Check',
-      email: 'Email Breach Detection',
-    };
-    const lines = [
-      `Scan Type:   ${scanTypeLabel[data.scanType] ?? data.scanType}`,
-      `Target:      ${data.target}`,
-      `Analyzed By: APGS Security Engine`,
-      `User:        ${data.userName ?? 'Guest'}`,
-      `Report Date: ${new Date().toLocaleString()}`,
+  // 4. SCORING BREAKDOWN (Quick Scan Only)
+  if (mode === 'quick') {
+    y = sectionHeader(doc, 'Scoring Breakdown', margin, y, cw);
+    const indicators = [
+      ['LENGTH', url.length > 75 ? 'FLAGGED' : 'PASS'],
+      ['HAS HTTPS', url.startsWith('https://') ? 'PASS' : 'FLAGGED'],
+      ['DOT COUNT', (url.match(/\./g) || []).length > 3 ? 'FLAGGED' : 'PASS'],
+      ['HAS IP', /\d+\.\d+\.\d+\.\d+/.test(url) ? 'FLAGGED' : 'PASS'],
+      ['HAS SUSPICIOUS WORD', ['login', 'verify', 'update', 'banking', 'secure', 'account'].some(w => url.toLowerCase().includes(w)) ? 'FLAGGED' : 'PASS'],
     ];
-    doc.setFontSize(10);
-    doc.setTextColor(50, 50, 50);
-    doc.setFont('helvetica', 'normal');
-    lines.forEach((line) => {
-      if (y > pageHeight - 20) { doc.addPage(); y = margin; }
-      doc.text(line, margin + 5, y);
+
+    indicators.forEach(([k, v], i) => {
+      y = checkPage(doc, y, pH, margin, pW);
+      if (i % 2 === 0) { doc.setFillColor(...C.veryLight); doc.rect(margin, y - 4, cw, 7, 'F'); }
+      doc.setFontSize(9); doc.setTextColor(...C.darkGrey);
+      doc.text(`• ${k}`, margin + 6, y + 1);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...(v === 'FLAGGED' ? C.danger : C.safe));
+      doc.text(v, pW - margin - 6, y + 1, { align: 'right' });
+      doc.setFont('helvetica', 'normal'); y += 8;
+    });
+
+    const keywords = (res.modelAnalysis?.explanations || []).filter(e => e.score > 0.05);
+    if (keywords.length > 0) {
+      y += 2;
+      doc.setFontSize(9); doc.setTextColor(...C.midGrey);
+      doc.text('Keyword Analysis:', margin + 4, y);
       y += 7;
-    });
-    return y + 5;
-  });
-
-  // ── SECTION 2: VERDICT & SCORE ───────────────────────────────────────────
-  y = addSection('2. SECURITY VERDICT', (_doc, y) => {
-    doc.setFontSize(12);
-    doc.setTextColor(colors.r, colors.g, colors.b);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`${emoji}  ${verdict.toUpperCase()} — ${severity} SEVERITY`, margin + 5, y);
+      keywords.forEach(kw => {
+        y = checkPage(doc, y, pH, margin, pW);
+        doc.setTextColor(...C.darkGrey); doc.text(`• Keyword: "${sanitize(kw.word)}"`, margin + 10, y);
+        doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.danger);
+        doc.text('FLAGGED', pW - margin - 6, y, { align: 'right' });
+        doc.setFont('helvetica', 'normal'); y += 7;
+      });
+    }
     y += 8;
+  }
 
-    // Score bar
-    doc.setFillColor(240, 240, 240);
-    doc.rect(margin + 5, y, 100, 8, 'F');
-    doc.setFillColor(colors.r, colors.g, colors.b);
-    doc.rect(margin + 5, y, (adjustedScore / 100) * 100, 8, 'F');
-    doc.setFontSize(9);
-    doc.setTextColor(50, 50, 50);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`${adjustedScore} / 100`, margin + 110, y + 6);
-    y += 15;
+  // 5. THREAT INTELLIGENCE (Deep Scan Only)
+  if (mode === 'deep' && res.vtStats) {
+    y = checkPage(doc, y, pH, margin, pW);
+    y = sectionHeader(doc, 'Threat Intelligence Analysis', margin, y, cw);
+    
+    const stats = res.vtStats;
+    const items = [
+      ['Total Analysis Vendors', stats.total || 94],
+      ['Confirmed Malicious', stats.malicious],
+      ['Suspicious Flagging', stats.suspicious],
+      ['Clean / Harmless', stats.harmless],
+      ['Undetected', stats.undetected],
+    ];
 
-    // Description
-    doc.setFontSize(10);
-    doc.setTextColor(80, 80, 80);
-    const descLines = doc.splitTextToSize(verdictDesc, contentWidth - 10);
-    doc.text(descLines, margin + 5, y);
-    y += (descLines.length * 5) + 5;
-    return y + 3;
+    items.forEach(([k, v], i) => {
+      y = checkPage(doc, y, pH, margin, pW);
+      if (i % 2 === 0) { doc.setFillColor(...C.veryLight); doc.rect(margin, y - 4, cw, 7, 'F'); }
+      doc.setFontSize(9); doc.setTextColor(...C.midGrey);
+      doc.text(`• ${k}`, margin + 6, y);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...((k as string).includes('Malicious') && stats.malicious > 0 ? C.danger : C.darkGrey));
+      doc.text(`${v}`, pW - margin - 6, y, { align: 'right' });
+      doc.setFont('helvetica', 'normal'); y += 8;
+    });
+    y += 8;
+  }
+
+  // 6. RISK INTERPRETATION
+  y = checkPage(doc, y, pH, margin, pW);
+  y = sectionHeader(doc, 'Risk Interpretation', margin, y, cw);
+  doc.setFontSize(9); doc.setTextColor(...C.darkGrey);
+  let interpretation = "";
+  if (score > 70) {
+    interpretation = "Critical Risk: The analyzed resource exhibits multiple confirmed malicious signatures. Accessing this URL poses a high probability of data theft, credential harvesting, or malware delivery.";
+  } else if (score > 30) {
+    interpretation = "Elevated Risk: Heuristic anomalies and suspicious patterns detected. While not definitively confirmed as malicious, the structural composition aligns with known phishing methodologies.";
+  } else {
+    interpretation = "Minimal Risk: No significant threat indicators were identified during the analysis. The resource appears to follow standard safety protocols and lacks recognized malicious features.";
+  }
+  const sInter = doc.splitTextToSize(interpretation, cw - 10);
+  doc.text(sInter, margin + 5, y);
+  y += (sInter.length * 6) + 10;
+
+  // 7. RECOMMENDATIONS
+  y = checkPage(doc, y, pH, margin, pW);
+  y = sectionHeader(doc, 'Actionable Recommendations', margin, y, cw);
+  const recs = score > 70 
+    ? ['DO NOT interact with this resource or provide any credentials.', 'Immediately blacklist this domain at the network level.', 'Report this incident to your Security Operations Center (SOC).', 'Audit any accounts that may have interacted with this link.'] 
+    : score > 30 
+    ? ['Proceed with extreme caution and verify source authenticity.', 'Do not enter sensitive information or download attachments.', 'Cross-reference this URL with known official channels.'] 
+    : ['This resource appears safe for standard use.', 'Maintain standard security awareness and report future anomalies.', 'Ensure your browser and security extensions are up to date.'];
+  
+  recs.forEach((r, i) => {
+    y = checkPage(doc, y, pH, margin, pW);
+    doc.setFontSize(9); doc.setTextColor(...C.darkGrey);
+    const lr = doc.splitTextToSize(`${i + 1}. ${r}`, cw - 12);
+    doc.text(lr, margin + 6, y);
+    y += (lr.length * 6) + 2;
   });
 
-  // ── SECTION 3: THREAT DETECTION SUMMARY (URL / File only) ────────────────
-  if ((data.scanType === 'url' || data.scanType === 'file') && result.vtStats) {
-    y = addSection('3. THREAT DETECTION SUMMARY', (_doc, y) => {
-      const vt    = result.vtStats;
-      const total = Math.max(
-        (vt.malicious ?? 0) + (vt.suspicious ?? 0) + (vt.harmless ?? 0) + (vt.undetected ?? 0),
-        1
-      );
-      const stats = [
-        { label: 'Malicious',  value: vt.malicious  ?? 0, color: [255, 77,  77 ] as [number,number,number] },
-        { label: 'Suspicious', value: vt.suspicious ?? 0, color: [255, 204, 0  ] as [number,number,number] },
-        { label: 'Harmless',   value: vt.harmless   ?? 0, color: [0,   230, 118] as [number,number,number] },
-        { label: 'Undetected', value: vt.undetected ?? 0, color: [180, 180, 180] as [number,number,number] },
-      ];
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      stats.forEach((stat) => {
-        if (y > pageHeight - 30) { doc.addPage(); y = margin; }
-        doc.setFillColor(stat.color[0], stat.color[1], stat.color[2]);
-        doc.rect(margin + 5, y - 3, 4, 4, 'F');
-        doc.setTextColor(50, 50, 50);
-        doc.text(
-          `${stat.label}: ${stat.value} vendor${stat.value !== 1 ? 's' : ''}`,
-          margin + 12, y
-        );
-        y += 6;
-      });
-      doc.setFontSize(8);
-      doc.setTextColor(120, 120, 120);
-      doc.text(`Total vendors scanned: ${total}`, margin + 5, y);
-      return y + 8;
-    });
-  }
-
-  // ── SECTION 4: DETAILED ANALYSIS ─────────────────────────────────────────
-  const reasons: any[] = Array.isArray(result.reasons) ? result.reasons : [];
-  if (reasons.length > 0) {
-    y = addSection('4. DETAILED ANALYSIS', (_doc, y) => {
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      reasons.slice(0, 15).forEach((reason) => {
-        if (y > pageHeight - 20) { doc.addPage(); y = margin; }
-        const flag       = reason?.flagged ?? false;
-        const statusMark = flag ? '⚠' : '✓';
-        const textColor  = flag ? [255, 100, 100] as [number,number,number]
-                                : [100, 150, 100] as [number,number,number];
-        doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-        doc.text(`${statusMark} ${reason?.label ?? ''}`, margin + 5, y);
-        doc.setTextColor(80, 80, 80);
-        const valueLines = doc.splitTextToSize(`${reason?.value ?? ''}`, contentWidth - 20);
-        doc.text(valueLines, margin + 10, y + 5);
-        y += 5 + valueLines.length * 4 + 3;
-      });
-      return y + 3;
-    });
-  }
-
-  // ── SECTION 5: IDENTIFIED THREATS ────────────────────────────────────────
-  const threats: string[] = Array.isArray(result.threats) ? result.threats : [];
-  if (threats.length > 0) {
-    y = addSection('5. IDENTIFIED THREATS', (_doc, y) => {
-      doc.setFontSize(9);
-      doc.setTextColor(255, 100, 100);
-      doc.setFont('helvetica', 'normal');
-      threats.forEach((threat) => {
-        if (y > pageHeight - 20) { doc.addPage(); y = margin; }
-        const lines = doc.splitTextToSize(`• ${threat ?? ''}`, contentWidth - 10);
-        doc.text(lines, margin + 5, y);
-        y += lines.length * 4 + 2;
-      });
-      return y + 3;
-    });
-  }
-
-  // ── SECTION 6: RECOMMENDATIONS ───────────────────────────────────────────
-  y = addSection('6. RECOMMENDED ACTIONS', (_doc, y) => {
-    doc.setFontSize(9);
-    doc.setTextColor(50, 50, 50);
-    doc.setFont('helvetica', 'normal');
-    recommendations.forEach((rec, idx) => {
-      if (y > pageHeight - 20) { doc.addPage(); y = margin; }
-      const lines = doc.splitTextToSize(`${idx + 1}. ${rec ?? ''}`, contentWidth - 10);
-      doc.text(lines, margin + 5, y);
-      y += lines.length * 4 + 3;
-    });
-    return y + 5;
-  });
-
-  // ── FOOTER ────────────────────────────────────────────────────────────────
-  const pageCount = (doc as any).internal.pages.length - 1;
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setFillColor(15, 23, 42);
-    doc.rect(0, pageHeight - 12, pageWidth, 12, 'F');
-    doc.setFontSize(8);
-    doc.setTextColor(colors.r, colors.g, colors.b);
-    doc.text(
-      `APGS Confidential Report  |  Page ${i} of ${pageCount}  |  ${new Date().toISOString()}`,
-      pageWidth / 2, pageHeight - 5, { align: 'center' }
-    );
-  }
-
+  drawFooters(doc, pW, pH, margin);
   return doc;
 };
 
-// ── Public exports ────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+//  BUILDER: FILE REPORT
+// ════════════════════════════════════════════════════════════
+const buildFileReport = async (data: PDFReportData) => {
+  const { default: jsPDF } = await import('jspdf');
+  const doc = new jsPDF();
+  const pW = doc.internal.pageSize.getWidth(), pH = doc.internal.pageSize.getHeight();
+  const margin = 20, cw = pW - margin * 2;
+  const res = data.result as FileAnalysis;
+  const score = res.score ?? 0;
 
-/** Save PDF directly to device */
-export const generatePDFReport = async (data: PDFReportData): Promise<void> => {
-  const doc = await buildPDFDoc(data);
-  doc.save('APGS_Report.pdf');
-};
+  let sCol = C.safe, sBg = C.safeLight, sLab = "FILE: CLEAN";
+  if (score > 70) { sCol = C.danger; sBg = C.dangerLight; sLab = "FILE: MALICIOUS"; }
+  else if (score > 30) { sCol = C.warning; sBg = C.warningLight; sLab = "FILE: SUSPICIOUS"; }
 
-/**
- * Generate PDF and return as a Blob.
- * Used by the Share button — caller handles file sharing / fallback download.
- */
-export const generatePDFBlob = async (data: PDFReportData): Promise<Blob> => {
-  const doc = await buildPDFDoc(data);
-  const blob = doc.output('blob');
-  if (!(blob instanceof Blob) || blob.size === 0) {
-    throw new Error('PDF generation produced an empty or invalid Blob.');
+  drawHeader(doc, pW, margin);
+  let y = 38;
+
+  y = sectionHeader(doc, 'Scan Information', margin, y, cw);
+  const info = [['Target File', res.fileName], ['File Size', res.fileSize], ['SHA-256 Hash', res.sha256 || 'N/A']];
+  const labelWidth = 45;
+  info.forEach(([k, v], i) => {
+    y = checkPage(doc, y, pH, margin, pW);
+    if (i % 2 === 0) { doc.setFillColor(...C.veryLight); doc.rect(margin, y - 5, cw, 8, 'F'); }
+    doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.midGrey);
+    doc.text(`${k}`, margin + 3, y + 1);
+    doc.text(':', margin + labelWidth - 5, y + 1);
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.darkGrey);
+    const sv = doc.splitTextToSize(sanitize(v), cw - labelWidth - 5);
+    doc.text(sv, margin + labelWidth, y + 1);
+    y += (sv.length * 5) + 3;
+  });
+  y += 5;
+
+  y = sectionHeader(doc, 'Risk Summary', margin, y, cw);
+  doc.setFillColor(...sBg); doc.roundedRect(margin, y, cw, 30, 2, 2, 'F');
+  doc.setDrawColor(...sCol); doc.setLineWidth(0.5); doc.roundedRect(margin, y, cw, 30, 2, 2, 'S');
+  
+  doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(...sCol);
+  doc.text('MALWARE VERDICT', margin + 10, y + 10);
+  doc.setFontSize(20); doc.text(sLab, margin + 10, y + 21);
+  
+  const bx = pW - margin - 35, by = y + 5, bw = 25, bh = 20;
+  doc.setFillColor(...sCol); doc.roundedRect(bx, by, bw, bh, 1, 1, 'F');
+  doc.setTextColor(...C.white); 
+  doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+  doc.text(`${score}`, bx + bw/2, by + 10, { align: 'center' });
+  doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+  doc.text('RISK SCORE', bx + bw/2, by + 16, { align: 'center' });
+  y += 40;
+
+  y = sectionHeader(doc, 'Threat Intelligence Analysis', margin, y, cw);
+  if (res.threats?.length) {
+    doc.setFontSize(9); doc.setTextColor(...C.danger);
+    res.threats.forEach(t => {
+      y = checkPage(doc, y, pH, margin, pW);
+      doc.text(`[!] Malware Signature: ${sanitize(t)}`, margin + 6, y);
+      y += 8;
+    });
+  } else {
+    doc.setFontSize(9); doc.setTextColor(...C.safe);
+    doc.text('✓ No known malware signatures detected.', margin + 6, y);
+    y += 10;
   }
-  return blob as Blob;
+
+  y = sectionHeader(doc, 'Actionable Recommendations', margin, y, cw);
+  const fRecs = score > 70 
+    ? ['DO NOT open this file on any network-connected device.', 'Quarantine the file immediately to prevent accidental execution.', 'Notify your IT Security administrator about this threat.'] 
+    : ['Scan the file with an alternative security provider.', 'Only open in a controlled, sandboxed environment.'];
+  
+  fRecs.forEach((r, i) => {
+    y = checkPage(doc, y, pH, margin, pW);
+    doc.setFontSize(9); doc.setTextColor(...C.darkGrey);
+    const lr = doc.splitTextToSize(`${i + 1}. ${r}`, cw - 12);
+    doc.text(lr, margin + 6, y);
+    y += (lr.length * 6) + 2;
+  });
+
+  drawFooters(doc, pW, pH, margin);
+  return doc;
 };
+
+// ════════════════════════════════════════════════════════════
+//  EXPORTS
+// ════════════════════════════════════════════════════════════
+export const generatePDFReport = async (data: PDFReportData): Promise<void> => {
+  const doc = data.scanType === 'file' ? await buildFileReport(data) : await buildURLReport(data);
+  const dateStr = new Date().toISOString().split('T')[0];
+  doc.save(`APGS_${data.scanType.toUpperCase()}_Audit_${dateStr}.pdf`);
+};
+
+export const generatePDFBlob = async (data: PDFReportData): Promise<Blob> => {
+  const doc = data.scanType === 'file' ? await buildFileReport(data) : await buildURLReport(data);
+  return doc.output('blob');
+};
+
+export const downloadReport = generatePDFReport;.darkGrey);
+    const lr = doc.splitTextToSize(`${i + 1}. ${r}`, cw - 12);
+    doc.text(lr, margin + 6, y);
+    y += (lr.length * 6) + 2;
+  });
+
+  drawFooters(doc, pW, pH, margin);
+  return doc;
+};
+
+// ════════════════════════════════════════════════════════════
+//  EXPORTS
+// ════════════════════════════════════════════════════════════
+export const generatePDFReport = async (data: PDFReportData): Promise<void> => {
+  const doc = data.scanType === 'file' ? await buildFileReport(data) : await buildURLReport(data);
+  const dateStr = new Date().toISOString().split('T')[0];
+  doc.save(`APGS_${data.scanType.toUpperCase()}_Audit_${dateStr}.pdf`);
+};
+
+export const generatePDFBlob = async (data: PDFReportData): Promise<Blob> => {
+  const doc = data.scanType === 'file' ? await buildFileReport(data) : await buildURLReport(data);
+  return doc.output('blob');
+};
+
+export const downloadReport = generatePDFReport;

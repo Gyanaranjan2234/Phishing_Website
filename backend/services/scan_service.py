@@ -158,9 +158,6 @@ async def run_full_scan(url: str, mode: str = "quick") -> dict:
     # QUICK SCAN — AI ONLY
     # =========================================================
     if mode != "deep":
-        print("MODE: QUICK → AI ONLY")
-        logger.info("MODE: QUICK → AI ONLY")
-
         model_result = await loop.run_in_executor(None, analyze_url, url)
         score        = _model_score(model_result)
         risk         = _score_to_risk(score)
@@ -178,9 +175,6 @@ async def run_full_scan(url: str, mode: str = "quick") -> dict:
     # =========================================================
     # DEEP SCAN — AI + VIRUSTOTAL (parallel)
     # =========================================================
-    print("MODE: DEEP → AI + API")
-    logger.info("MODE: DEEP → AI + API")
-
     # Run both concurrently
     try:
         model_result, api_result = await asyncio.gather(

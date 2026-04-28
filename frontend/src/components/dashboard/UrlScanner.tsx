@@ -153,6 +153,12 @@ const handleAnalyze = async (e: React.FormEvent) => {
       source:           response.source || (isDeep ? "Deep Scan" : "Quick Scan"),
       apiUnavailable:   apiErr,
       maliciousEngines: apiOk ? (apiData.malicious_engines || []) : [],
+      modelAnalysis: {
+        prediction: response.model_analysis.prediction,
+        confidence: response.model_analysis.confidence,
+        features:   response.model_analysis.features,
+        explanations: response.model_analysis.explanations
+      }
     };
 
     setResult(analysis);

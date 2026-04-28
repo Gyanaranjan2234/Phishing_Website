@@ -1,4 +1,4 @@
-import { CheckCircle2, XCircle, BarChart3 } from "lucide-react";
+import { CheckCircle2, XCircle, Target, Database } from "lucide-react";
 
 interface StatsCardsProps {
   totalScans?: number; // Optional as we recalculate
@@ -34,7 +34,7 @@ const StatsCards = ({ threats, safe }: StatsCardsProps) => {
     { 
       label: "Detection Rate", 
       value: `${detectionRate}%`, 
-      icon: BarChart3, 
+      icon: Target, 
       bgColor: "bg-orange-500/10",
       borderColor: "border-orange-500/30",
       iconColor: "text-orange-400",
@@ -43,7 +43,7 @@ const StatsCards = ({ threats, safe }: StatsCardsProps) => {
     { 
       label: "Total Scans", 
       value: actualTotal, 
-      icon: BarChart3, 
+      icon: Database, 
       bgColor: "bg-cyan-500/10",
       borderColor: "border-cyan-500/30",
       iconColor: "text-cyan-400",
