@@ -27,6 +27,23 @@ const C = {
   safeLight:    [220, 252, 231] as [number, number, number],
 };
 
+// ── Shared Styling (Global "CSS" for PDF) ─────────────────────
+const PDF_STYLES = {
+  header: {
+    titleSize: 16,
+    subSize: 10,
+    idSize: 8,
+    fontBold: 'helvetica-bold', // Mapping for readability
+    fontNormal: 'helvetica'
+  },
+  footer: {
+    mainSize: 8,
+    subSize: 7,
+    fontNormal: 'helvetica',
+    fontItalic: 'helvetica-oblique'
+  }
+};
+
 // ── Helper: Sanitize & Format ─────────────────────────────────
 const sanitize = (str: string) => str.replace(/[^\x20-\x7E]/g, '').substring(0, 200);
 
@@ -34,12 +51,13 @@ const getRiskLevel = (score: number) => {
   if (score === 0) return "SAFE";
   if (score <= 10) return "LOW RISK";
   if (score <= 30) return "MODERATE";
-  if (score <= 70) return "HIGH RISK";
+  if (score <= 50) return "SUSPICIOUS";
+  if (score <= 85) return "HIGH RISK";
   return "DANGEROUS";
 };
 
 // ── 1. REPORT HEADER ──────────────────────────────────────────
-const drawHeader = (doc: any, pageW: number, margin: number, isFirstPage: boolean = false) => {
+const drawHeader = (doc: any, pageW: number, margin: number) => {
   // Dark Blue Header Banner for all pages
   doc.setFillColor(...C.brandDark);
   doc.rect(0, 0, pageW, 35, 'F');
@@ -62,31 +80,32 @@ const drawHeader = (doc: any, pageW: number, margin: number, isFirstPage: boolea
     // Add logo image
     doc.addImage(logoUrl, 'PNG', logoX, logoY, logoWidth, logoHeight);
     
-    // Header Text — same offsets as page 2 for consistent alignment
+    // Header Text — identical styling on every page
     const textX = logoX + logoWidth + 8;
-    doc.setFontSize(isFirstPage ? 22 : 16);
+    doc.setFontSize(PDF_STYLES.header.titleSize);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...textColor);
     doc.text('APGS Security Intelligence', textX, logoY + 7);
     
-    doc.setFontSize(isFirstPage ? 12 : 10);
+    doc.setFontSize(PDF_STYLES.header.subSize);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...subColor);
     doc.text('Advanced Phishing Guard System - Audit Report', textX, logoY + 14);
     
-    if (!isFirstPage) {
-      doc.setFontSize(8);
-      doc.setTextColor(200, 220, 255);
-      doc.text(`ID: ${Math.random().toString(36).substring(2, 8).toUpperCase()}`, pageW - margin, 21, { align: 'right' });
+    // Consistent Report ID for every page
+    if (!doc.reportId) {
+      doc.reportId = Math.random().toString(36).substring(2, 8).toUpperCase();
     }
+    doc.setFontSize(PDF_STYLES.header.idSize);
+    doc.setTextColor(200, 220, 255);
+    doc.text(`ID: ${doc.reportId}`, pageW - margin, 21, { align: 'right' });
+    
   } catch (error) {
-    const logoX = margin;
-    const logoY = isFirstPage ? 20 : 15;
-    const textColor = isFirstPage ? C.brandDark : C.white;
-    doc.setFontSize(isFirstPage ? 22 : 16);
+    // Fallback: consistent styling matches normal header
+    doc.setFontSize(PDF_STYLES.header.titleSize);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...textColor);
-    doc.text('APGS SECURITY REPORT', logoX, logoY);
+    doc.setTextColor(...C.white);
+    doc.text('APGS SECURITY REPORT', margin, 15);
   }
 };
 
@@ -101,13 +120,13 @@ const drawFooters = (doc: any, pageW: number, pageH: number, margin: number) => 
     doc.setDrawColor(...C.accent);
     doc.setLineWidth(0.5);
     doc.line(0, footerY, pageW, footerY);
-    doc.setFontSize(8);
+    doc.setFontSize(PDF_STYLES.footer.mainSize);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...C.white);
     doc.text('APGS — Confidential Security Intelligence', margin, footerY + 8);
     doc.setTextColor(200, 220, 255);
     doc.text(`Page ${i} of ${total}`, pageW - margin, footerY + 8, { align: 'right' });
-    doc.setFontSize(7);
+    doc.setFontSize(PDF_STYLES.footer.subSize);
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(180, 200, 230);
     doc.text('Automated security assessment. Results should be verified by a professional.', margin, footerY + 14);
@@ -133,7 +152,7 @@ const sectionHeader = (doc: any, title: string, x: number, y: number, w: number)
 const checkPage = (doc: any, y: number, pageH: number, margin: number, pageW: number, requiredSpace: number = 10) => {
   if (y + requiredSpace > pageH - FOOTER_RESERVED) {
     doc.addPage();
-    drawHeader(doc, pageW, margin, false);
+    drawHeader(doc, pageW, margin);
     return HEADER_SPACE;
   }
   return y;
@@ -159,9 +178,9 @@ const buildURLReport = async (data: PDFReportData) => {
   else if (score > 30) { sCol = C.warning; sBg = C.warningLight; }
   else if (score > 0) { sCol = C.warning; sBg = C.warningLight; }
 
-  // 1. PAGE 1 HEADER (Title focused)
-  drawHeader(doc, pW, margin, true);
-  let y = 50;
+  // 1. SHARED HEADER
+  drawHeader(doc, pW, margin);
+  let y = HEADER_SPACE;
 
   // 2. SCAN INFORMATION
   y = sectionHeader(doc, 'SCAN INFORMATION', margin, y, cw);
@@ -495,47 +514,79 @@ const buildFileReport = async (data: PDFReportData) => {
   const res = data.result as FileAnalysis;
   const score = res.score ?? 0;
 
-  let sCol = C.safe, sBg = C.safeLight, sLab = "FILE: CLEAN";
-  if (score > 70) { sCol = C.danger; sBg = C.dangerLight; sLab = "FILE: MALICIOUS"; }
-  else if (score > 30) { sCol = C.warning; sBg = C.warningLight; sLab = "FILE: SUSPICIOUS"; }
 
-  // 1. PAGE 1 HEADER
-  drawHeader(doc, pW, margin, true);
-  let y = 50;
+  // 1. SHARED HEADER
+  drawHeader(doc, pW, margin);
+  let y = HEADER_SPACE;
 
   y = sectionHeader(doc, 'SCAN INFORMATION', margin, y, cw);
-  const info = [['Target File', res.fileName], ['File Size', res.fileSize], ['SHA-256 Hash', res.sha256 || 'N/A']];
-  const labelWidth = 45;
+  const info = [
+    ['Audit Type', 'File Security Analysis'],
+    ['Target File', res.fileName],
+    ['File Size', res.fileSize],
+    ['SHA-256 Hash', res.sha256 || 'N/A'],
+    ['Scan By', 'APGS Security Engine'],
+    ['Timestamp', new Date().toLocaleString()]
+  ];
+  const labelWidth = 50;
+  const colonX = margin + labelWidth;
+  const valueX = colonX + 5;
+
   info.forEach(([k, v], i) => {
     y = checkPage(doc, y, pH, margin, pW, 12);
-    if (i % 2 === 0) { doc.setFillColor(...C.veryLight); doc.rect(margin, y - 5, cw, 8, 'F'); }
-    doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.midGrey);
-    doc.text(`${k}`, margin + 3, y + 1);
-    doc.text(':', margin + labelWidth - 5, y + 1);
-    doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.darkGrey);
-    const sv = doc.splitTextToSize(sanitize(v), cw - labelWidth - 5);
-    doc.text(sv, margin + labelWidth, y + 1);
-    y += (sv.length * 5) + 3;
+    if (i % 2 === 0) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(margin, y - 5, cw, 9, 'F');
+    }
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...C.darkGrey);
+    doc.text(k, margin + 4, y);
+    doc.text(':', colonX - 2, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...C.black);
+    const valueText = sanitize(v);
+    const sv = doc.splitTextToSize(valueText, cw - (valueX - margin) - 4);
+    doc.text(sv, valueX, y);
+    y += Math.max(sv.length * 5, 9) + 2;
   });
   y += 5;
 
   y = checkPage(doc, y, pH, margin, pW, 45);
   y = sectionHeader(doc, 'RISK SUMMARY', margin, y, cw);
-  doc.setFillColor(...sBg); doc.roundedRect(margin, y, cw, 30, 2, 2, 'F');
-  doc.setDrawColor(...sCol); doc.setLineWidth(0.5); doc.roundedRect(margin, y, cw, 30, 2, 2, 'S');
+  
+  const riskLevel = getRiskLevel(score);
+  const sLab = `FILE: ${riskLevel}`;
+  let sCol = C.safe, sBg = C.safeLight;
+  if (score > 85) { sCol = C.danger; sBg = C.dangerLight; }
+  else if (score > 50) { sCol = C.danger; sBg = C.dangerLight; } // HIGH RISK also uses danger red
+  else if (score > 0) { sCol = C.warning; sBg = C.warningLight; }
+
+  doc.setFillColor(...sBg); doc.roundedRect(margin, y, cw, 32, 2, 2, 'F');
+  doc.setDrawColor(...sCol); doc.setLineWidth(0.8); doc.roundedRect(margin, y, cw, 32, 2, 2, 'S');
   
   doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(...sCol);
-  doc.text('MALWARE VERDICT', margin + 10, y + 10);
-  doc.setFontSize(20); doc.text(sLab, margin + 10, y + 21);
+  doc.text('MALWARE VERDICT', margin + 10, y + 9);
+  doc.setFontSize(18); doc.text(sLab, margin + 10, y + 19);
   
-  const bx = pW - margin - 35, by = y + 5, bw = 25, bh = 20;
-  doc.setFillColor(...sCol); doc.roundedRect(bx, by, bw, bh, 1, 1, 'F');
+  // Dynamic Justification
+  doc.setFontSize(8.5); doc.setFont('helvetica', 'normal');
+  let justification = "No malicious indicators or known signatures detected.";
+  if (res.threats?.length) {
+    justification = `Identified ${res.threats.length} known malware signature(s) in database.`;
+  } else if (score > 0) {
+    justification = "Abnormal structural patterns or heuristic indicators detected.";
+  }
+  doc.text(justification, margin + 10, y + 26);
+  
+  const bx = pW - margin - 40, by = y + 4, bw = 30, bh = 22;
+  doc.setFillColor(...sCol); doc.roundedRect(bx, by, bw, bh, 2, 2, 'F');
   doc.setTextColor(...C.white); 
   doc.setFontSize(14); doc.setFont('helvetica', 'bold');
   doc.text(`${score}`, bx + bw/2, by + 10, { align: 'center' });
   doc.setFontSize(7); doc.setFont('helvetica', 'normal');
-  doc.text('RISK SCORE', bx + bw/2, by + 16, { align: 'center' });
-  y += 40;
+  doc.text('/ 100', bx + bw/2, by + 16, { align: 'center' });
+  y += 42;
 
   y = checkPage(doc, y, pH, margin, pW, 30);
   y = sectionHeader(doc, 'THREAT INTELLIGENCE ANALYSIS', margin, y, cw);
