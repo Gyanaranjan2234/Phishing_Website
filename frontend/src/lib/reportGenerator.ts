@@ -12,17 +12,21 @@ export interface RiskReportData {
 
 const getRiskLevel = (score: number | undefined): string => {
   if (score === undefined) return "UNKNOWN";
-  if (score <= 30) return "LOW";
-  if (score <= 70) return "MEDIUM";
-  return "HIGH";
+  if (score === 0) return "SAFE";
+  if (score <= 10) return "LOW RISK";
+  if (score <= 30) return "MODERATE";
+  if (score <= 70) return "HIGH RISK";
+  return "DANGEROUS";
 };
 
 const getRiskIcon = (level: string): string => {
   switch (level) {
-    case "HIGH":   return "🔴";
-    case "MEDIUM": return "🟠";
-    case "LOW":    return "🟢";
-    default:       return "⚪";
+    case "DANGEROUS": return "🔴";
+    case "HIGH RISK": return "🔴";
+    case "MODERATE":  return "🟠";
+    case "LOW RISK":  return "🟡";
+    case "SAFE":      return "🟢";
+    default:          return "⚪";
   }
 };
 
@@ -99,9 +103,11 @@ ${threatsSummary}
 🛡️  RISK LEVEL REFERENCE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  🔴 HIGH   (Score 71–100) — Critical risk. Immediate action required.
-  🟠 MEDIUM (Score 31–70)  — Caution needed. Review before proceeding.
-  🟢 LOW    (Score 0–30)   — Appears safe. Standard precautions apply.
+  🔴 DANGEROUS  (Score 71–100) — Critical risk. Do NOT proceed. Immediate action required.
+  🔴 HIGH RISK  (Score 31–70)  — Major threat. Avoid unless verified.
+  🟠 MODERATE   (Score 11–30)  — Notable risk. Verify before proceeding.
+  🟡 LOW RISK   (Score 1–10)   — Minor risk. Proceed with awareness.
+  🟢 SAFE       (Score 0)      — No threats detected. Safe to proceed.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📌 FINAL RESULT

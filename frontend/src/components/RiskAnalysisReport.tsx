@@ -18,6 +18,7 @@ import {
   calculateAdjustedScore,
   getVerdictDescription,
   getVerdictTitle,
+  getVerdictLabel,
   type RiskFlags,
   type FinalVerdict,
 } from "@/lib/riskDecisionLogic";
@@ -75,7 +76,10 @@ const validateData = (data: RiskAnalysisData): RiskAnalysisData => {
   };
 };
 
-const getRiskInfo = (score: number, status: string) => {
+const getRiskInfo = (score: number, status: string, flags?: RiskFlags) => {
+  // Calculate verdict dynamically from score using unified decision logic
+  const verdict = calculateFinalVerdict(score, flags || {});
+  
   const verdictConfig: Record<string, any> = {
     safe: {
       level:       "SAFE",
@@ -100,7 +104,7 @@ const getRiskInfo = (score: number, status: string) => {
       description: "Low-level risk indicators found."
     },
     moderate: {
-      level:       "MODERATE RISK",
+      level:       "MODERATE",
       textColor:   "text-yellow-400",
       dotColor:    "bg-yellow-500",
       barColor:    "bg-gradient-to-r from-yellow-500 to-yellow-400",
@@ -134,17 +138,9 @@ const getRiskInfo = (score: number, status: string) => {
     },
   };
 
-  // Normalize legacy status values to current tier keys
-  const normalized =
-    status === "suspicious" ? "low" :
-    status === "phishing"   ? "high" :
-    status === "infected"   ? "dangerous" :
-    status === "warning"    ? "low" :
-    status;
-
-  const config = verdictConfig[normalized] || verdictConfig.safe;
+  const config = verdictConfig[verdict] || verdictConfig.safe;
   return {
-    verdict: normalized,
+    verdict,
     adjustedScore: score,
     ...config,
   };
@@ -171,7 +167,7 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
     );
   }
 
-  const riskInfo  = getRiskInfo(data.score, data.status);
+  const riskInfo  = getRiskInfo(data.score, data.status, data.flags);
   const RiskIcon  = riskInfo.icon;
   const formatTime = (date?: string) => date ? new Date(date).toLocaleString() : new Date().toLocaleString();
 
@@ -261,8 +257,12 @@ const RiskAnalysisReport = ({ data: rawData }: { data: RiskAnalysisData }) => {
             <div className="space-y-5">
               <div>
                 <div className="flex justify-between items-center mb-3">
+                  <p className="text-xs text-slate-400 uppercase font-semibold tracking-wide">Risk Level</p>
+                  <span className={`text-2xl font-bold ${riskInfo.textColor}`}>{riskInfo.level}</span>
+                </div>
+                <div className="flex justify-between items-center mb-3">
                   <p className="text-xs text-slate-400 uppercase font-semibold tracking-wide">Risk Score</p>
-                  <span className={`text-3xl font-bold ${riskInfo.textColor}`}>{riskInfo.adjustedScore}%</span>
+                  <span className={`text-3xl font-bold ${riskInfo.textColor}`}>{riskInfo.adjustedScore} / 100</span>
                 </div>
                 <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden border border-slate-600">
                   <div

@@ -25,7 +25,10 @@ const C = {
   safeLight:    [220, 252, 231] as [number, number, number],
 };
 
-// ── Helper: Sanitize & Format ───────────────────�const getRiskLevel = (score: number) => {
+// ── Helper: Sanitize & Format ─────────────────────────────────
+const sanitize = (str: string) => str.replace(/[^\x20-\x7E]/g, '').substring(0, 200);
+
+const getRiskLevel = (score: number) => {
   if (score === 0) return "SAFE";
   if (score <= 10) return "LOW RISK";
   if (score <= 30) return "MODERATE";
@@ -37,27 +40,41 @@ const C = {
 const drawHeader = (doc: any, pageW: number, margin: number) => {
   // Dark Blue Header Banner
   doc.setFillColor(...C.accent);
-  doc.rect(0, 0, pageW, 25, 'F');
+  doc.rect(0, 0, pageW, 30, 'F');
   
-  // Logo
+  // Logo Circle at top-left
+  const logoX = margin + 10;
+  const logoY = 15;
+  const logoR = 9;
   doc.setFillColor(...C.white);
-  doc.circle(margin + 8, 12.5, 7, 'F');
-  doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.accent);
-  doc.text('APGS', margin + 8, 13.5, { align: 'center' });
+  doc.circle(logoX, logoY, logoR, 'F');
   
-  // Header Text
-  doc.setFontSize(12); doc.setTextColor(...C.white);
-  doc.text('APGS - Advanced Phishing Guard System', margin + 18, 11);
-  doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.white);
-  doc.text('Security Audit Report', margin + 18, 17);
+  // Logo Text
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...C.accent);
+  doc.text('APGS', logoX, logoY + 1.5, { align: 'center' });
   
-  // Divider
+  // Header Text - aligned with logo
+  const textX = logoX + logoR + 6;
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...C.white);
+  doc.text('APGS - Advanced Phishing Guard System', textX, 12);
+  
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Professional Security Audit Report', textX, 18);
+  
+  // Divider line
   doc.setDrawColor(...C.white);
-  doc.setLineWidth(0.1);
-  doc.line(margin + 18, 19, pageW - margin, 19);
+  doc.setLineWidth(0.3);
+  doc.line(textX, 21, pageW - margin, 21);
   
+  // Report ID on right side
   doc.setFontSize(8);
-  doc.text(`ID: ${Math.random().toString(36).substring(2, 9).toUpperCase()}`, pageW - margin, 17, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Report ID: ${Math.random().toString(36).substring(2, 9).toUpperCase()}`, pageW - margin, 18, { align: 'right' });
 };
 
 // ── 9. FOOTER ─────────────────────────────────────────────────
@@ -65,24 +82,52 @@ const drawFooters = (doc: any, pageW: number, pageH: number, margin: number) => 
   const total = doc.internal.getNumberOfPages();
   for (let i = 1; i <= total; i++) {
     doc.setPage(i);
-    // Divider
-    doc.setDrawColor(...C.lightGrey); doc.line(margin, pageH - 18, pageW - margin, pageH - 18);
     
-    doc.setFontSize(8); doc.setTextColor(...C.midGrey);
-    doc.text('APGS — Confidential Security Intelligence', margin, pageH - 12);
-    doc.text(`Page ${i} of ${total}`, pageW - margin, pageH - 12, { align: 'right' });
+    // Footer background bar
+    const footerY = pageH - 22;
+    doc.setFillColor(240, 245, 250); // Light blue-grey background
+    doc.rect(0, footerY, pageW, 22, 'F');
     
-    doc.setFontSize(7);
-    doc.text('DISCLAIMER: Automated probability-based risk assessment. Results should be verified by a security professional.', margin, pageH - 7);
+    // Top border line
+    doc.setDrawColor(...C.accent);
+    doc.setLineWidth(0.4);
+    doc.line(0, footerY, pageW, footerY);
+    
+    // Footer text
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...C.accent);
+    doc.text('APGS — Confidential Security Intelligence', margin, footerY + 7);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...C.midGrey);
+    doc.text(`Page ${i} of ${total}`, pageW - margin, footerY + 7, { align: 'right' });
+    
+    // Disclaimer in smaller font
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(...C.midGrey);
+    doc.text('DISCLAIMER: Automated probability-based risk assessment. Results should be verified by a security professional.', margin, footerY + 14);
   }
 };
 
 // ── Layout Helpers ────────────────────────────────────────────
 const sectionHeader = (doc: any, title: string, x: number, y: number, w: number) => {
-  doc.setFillColor(...C.veryLight); doc.rect(x, y, w, 9, 'F');
-  doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.accent);
-  doc.text(title.toUpperCase(), x + 4, y + 6);
-  return y + 14;
+  // Section background
+  doc.setFillColor(245, 248, 252);
+  doc.rect(x, y, w, 10, 'F');
+  
+  // Left accent bar
+  doc.setFillColor(...C.accent);
+  doc.rect(x, y, 3, 10, 'F');
+  
+  // Section title
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...C.accent);
+  doc.text(title.toUpperCase(), x + 7, y + 7);
+  
+  return y + 16; // Return next Y position with proper spacing
 };
 
 const checkPage = (doc: any, y: number, pageH: number, margin: number, pageW: number) => {
@@ -111,7 +156,8 @@ const buildURLReport = async (data: PDFReportData) => {
   const sLab = getRiskLevel(score);
   let sCol = C.safe, sBg = C.safeLight;
   if (score > 70) { sCol = C.danger; sBg = C.dangerLight; }
-  else if (score > 10) { sCol = C.warning; sBg = C.warningLight; }
+  else if (score > 30) { sCol = C.warning; sBg = C.warningLight; }
+  else if (score > 0) { sCol = C.warning; sBg = C.warningLight; }
 
   drawHeader(doc, pW, margin);
   let y = 38;
@@ -120,49 +166,91 @@ const buildURLReport = async (data: PDFReportData) => {
   y = sectionHeader(doc, 'Scan Information', margin, y, cw);
   const info = [
     ['Audit Type', 'URL Threat Detection'],
-    ['Analysis Mode', mode === 'deep' ? 'Deep Scan (API + AI)' : 'Quick Scan (AI Only)'],
+    ['Analysis Mode', mode === 'deep' ? 'Deep Scan (API + External)' : 'Quick Scan'],
     ['Target Resource', url],
-    ['Detection Engine', res.source || 'APGS Neural-X Engine'],
+    ['Detection Engine', res.source || 'APGS Security Engine'],
+    ['Scan By', 'APGS Security Engine'],
     ['Timestamp', new Date().toLocaleString()],
   ];
 
-  const labelWidth = 45;
+  // Calculate max label width for alignment
+  const maxLabelWidth = 50;
+  const colonX = margin + maxLabelWidth;
+  const valueX = colonX + 5;
+  
   info.forEach(([k, v], i) => {
     y = checkPage(doc, y, pH, margin, pW);
-    if (i % 2 === 0) { doc.setFillColor(...C.veryLight); doc.rect(margin, y - 5, cw, 8, 'F'); }
     
-    doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.midGrey);
-    doc.text(`${k}`, margin + 3, y + 1);
-    doc.text(':', margin + labelWidth - 5, y + 1);
+    // Alternating row background
+    if (i % 2 === 0) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(margin, y - 5, cw, 9, 'F');
+    }
     
-    doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.darkGrey);
-    const sv = doc.splitTextToSize(sanitize(v), cw - labelWidth - 5);
-    doc.text(sv, margin + labelWidth, y + 1);
-    y += (sv.length * 5) + 3;
+    // Label (bold)
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...C.darkGrey);
+    doc.text(k, margin + 4, y);
+    
+    // Colon (aligned)
+    doc.text(':', colonX - 2, y);
+    
+    // Value (normal)
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...C.black);
+    const valueText = sanitize(v);
+    const sv = doc.splitTextToSize(valueText, cw - (valueX - margin) - 4);
+    doc.text(sv, valueX, y);
+    
+    // Move to next row with consistent spacing
+    y += Math.max(sv.length * 5, 9) + 2;
   });
-  y += 5;
+  y += 6;
 
-  // 3. RISK SUMMARY
+  // 3. RISK SUMMARY (DYNAMIC)
   y = sectionHeader(doc, 'Risk Summary', margin, y, cw);
-  doc.setFillColor(...sBg); doc.roundedRect(margin, y, cw, 30, 2, 2, 'F');
-  doc.setDrawColor(...sCol); doc.setLineWidth(0.5); doc.roundedRect(margin, y, cw, 30, 2, 2, 'S');
   
-  doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(...sCol);
-  doc.text('SECURITY VERDICT', margin + 10, y + 10);
-  doc.setFontSize(20); doc.text(sLab, margin + 10, y + 21);
+  // Risk summary box with proper styling
+  doc.setFillColor(...sBg);
+  doc.roundedRect(margin, y, cw, 28, 2, 2, 'F');
+  doc.setDrawColor(...sCol);
+  doc.setLineWidth(0.8);
+  doc.roundedRect(margin, y, cw, 28, 2, 2, 'S');
+  
+  // Risk Level label and value
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...sCol);
+  doc.text('RISK LEVEL', margin + 10, y + 9);
+  
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text(sLab, margin + 10, y + 20);
   
   // Centered Score Box on right side
-  const bx = pW - margin - 35, by = y + 5, bw = 25, bh = 20;
-  doc.setFillColor(...sCol); doc.roundedRect(bx, by, bw, bh, 1, 1, 'F');
+  const bx = pW - margin - 40;
+  const by = y + 4;
+  const bw = 30;
+  const bh = 20;
+  doc.setFillColor(...sCol);
+  doc.roundedRect(bx, by, bw, bh, 2, 2, 'F');
   doc.setTextColor(...C.white); 
-  doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-  doc.text(`${score} / 100`, bx + bw/2, by + 12, { align: 'center' });
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`${score}`, bx + bw/2, by + 9, { align: 'center' });
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.text('/ 100', bx + bw/2, by + 15, { align: 'center' });
   
+  // Vendor info for deep scan
   if (mode === 'deep' && res.vtStats) {
-    doc.setFontSize(8); doc.setTextColor(...sCol);
-    doc.text(`${res.vtStats.malicious} / ${res.vtStats.total || 90} vendors flagged`, pW - margin - 22.5, y + 28, { align: 'center' });
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...sCol);
+    doc.text(`${res.vtStats.malicious}/${res.vtStats.total || 90} vendors`, bx + bw/2, y + 27, { align: 'center' });
   }
-  y += 40;
+  y += 36;
 
   // 4. SCORING BREAKDOWN (Quick Scan Only)
   if (mode === 'quick') {
@@ -177,27 +265,52 @@ const buildURLReport = async (data: PDFReportData) => {
 
     indicators.forEach(([k, v], i) => {
       y = checkPage(doc, y, pH, margin, pW);
-      if (i % 2 === 0) { doc.setFillColor(...C.veryLight); doc.rect(margin, y - 4, cw, 7, 'F'); }
-      doc.setFontSize(9); doc.setTextColor(...C.darkGrey);
+      
+      // Alternating row background
+      if (i % 2 === 0) {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(margin, y - 4, cw, 8, 'F');
+      }
+      
+      // Indicator label (bold)
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...C.darkGrey);
       doc.text(`• ${k}`, margin + 6, y + 1);
+      
+      // Status value (bold with color)
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...(v === 'FLAGGED' ? C.danger : C.safe));
       doc.text(v, pW - margin - 6, y + 1, { align: 'right' });
-      doc.setFont('helvetica', 'normal'); y += 8;
+      
+      doc.setFont('helvetica', 'normal');
+      y += 8;
     });
 
+    // Keyword Analysis section
     const keywords = (res.modelAnalysis?.explanations || []).filter(e => e.score > 0.05);
     if (keywords.length > 0) {
-      y += 2;
-      doc.setFontSize(9); doc.setTextColor(...C.midGrey);
+      y += 5;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...C.accent);
       doc.text('Keyword Analysis:', margin + 4, y);
-      y += 7;
+      y += 8;
+      
       keywords.forEach(kw => {
         y = checkPage(doc, y, pH, margin, pW);
-        doc.setTextColor(...C.darkGrey); doc.text(`• Keyword: "${sanitize(kw.word)}"`, margin + 10, y);
-        doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.danger);
+        
+        // Keyword label
+        doc.setTextColor(...C.darkGrey);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`• Keyword: "${sanitize(kw.word)}"`, margin + 10, y);
+        
+        // Status
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...C.danger);
         doc.text('FLAGGED', pW - margin - 6, y, { align: 'right' });
-        doc.setFont('helvetica', 'normal'); y += 7;
+        doc.setFont('helvetica', 'normal');
+        y += 7;
       });
     }
     y += 8;
@@ -219,13 +332,26 @@ const buildURLReport = async (data: PDFReportData) => {
 
     items.forEach(([k, v], i) => {
       y = checkPage(doc, y, pH, margin, pW);
-      if (i % 2 === 0) { doc.setFillColor(...C.veryLight); doc.rect(margin, y - 4, cw, 7, 'F'); }
-      doc.setFontSize(9); doc.setTextColor(...C.midGrey);
-      doc.text(`• ${k}`, margin + 6, y);
+      
+      // Alternating row background
+      if (i % 2 === 0) {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(margin, y - 4, cw, 8, 'F');
+      }
+      
+      // Label (bold)
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...((k as string).includes('Malicious') && stats.malicious > 0 ? C.danger : C.darkGrey));
+      doc.setTextColor(...C.darkGrey);
+      doc.text(`• ${k}`, margin + 6, y);
+      
+      // Value (bold with conditional color)
+      doc.setFont('helvetica', 'bold');
+      const isMalicious = (k as string).includes('Malicious') && stats.malicious > 0;
+      doc.setTextColor(...(isMalicious ? C.danger : C.black));
       doc.text(`${v}`, pW - margin - 6, y, { align: 'right' });
-      doc.setFont('helvetica', 'normal'); y += 8;
+      doc.setFont('helvetica', 'normal');
+      y += 8;
     });
     y += 8;
   }
@@ -233,34 +359,83 @@ const buildURLReport = async (data: PDFReportData) => {
   // 6. RISK INTERPRETATION
   y = checkPage(doc, y, pH, margin, pW);
   y = sectionHeader(doc, 'Risk Interpretation', margin, y, cw);
-  doc.setFontSize(9); doc.setTextColor(...C.darkGrey);
+  
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...C.darkGrey);
+  
   let interpretation = "";
-  if (score > 70) {
-    interpretation = "Critical Risk: The analyzed resource exhibits multiple confirmed malicious signatures. Accessing this URL poses a high probability of data theft, credential harvesting, or malware delivery.";
-  } else if (score > 30) {
-    interpretation = "Elevated Risk: Heuristic anomalies and suspicious patterns detected. While not definitively confirmed as malicious, the structural composition aligns with known phishing methodologies.";
+  if (score === 0) {
+    interpretation = "SAFE: The analyzed resource shows no threat indicators. The URL appears legitimate and follows standard safety protocols.";
+  } else if (score <= 10) {
+    interpretation = "LOW RISK: Minor anomalies detected. A small number of heuristic indicators flagged this URL. Proceed with standard caution.";
+  } else if (score <= 30) {
+    interpretation = "MODERATE: Some suspicious patterns detected. While not definitively malicious, the URL exhibits characteristics that warrant verification before interaction.";
+  } else if (score <= 70) {
+    interpretation = "HIGH RISK: Significant threat indicators detected. Multiple heuristic anomalies and suspicious patterns align with known phishing methodologies. Avoid unless verified.";
   } else {
-    interpretation = "Minimal Risk: No significant threat indicators were identified during the analysis. The resource appears to follow standard safety protocols and lacks recognized malicious features.";
+    interpretation = "DANGEROUS: Critical threat confirmed. The analyzed resource exhibits multiple confirmed malicious signatures. Accessing this URL poses a high probability of data theft, credential harvesting, or malware delivery. DO NOT PROCEED.";
   }
-  const sInter = doc.splitTextToSize(interpretation, cw - 10);
-  doc.text(sInter, margin + 5, y);
-  y += (sInter.length * 6) + 10;
+  
+  const sInter = doc.splitTextToSize(interpretation, cw - 12);
+  doc.text(sInter, margin + 6, y);
+  y += (sInter.length * 5.5) + 12;
 
   // 7. RECOMMENDATIONS
   y = checkPage(doc, y, pH, margin, pW);
   y = sectionHeader(doc, 'Actionable Recommendations', margin, y, cw);
-  const recs = score > 70 
-    ? ['DO NOT interact with this resource or provide any credentials.', 'Immediately blacklist this domain at the network level.', 'Report this incident to your Security Operations Center (SOC).', 'Audit any accounts that may have interacted with this link.'] 
-    : score > 30 
-    ? ['Proceed with extreme caution and verify source authenticity.', 'Do not enter sensitive information or download attachments.', 'Cross-reference this URL with known official channels.'] 
-    : ['This resource appears safe for standard use.', 'Maintain standard security awareness and report future anomalies.', 'Ensure your browser and security extensions are up to date.'];
+  
+  let recs: string[];
+  if (score === 0) {
+    recs = [
+      'This resource appears safe for standard use.',
+      'Maintain standard security awareness and report future anomalies.',
+      'Ensure your browser and security extensions are up to date.',
+    ];
+  } else if (score <= 10) {
+    recs = [
+      'Minimal risk detected — a small number of indicators flagged this URL.',
+      'Verify the source before sharing personal information.',
+      'Use caution if prompted to download files or enter credentials.',
+    ];
+  } else if (score <= 30) {
+    recs = [
+      'Moderate risk — suspicious characteristics detected.',
+      'Do not enter sensitive information without further verification.',
+      'Consider using additional security tools for confirmation.',
+      'Monitor your accounts for suspicious activity.',
+    ];
+  } else if (score <= 70) {
+    recs = [
+      'High risk detected — multiple threat indicators found.',
+      'Avoid interacting with this URL unless you are certain of its legitimacy.',
+      'Do NOT enter credentials or personal information.',
+      'Report to your IT or security team.',
+    ];
+  } else {
+    recs = [
+      'DO NOT interact with this resource or provide any credentials.',
+      'Immediately blacklist this domain at the network level.',
+      'Report this incident to your Security Operations Center (SOC).',
+      'Audit any accounts that may have interacted with this link.',
+    ];
+  }
   
   recs.forEach((r, i) => {
     y = checkPage(doc, y, pH, margin, pW);
-    doc.setFontSize(9); doc.setTextColor(...C.darkGrey);
-    const lr = doc.splitTextToSize(`${i + 1}. ${r}`, cw - 12);
-    doc.text(lr, margin + 6, y);
-    y += (lr.length * 6) + 2;
+    
+    // Alternating background
+    if (i % 2 === 0) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(margin, y - 4, cw, 8, 'F');
+    }
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...C.darkGrey);
+    const lr = doc.splitTextToSize(`${i + 1}. ${r}`, cw - 14);
+    doc.text(lr, margin + 7, y);
+    y += (lr.length * 5.5) + 3;
   });
 
   drawFooters(doc, pW, pH, margin);
@@ -340,30 +515,6 @@ const buildFileReport = async (data: PDFReportData) => {
   fRecs.forEach((r, i) => {
     y = checkPage(doc, y, pH, margin, pW);
     doc.setFontSize(9); doc.setTextColor(...C.darkGrey);
-    const lr = doc.splitTextToSize(`${i + 1}. ${r}`, cw - 12);
-    doc.text(lr, margin + 6, y);
-    y += (lr.length * 6) + 2;
-  });
-
-  drawFooters(doc, pW, pH, margin);
-  return doc;
-};
-
-// ════════════════════════════════════════════════════════════
-//  EXPORTS
-// ════════════════════════════════════════════════════════════
-export const generatePDFReport = async (data: PDFReportData): Promise<void> => {
-  const doc = data.scanType === 'file' ? await buildFileReport(data) : await buildURLReport(data);
-  const dateStr = new Date().toISOString().split('T')[0];
-  doc.save(`APGS_${data.scanType.toUpperCase()}_Audit_${dateStr}.pdf`);
-};
-
-export const generatePDFBlob = async (data: PDFReportData): Promise<Blob> => {
-  const doc = data.scanType === 'file' ? await buildFileReport(data) : await buildURLReport(data);
-  return doc.output('blob');
-};
-
-export const downloadReport = generatePDFReport;.darkGrey);
     const lr = doc.splitTextToSize(`${i + 1}. ${r}`, cw - 12);
     doc.text(lr, margin + 6, y);
     y += (lr.length * 6) + 2;
