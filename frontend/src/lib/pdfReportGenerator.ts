@@ -205,10 +205,10 @@ const buildURLReport = async (data: PDFReportData) => {
   let y = 38;
 
   // 2. SCAN INFORMATION
-  y = sectionHeader(doc, 'Scan Information', margin, y, cw);
+  y = sectionHeader(doc, 'SCAN INFORMATION', margin, y, cw);
   const info = [
     ['Audit Type', 'URL Threat Detection'],
-    ['Analysis Mode', mode === 'deep' ? 'Deep Scan (API + External)' : 'Quick Scan'],
+    ['Analysis Mode', mode === 'deep' ? 'Deep Scan' : 'Quick Scan'],
     ['Target Resource', url],
     ['Scan By', 'APGS Security Engine'],
     ['Timestamp', new Date().toLocaleString()],
@@ -250,7 +250,7 @@ const buildURLReport = async (data: PDFReportData) => {
   y += 6;
 
   // 3. RISK SUMMARY (DYNAMIC)
-  y = sectionHeader(doc, 'Risk Summary', margin, y, cw);
+  y = sectionHeader(doc, 'RISK SUMMARY', margin, y, cw);
   
   // Risk summary box with proper styling
   doc.setFillColor(...sBg);
@@ -289,13 +289,18 @@ const buildURLReport = async (data: PDFReportData) => {
     doc.setFontSize(8.5);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...sCol);
-    doc.text(`${res.vtStats.malicious}/${res.vtStats.total || 90} vendors`, bx + bw/2, y + 27, { align: 'center' });
+    const totalVendors = res.vtStats.malicious + res.vtStats.suspicious + res.vtStats.harmless + res.vtStats.undetected;
+    doc.text(`${res.vtStats.malicious} / ${totalVendors} vendors flagged this resource`, bx + bw/2, y + 27, { align: 'center' });
   }
   y += 36;
 
-  // 4. SCORING BREAKDOWN (Quick Scan Only)
+  // 4. SCORING BREAKDOWN
+  // For Quick Scan: AI indicators only
+  // For Deep Scan: Combined AI + API analysis
+  y = sectionHeader(doc, 'SCORING BREAKDOWN', margin, y, cw);
+  
   if (mode === 'quick') {
-    y = sectionHeader(doc, 'Scoring Breakdown', margin, y, cw);
+    // Quick Scan: URL indicators only
     const indicators = [
       ['LENGTH', url.length > 75 ? 'FLAGGED' : 'PASS'],
       ['HAS HTTPS', url.startsWith('https://') ? 'PASS' : 'FLAGGED'],
@@ -335,7 +340,7 @@ const buildURLReport = async (data: PDFReportData) => {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...C.accent);
-      doc.text('Keyword Analysis:', margin + 4, y);
+      doc.text('KEYWORD ANALYSIS', margin + 4, y);
       y += 8;
       
       keywords.forEach(kw => {
@@ -345,7 +350,7 @@ const buildURLReport = async (data: PDFReportData) => {
         doc.setTextColor(...C.darkGrey);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9.5);
-        doc.text(`• Keyword: "${sanitize(kw.word)}"`, margin + 10, y);
+        doc.text(`• Keyword: ${sanitize(kw.word)}`, margin + 10, y);
         
         // Status
         doc.setFont('helvetica', 'bold');
@@ -357,20 +362,150 @@ const buildURLReport = async (data: PDFReportData) => {
       });
     }
     y += 8;
+  } else if (mode === 'deep') {
+    // Deep Scan: Combined AI + API Scoring Breakdown
+    
+    // AI Analysis - URL Indicators
+    const urlIndicators = [
+      ['LENGTH', url.length > 75 ? 'FLAGGED' : 'PASS'],
+      ['HAS HTTPS', url.startsWith('https://') ? 'PASS' : 'FLAGGED'],
+      ['DOT COUNT', (url.match(/\./g) || []).length > 3 ? 'FLAGGED' : 'PASS'],
+      ['HAS IP', /\d+\.\d+\.\d+\.\d+/.test(url) ? 'FLAGGED' : 'PASS'],
+      ['HAS SUSPICIOUS WORD', ['login', 'verify', 'update', 'banking', 'secure', 'account'].some(w => url.toLowerCase().includes(w)) ? 'FLAGGED' : 'PASS'],
+    ];
+
+    urlIndicators.forEach(([k, v], i) => {
+      y = checkPage(doc, y, pH, margin, pW);
+      if (i % 2 === 0) {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(margin, y - 4, cw, 8, 'F');
+      }
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...C.darkGrey);
+      doc.text(`• ${k}`, margin + 6, y + 1);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...(v === 'FLAGGED' ? C.danger : C.safe));
+      doc.text(v, pW - margin - 6, y + 1, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      y += 8;
+    });
+
+    // Keyword Analysis
+    const keywords = (res.modelAnalysis?.explanations || []).filter(e => e.score > 0.05);
+    if (keywords.length > 0) {
+      y += 5;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...C.accent);
+      doc.text('Keyword Analysis:', margin + 4, y);
+      y += 8;
+      
+      keywords.forEach(kw => {
+        y = checkPage(doc, y, pH, margin, pW);
+        doc.setTextColor(...C.darkGrey);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9.5);
+        doc.text(`• Keyword: ${sanitize(kw.word)}`, margin + 10, y);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...C.danger);
+        doc.text('FLAGGED', pW - margin - 6, y, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
+        y += 7;
+      });
+      y += 4;
+    }
+
+    // External Threat Signals
+    if (res.vtStats && !res.apiUnavailable) {
+      y += 6;
+      
+      // Check if we need a new page for the entire API section
+      if (y > pH - 80) {
+        doc.addPage();
+        drawHeader(doc, pW, margin);
+        y = 45;
+      }
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...C.accent);
+      doc.text('External Threat Signals', margin + 4, y);
+      y += 10;
+      
+      const stats = res.vtStats;
+      const apiSignals = [
+        ['Malicious detections', stats.malicious >= 1 ? 'FLAGGED' : 'PASS'],
+        ['Suspicious detections', stats.suspicious >= 1 ? 'FLAGGED' : 'PASS'],
+        ['Vendor consensus', (stats.malicious + stats.suspicious) > 0 ? 'FLAGGED' : 'PASS'],
+      ];
+      
+      apiSignals.forEach(([k, v], i) => {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...C.darkGrey);
+        doc.text(`• ${k}`, margin + 6, y);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...(v === 'FLAGGED' ? C.danger : C.safe));
+        doc.text(v, pW - margin - 6, y, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
+        y += 9;
+      });
+      
+      y += 4;
+    }
+
+    // FINAL DECISION SIGNAL - Compact single-line format
+    y += 6;
+    
+    // Check if we need a new page
+    if (y > pH - 25) {
+      doc.addPage();
+      drawHeader(doc, pW, margin);
+      y = 45;
+    }
+    
+    const riskLevel = getRiskLevel(score);
+    let riskColor = C.safe;
+    
+    if (riskLevel === 'DANGEROUS') {
+      riskColor = C.danger;
+    } else if (riskLevel === 'HIGH RISK') {
+      riskColor = [255, 140, 0] as [number, number, number]; // Orange
+    } else if (riskLevel === 'MODERATE' || riskLevel === 'LOW RISK') {
+      riskColor = C.warning;
+    }
+    
+    // Single-line format: "FINAL VERDICT: [RISK_LEVEL]"
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...C.accent);
+    doc.text('FINAL VERDICT:', margin + 6, y);
+    
+    // Risk level (right-aligned, color-coded)
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...riskColor);
+    doc.text(riskLevel, pW - margin - 6, y, { align: 'right' });
+    
+    doc.setFont('helvetica', 'normal');
+    y += 12;
   }
 
   // 5. THREAT INTELLIGENCE (Deep Scan Only)
   if (mode === 'deep' && res.vtStats) {
     y = checkPage(doc, y, pH, margin, pW);
-    y = sectionHeader(doc, 'Threat Intelligence Analysis', margin, y, cw);
+    y = sectionHeader(doc, 'THREAT INTELLIGENCE', margin, y, cw);
     
     const stats = res.vtStats;
+    // Calculate total dynamically from actual API response
+    const totalVendors = stats.malicious + stats.suspicious + stats.harmless + stats.undetected;
+    
     const items = [
-      ['Total Analysis Vendors', stats.total || 94],
-      ['Confirmed Malicious', stats.malicious],
-      ['Suspicious Flagging', stats.suspicious],
-      ['Clean / Harmless', stats.harmless],
-      ['Undetected', stats.undetected],
+      ['Vendors Flagged', `${stats.malicious + stats.suspicious} / ${totalVendors}`],
+      ['Malicious', `${stats.malicious}`],
+      ['Suspicious', `${stats.suspicious}`],
+      ['Harmless', `${stats.harmless}`],
+      ['Undetected', `${stats.undetected}`],
     ];
 
     items.forEach(([k, v], i) => {
@@ -402,7 +537,7 @@ const buildURLReport = async (data: PDFReportData) => {
 
   // 6. RISK INTERPRETATION
   y = checkPage(doc, y, pH, margin, pW);
-  y = sectionHeader(doc, 'Risk Interpretation', margin, y, cw);
+  y = sectionHeader(doc, 'RISK INTERPRETATION', margin, y, cw);
   
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
@@ -427,7 +562,7 @@ const buildURLReport = async (data: PDFReportData) => {
 
   // 7. RECOMMENDATIONS
   y = checkPage(doc, y, pH, margin, pW);
-  y = sectionHeader(doc, 'Actionable Recommendations', margin, y, cw);
+  y = sectionHeader(doc, 'ACTIONABLE RECOMMENDATIONS', margin, y, cw);
   
   let recs: string[];
   if (score === 0) {
