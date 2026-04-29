@@ -1171,20 +1171,32 @@ const Index = () => {
             <h2 className="text-2xl font-heading font-bold">Frequently Asked Questions</h2>
             <div className="space-y-3">
               <FaqItem
-                question="How does the phishing link checker work?"
-                answer="Our tool analyzes URLs using multiple security layers: domain reputation checking, pattern recognition for suspicious URLs, SSL certificate validation, and cross-referencing with known threat databases. It provides instant results with detailed explanations."
+                question="How does the URL phishing detector work?"
+                answer="Our URL scanner analyzes multiple security indicators including domain reputation, HTTPS certificates, URL structure patterns, and known phishing databases. It checks for suspicious elements like typosquatting, hidden redirects, and malicious content to provide a comprehensive risk assessment."
               />
               <FaqItem
-                question="How to identify URL phishing?"
-                answer="Look for suspicious elements like misspelled domains, unusual URL structures, requests for personal information, urgent language, or links from untrusted sources. Our scanner automatically detects these patterns and more."
+                question="What should I look for to identify a phishing URL?"
+                answer="Watch for misspelled domain names (like 'g00gle.com' instead of 'google.com'), unexpected urgency in messages, requests for sensitive information, unusual URL structures with excessive parameters, and links from unverified sources. Our tool automatically flags these warning signs."
               />
               <FaqItem
-                question="What is a safe URL?"
-                answer="Safe URLs typically have HTTPS encryption, legitimate domain names, and come from trusted sources. They don't request sensitive information unexpectedly and don't contain suspicious characters or redirects."
+                question="What makes a URL safe to visit?"
+                answer="Safe URLs typically use HTTPS encryption with valid certificates, come from recognized and trusted domains, have clear and logical structures, and don't contain suspicious redirects or encoded characters. Always verify the sender's identity before clicking any link."
               />
               <FaqItem
-                question="What is a suspicious URL?"
-                answer="Suspicious URLs may use URL shortening to hide the real destination, contain random characters, mimic legitimate sites with slight variations, or lead to unexpected redirects. Always verify before clicking."
+                question="What are examples of suspicious URL patterns?"
+                answer="Suspicious URLs often contain: IP addresses instead of domain names, excessive subdomains (like 'secure-login.bank.example.com'), URL shorteners hiding the real destination, random character strings, and domains that closely mimic legitimate sites with slight spelling variations."
+              />
+              <FaqItem
+                question="How does the file scanner detect malicious files?"
+                answer="Our file scanner analyzes uploaded files using multiple detection methods including signature matching against known malware databases, behavioral pattern analysis, and heuristic scanning. It checks for embedded scripts, suspicious macros, and other indicators of malicious content without executing the file."
+              />
+              <FaqItem
+                question="How can I check if my email has been compromised?"
+                answer="Our email breach checker searches through known data breach databases to see if your email address has been exposed in any security incidents. It alerts you to compromised accounts so you can take immediate action like changing passwords and enabling two-factor authentication."
+              />
+              <FaqItem
+                question="Is it safe to check my password on this platform?"
+                answer="Yes, our password checker uses secure, privacy-preserving methods. It compares your password against databases of compromised passwords using cryptographic hashing, meaning your actual password is never stored or transmitted. We only tell you if it has been previously exposed in breaches."
               />
             </div>
           </section>
