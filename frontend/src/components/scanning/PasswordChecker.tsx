@@ -9,9 +9,9 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
 import zxcvbn from "zxcvbn";  // Real-world password strength library
-import { apiScans } from "@/lib/api-backend";  // UPDATED: Use backend API
-import { saveScanResult } from "@/lib/scanHistory";
-import { handleScanAttempt } from "@/lib/guestAccess";  // ADDED: Guest access control
+import { apiScans } from "@/lib/api/api-backend";  // UPDATED: Use backend API
+import { saveScanResult } from "@/lib/services/scanHistory";
+import { handleScanAttempt } from "@/lib/services/guestAccess";  // ADDED: Guest access control
 import confetti from "canvas-confetti"; // Import confetti
 
 
