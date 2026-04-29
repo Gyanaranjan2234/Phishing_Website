@@ -80,6 +80,27 @@ async def analyze_url_endpoint(request: URLAnalyzeRequest, db: Session = Depends
                 )
                 db.add(new_scan)
                 db.commit()
+                
+                # INCREMENT GLOBAL SCAN COUNTER for URL scans
+                try:
+                    stats_record = db.query(ScanStats).filter(ScanStats.id == 1).first()
+                    if stats_record:
+                        stats_record.total_scans += 1
+                        stats_record.last_updated = datetime.utcnow()
+                        db.commit()
+                    else:
+                        # Create initial record if it doesn't exist
+                        stats_record = ScanStats(
+                            id=1,
+                            total_scans=1,
+                            last_updated=datetime.utcnow()
+                        )
+                        db.add(stats_record)
+                        db.commit()
+                except Exception as stats_err:
+                    # Don't fail the scan if stats update fails
+                    print(f"Warning: Failed to update global scan counter: {stats_err}")
+                    db.rollback()
             except Exception as save_err:
                 # Log but don't fail the analysis response
                 print(f"Warning: Failed to auto-save scan: {save_err}")
