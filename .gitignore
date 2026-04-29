@@ -28,3 +28,8 @@ dist-ssr
 !.env.example
 # Tool specific
 .qoder/
+
+# Python cache and DB files
+__pycache__/
+*.pyc
+*.db
