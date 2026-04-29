@@ -1,5 +1,5 @@
 # FastAPI - Modern web framework for building APIs
-fastapi==0.115.6
+fastapi==0.95.2
 
 # Uvicorn - ASGI server to run FastAPI
 uvicorn==0.34.0
@@ -8,8 +8,7 @@ uvicorn==0.34.0
 sqlalchemy==2.0.36
 
 # Pydantic - Data validation (v2 with pre-built wheels)
-pydantic==2.10.4
-pydantic-core==2.27.2
+pydantic==1.10.13
 email-validator==2.2.0
 
 # Bcrypt - Password hashing
