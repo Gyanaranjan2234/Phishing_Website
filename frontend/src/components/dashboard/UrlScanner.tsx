@@ -1,17 +1,14 @@
 import { useState } from "react";
-import { Search, Loader2, CheckCircle, AlertTriangle, Shield, FileText, Lock, Download, AlertCircle, Check, RotateCcw, Link, Type, Zap } from "lucide-react";
+import { Search, Loader2, CheckCircle, AlertTriangle, Shield, FileText, Lock, Download, AlertCircle, Check, RotateCcw, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
-import type { UrlAnalysis, ScanStatus } from "@/lib/interfaces";
+import type { UrlAnalysis } from "@/lib/interfaces";
 import { apiScans } from "@/lib/api-backend";  // UPDATED: Use backend API instead of mock
-import { saveScanResult } from "@/lib/scanHistory";
 import { handleScanAttempt } from "@/lib/guestAccess";  // ADDED: Guest access control
 import RiskAnalysisReport from "@/components/RiskAnalysisReport";
 import { generatePDFReport, generatePDFBlob } from "@/lib/pdfReportGenerator";
-import { scanUrlWithVT } from "@/lib/virustotal";
-import { mapVTToUrlAnalysis } from "@/lib/mapVTResult";
 import { calculateFinalVerdict, type RiskFlags } from "@/lib/riskDecisionLogic";
 
 interface UrlScannerProps {

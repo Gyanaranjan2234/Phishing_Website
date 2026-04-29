@@ -1,5 +1,5 @@
 import { Search, Upload, Mail, Lock, CheckCircle, AlertTriangle, Clock } from "lucide-react";
-import { type ScanHistoryItem } from "@/lib/mockData";
+import { type ScanHistoryItem } from "@/lib/interfaces";
 
 
 const typeIcons = { url: Search, file: Upload, email: Mail, password: Lock };

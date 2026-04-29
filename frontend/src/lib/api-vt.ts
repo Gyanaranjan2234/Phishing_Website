@@ -15,7 +15,6 @@ export const vtApi = {
       method: "POST",
       headers: {
         "accept": "application/json",
-//"content-type":"multipart/form-data", // Let the browser set this with the correct boundary
         "x-apikey": API_KEY!,
       },
       body: formData,
@@ -27,8 +26,30 @@ export const vtApi = {
     }
 
     const json = await response.json();
+    return json.data.id;
+  },
 
-    return json.data.id; // This is the analysisId
+  /**
+   * Step 1 (Alternative): Submit URL for analysis
+   */
+  async submitUrl(url: string): Promise<string> {
+    const response = await fetch(`${BASE_URL}/urls`, {
+      method: "POST",
+      headers: {
+        "accept": "application/json",
+        "x-apikey": API_KEY!,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({ url }).toString(),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || "URL analysis submission failed");
+    }
+
+    const json = await response.json();
+    return json.data.id;
   },
 
   /**
@@ -64,11 +85,32 @@ export const vtApi = {
 
     if (!response.ok) {
       if (response.status === 404) {
-        return null; // File not found in VT database
+        return null;
       }
       throw new Error(`Failed to fetch file report: ${response.statusText}`);
     }
 
     return await response.json();
+  },
+
+  /**
+   * Combined: Submit URL + Poll (Legacy support)
+   */
+  async scanUrlWithVT(url: string) {
+    const analysisId = await this.submitUrl(url);
+    // Poll for completion (simple version for legacy compatibility)
+    for (let i = 0; i < 10; i++) {
+      const result = await this.getAnalysisResults(analysisId);
+      if (result.data.attributes.status === "completed") {
+        return {
+          analysisId,
+          stats: result.data.attributes.stats,
+          results: result.data.attributes.results,
+          url: result.meta?.url_info?.url ?? url,
+        };
+      }
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    throw new Error("Analysis engine timed out. Please try again.");
   }
 };

@@ -97,18 +97,29 @@ Phishing_Website/ (Root)
 │   ├── models/             # SQLAlchemy Models
 │   ├── routes/             # API Endpoints
 │   ├── schemas/            # Pydantic Validation
-│   ├── utils/              # Hashing & Security
+│   ├── services/           # External API & Business Logic
+│   ├── utils/              # Hashing & Security Helpers
 │   ├── main.py             # App Entry Point
-│   ├── requirements.txt    # Python Deps
-│   └── .env                # Backend Env Vars
+│   ├── phishing_model.py   # AI/ML Prediction Logic
+│   ├── requirements.txt    # Python Dependencies
+│   └── .env                # Backend Environment Variables
 ├── frontend/               # React TypeScript Frontend
 │   ├── src/                # Source Code
-│   ├── public/             # Static Assets
-│   ├── package.json        # Frontend Deps
-│   ├── vite.config.ts      # Vite Config
-│   └── .env                # Frontend Env Vars (VITE_...)
+│   │   ├── components/     # UI Components (Dashboard, UI, etc.)
+│   │   ├── hooks/          # Custom React Hooks
+│   │   ├── lib/            # Utilities, API Clients & Unified Logic
+│   │   │   ├── api-backend.ts  # Main Backend Integration
+│   │   │   ├── api-vt.ts       # Unified VirusTotal API Client
+│   │   │   ├── riskDecisionLogic.ts # Centralized Risk Assessment
+│   │   │   └── ...
+│   │   ├── pages/          # Full Page Components
+│   │   └── App.tsx         # Main Routing
+│   ├── public/             # Static Assets (Logo, etc.)
+│   ├── package.json        # Frontend Dependencies
+│   ├── vite.config.ts      # Vite Configuration
+│   └── .env.local          # Frontend Env Vars (Auth & API Keys)
 ├── .gitignore              # Global Ignore File
-└── README.md               # Main Project Docs
+└── README.md               # Main Project Documentation
 ```
 
 ---

@@ -1,6 +1,4 @@
-//export type ScanStatus = "safe" | "phishing" | "safe"| "suspicious" | "dangerous" ;
-    //status: "safe" | "suspicious" | "dangerous";
-
+// Combined scan status and analysis interfaces
 // 
 export interface ScanReason {
     label: string;
@@ -41,12 +39,6 @@ export interface FileAnalysis {
       prediction: string;
       confidence: number;
     };
-}
-export interface UrlAnalysis {
-    status: ScanStatus;
-    url: string;
-    reasons: { label: string; value: string; flagged: boolean }[];
-    score: number;
 }
 
 export interface ScanHistoryItem {
@@ -104,7 +96,7 @@ export interface VTVendorResult {
   result: string | null;
 }
 
-export type ScanStatus = "safe" | "phishing" | "suspicious";
+export type ScanStatus = "safe" | "phishing" | "suspicious" | "dangerous";
 
 export interface UrlAnalysis {
   url: string;

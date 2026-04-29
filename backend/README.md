@@ -125,12 +125,14 @@ uvicorn main:app --reload
 ```text
 backend/
 ├── main.py              # Application entry point & CORS
+├── phishing_model.py    # AI/ML Prediction Logic & Core Scanning
 ├── apgs.db              # SQLite Database (Auto-generated)
 ├── database/            # SQLAlchemy session & engine config
 ├── models/              # Database Table Schemas (SQLAlchemy)
 ├── schemas/             # Request/Response Data Models (Pydantic)
-├── routes/              # API Endpoints (Auth, Scans)
-├── utils/               # Hashing & Security helpers
+├── routes/              # API Endpoints (Auth, Scans, Contacts)
+├── services/            # Business Logic & External API Integrations
+├── utils/               # Hashing, JWT & Security helpers
 └── requirements.txt     # Dependency manifest
 ```
 
