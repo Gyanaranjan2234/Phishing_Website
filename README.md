@@ -1,4 +1,5 @@
-# 🔐 APGS - Authentication Protocol Gateway Secure
+# 🔐 APGS - Advanced Phishing Guard System
+
 
 [![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
@@ -128,17 +129,19 @@ Phishing_Website/ (Root)
 
 To run this project, you will need to add the following environment variables.
 
-### `frontend/.env`
+### `frontend/.env.local`
 ```env
 VITE_VIRUSTOTAL_API_KEY=your_virustotal_api_key
+VITE_API_URL=http://localhost:8000
 ```
 
 ### `backend/.env`
 ```env
 # Backend specific configurations
-SECRET_KEY=your_jwt_secret_key
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
+JWT_SECRET_KEY=your_jwt_secret_key
+JWT_ALGORITHM=HS256
+JWT_EXPIRATION_HOURS=24
+VIRUSTOTAL_API_KEY=your_virustotal_api_key
 ```
 
 ---

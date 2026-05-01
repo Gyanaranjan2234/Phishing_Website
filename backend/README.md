@@ -1,6 +1,18 @@
-# ⚙️ APGS Backend - FastAPI Service
+# ⚙️ APGS Backend - Advanced Phishing Guard System
 
-Technical documentation for the **Authentication Protocol Gateway Secure (APGS)** backend. This service handles user authentication, security scan history, and threat intelligence aggregation.
+Technical documentation for the **Advanced Phishing Guard System (APGS)** backend. This service handles user authentication, security scan history, and threat intelligence aggregation.
+
+APGS is a comprehensive cybersecurity backend designed to provide real-time threat detection and secure data management. It serves as the core logic engine for processing security scans and managing user-specific security data.
+
+---
+
+## 🚀 Key Features
+
+- **🔍 Unified Security Scans**: Centralized processing for URL, File, Password, and Email breach detections.
+- **🔐 Robust Authentication**: JWT-based secure sessions and Google OAuth 2.0 integration.
+- **📊 Scan History & Analytics**: Efficient storage and retrieval of user scan history with safe/threat statistics.
+- **📄 PDF Report Support**: Data aggregation for generating professional security reports.
+- **🛡️ Rate Limiting & Security**: Built-in protection against API abuse and secure password hashing.
 
 ---
 
@@ -18,7 +30,7 @@ Technical documentation for the **Authentication Protocol Gateway Secure (APGS)*
 
 ---
 
-## 🚀 Getting Started
+## ⚙️ Setup & Installation
 
 ### 1. Environment Setup
 Create a virtual environment and install the required dependencies.
@@ -56,8 +68,11 @@ GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
 GOOGLE_REDIRECT_URI=http://localhost:8000/api/auth/google/callback
 
+# VirusTotal API
+VIRUSTOTAL_API_KEY=your_virustotal_api_key
+
 # Frontend Integration
-FRONTEND_URL=http://localhost:5173
+FRONTEND_URL=http://localhost:8080
 ```
 
 ### 3. Run the Server
@@ -71,56 +86,7 @@ uvicorn main:app --reload
 
 ---
 
-## 🛣️ API Routes
-
-### 🔐 Authentication (`/api/auth`)
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `POST` | `/signup` | Register a new user account |
-| `POST` | `/login` | Authenticate user & return session data |
-| `POST` | `/forgot-password` | Generate & email password reset link |
-| `POST` | `/reset-password` | Update password using secure token |
-| `GET` | `/google` | Initiate Google OAuth 2.0 flow |
-| `GET` | `/google/callback` | Google OAuth redirect handler |
-| `POST` | `/contact/send` | Save contact message & notify admin |
-
-### 🔍 Security Scans (`/api/scans`)
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `POST` | `/save` | Save a scan result (URL, Email, Pass, File) |
-| `GET` | `/history` | Retrieve scan history for a specific user |
-| `GET` | `/stats` | Get user-specific scan safe/threat counts |
-| `GET` | `/dashboard` | Comprehensive profile dashboard data |
-| `DELETE` | `/{scan_id}` | Remove a specific scan record |
-| `DELETE` | `/clear-history/{u_id}` | Wipe all scan history for a user |
-
-### 📊 Platform Stats
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `GET` | `/api/stats` | Global platform metrics (Total Users/Scans) |
-
----
-
-## 🔐 Authentication Flow
-
-### 1. Traditional Auth
-- **Signup**: Passwords are hashed using `Bcrypt` before storage.
-- **Login**: Verifies credentials and returns user metadata. Client stores `user_id` in `localStorage`.
-
-### 2. Google OAuth
-- User is redirected to Google Consent Screen.
-- Google returns an `authorization_code` to `/api/auth/google/callback`.
-- Backend exchanges code for `access_token`, fetches user profile, and creates/updates the user in SQLite.
-- A JWT is generated and the user is redirected back to the frontend.
-
-### 3. JWT Strategy
-- Tokens contain `user_id`, `email`, and `username`.
-- Expiration is set to 24 hours by default.
-- Used for cross-domain authentication between the backend and frontend.
-
----
-
-## 📁 Directory Structure
+## 📁 Project Structure
 
 ```text
 backend/
@@ -141,5 +107,6 @@ backend/
 ## 📌 Development Notes
 
 - **Data Isolation**: All scan operations are strictly filtered by `user_id` to ensure users only see their own data.
-- **Rate Limiting**: The `/save` endpoint includes an in-memory rate limiter (20 requests/min) to prevent API abuse.
-- **Auto-migrations**: Database tables are automatically created on startup via `Base.metadata.create_all()`.
+- **Rate Limiting**: The `/save` endpoint includes an in-memory rate limiter to prevent API abuse.
+- **Auto-migrations**: Database tables are automatically created on startup.
+
