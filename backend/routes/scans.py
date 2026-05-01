@@ -20,7 +20,20 @@ import time
 from collections import defaultdict
 from datetime import datetime
 
+from datetime import datetime
+from functools import lru_cache
+
 router = APIRouter(prefix="/api/scans", tags=["scans"])
+
+def categorize_status(status: str) -> str:
+    """Unified categorization for all scan types."""
+    s = (status or "").lower()
+    if s in ["safe", "strong", "very_strong", "clean", "secure"]:
+        return "safe"
+    if s in ["phishing", "breached", "infected", "dangerous", "malicious", "high", "threat", "very_weak", "weak"]:
+        return "threat"
+    # suspicious, low, moderate, unknown, etc.
+    return "suspicious"
 
 class URLAnalyzeRequest(BaseModel):
     url: str
@@ -331,23 +344,20 @@ def get_scan_stats(
                 "data": {}
             }
         
-        # Get GLOBAL total scans (NEVER decreases)
-        stats_record = db.query(ScanStats).filter(ScanStats.id == 1).first()
-        global_total_scans = stats_record.total_scans if stats_record else 0
-        
-        # Get user-specific scans for safe/threat breakdown
+        # Get user-specific scans from ScanHistory (SINGLE SOURCE OF TRUTH)
         user_scans = db.query(ScanHistory).filter(ScanHistory.user_id == user_id).all()
         
-        # Calculate user-specific statistics
-        safe_scans = len([s for s in user_scans if s.status in ["safe", "strong", "very_strong"]])
-        suspicious_scans = len([s for s in user_scans if s.status == "suspicious"])
-        threat_scans = len([s for s in user_scans if s.status in ["phishing", "breached", "infected", "dangerous", "weak", "very_weak"]])
+        # Calculate user-specific statistics using unified categorization
+        total_count = len(user_scans)
+        safe_count = len([s for s in user_scans if categorize_status(s.status) == "safe"])
+        threat_count = len([s for s in user_scans if categorize_status(s.status) == "threat"])
+        suspicious_count = len([s for s in user_scans if categorize_status(s.status) == "suspicious"])
         
         stats = {
-            "totalScans": global_total_scans,  # GLOBAL counter - NEVER decreases
-            "safeScans": safe_scans,            # User-specific
-            "suspiciousScans": suspicious_scans, # User-specific
-            "threatScans": threat_scans,         # User-specific
+            "totalScans": total_count,          # User-specific count
+            "safeScans": safe_count,            # User-specific
+            "suspiciousScans": suspicious_count, # User-specific
+            "threatScans": threat_count,         # User-specific
             "user_id": user_id
         }
         
@@ -442,7 +452,7 @@ def clear_history_new(
 ):
     """Alternative endpoint for clearing history."""
     return clear_history_legacy(user_id, db)
-@router.get("/clear-history/{user_id}", response_model=dict)
+@router.delete("/clear-history/{user_id}", response_model=dict)
 def clear_history_by_path(
     user_id: int,
     db: Session = Depends(get_db)
@@ -496,11 +506,11 @@ def get_dashboard_data(
             .all()
         )
         
-        # Calculate statistics
+        # Calculate statistics using unified categorization
         total_scans = len(all_scans)
-        threats = len([s for s in all_scans if s.status in ["phishing", "breached", "infected", "dangerous", "weak", "very_weak"]])
-        safe = len([s for s in all_scans if s.status in ["safe", "strong", "very_strong"]])
-        suspicious = len([s for s in all_scans if s.status == "suspicious"])
+        safe = len([s for s in all_scans if categorize_status(s.status) == "safe"])
+        threats = len([s for s in all_scans if categorize_status(s.status) == "threat"])
+        suspicious = len([s for s in all_scans if categorize_status(s.status) == "suspicious"])
         
         # Get last scan
         last_scan = None
@@ -534,9 +544,10 @@ def get_dashboard_data(
                 date_key = scan.timestamp.strftime("%Y-%m-%d")
                 date_wise_scans[date_key]["total"] += 1
                 
-                if scan.status in ["safe", "strong", "very_strong"]:
+                cat = categorize_status(scan.status)
+                if cat == "safe":
                     date_wise_scans[date_key]["safe"] += 1
-                elif scan.status in ["phishing", "breached", "infected", "dangerous", "weak", "very_weak"]:
+                elif cat == "threat":
                     date_wise_scans[date_key]["threat"] += 1
         
         # Convert to sorted list

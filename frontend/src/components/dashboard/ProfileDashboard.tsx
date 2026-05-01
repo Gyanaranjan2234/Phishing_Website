@@ -151,11 +151,11 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
 
   // Calculate Security Score (0-100)
   const calculateSecurityScore = () => {
-    const total = (dashboardData?.safe || 0) + (dashboardData?.threats || 0);
+    const total = dashboardData?.totalScans || 0;
     if (total === 0) return 100;
     
     // Score calculation: (Safe / Total) * 100
-    return Math.round((dashboardData.safe / total) * 100);
+    return Math.round(((dashboardData?.safe || 0) / total) * 100);
   };
 
   const getRiskColor = (score: number) => {
@@ -391,7 +391,7 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
             <Database className="w-5 h-5 text-primary/70" />
           </div>
           <p className="text-3xl font-bold text-foreground mb-1">
-            {(dashboardData?.safe || 0) + (dashboardData?.threats || 0)}
+            {dashboardData?.totalScans || 0}
           </p>
           <p className="text-xs text-muted-foreground">All time</p>
         </div>
@@ -427,8 +427,8 @@ const ProfileDashboard = ({ userId }: { userId: number }) => {
             <Target className="w-5 h-5 text-blue-400/70" />
           </div>
           <p className="text-3xl font-bold text-foreground mb-1">
-            {dashboardData && (dashboardData.safe + dashboardData.threats) > 0 
-              ? Math.round((dashboardData.threats / (dashboardData.safe + dashboardData.threats)) * 100) 
+            {dashboardData && dashboardData.totalScans > 0 
+              ? Math.round((dashboardData.threats / dashboardData.totalScans) * 100) 
               : 0}%
           </p>
           <p className="text-xs text-muted-foreground">Threat ratio</p>

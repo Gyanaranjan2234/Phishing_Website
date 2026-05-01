@@ -48,9 +48,9 @@ const ActivityHistory = ({ history, onHistoryChange, userId }: ActivityHistoryPr
     
     if (filterStatus !== "all") {
       if (filterStatus === "safe") {
-        items = items.filter(item => ["safe", "strong", "very_strong", "low"].includes(item.status));
+        items = items.filter(item => ["safe", "strong", "very_strong", "clean", "secure"].includes(item.status));
       } else if (filterStatus === "breached") {
-        items = items.filter(item => ["phishing", "breached", "weak", "very_weak", "dangerous", "high", "moderate"].includes(item.status));
+        items = items.filter(item => ["phishing", "breached", "infected", "dangerous", "malicious", "high", "threat", "very_weak", "weak"].includes(item.status));
       }
     }
     
@@ -224,7 +224,7 @@ const ActivityHistory = ({ history, onHistoryChange, userId }: ActivityHistoryPr
             if (statusKey === "very weak") statusKey = "very_weak";
             
             const config = statusConfig[statusKey] || statusConfig.safe;
-            const isSafe = ["safe", "strong", "very_strong", "low"].includes(item.status);
+            const isSafe = ["safe", "strong", "very_strong", "clean", "secure"].includes(item.status);
             
             return (
               <div key={item.id} className="flex items-center gap-3 p-3 bg-muted/20 rounded border border-border hover:border-primary/40 hover:bg-muted/40 transition-all group">

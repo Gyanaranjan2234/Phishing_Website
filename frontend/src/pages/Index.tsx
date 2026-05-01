@@ -249,23 +249,26 @@ const Index = () => {
   useEffect(() => {
     if (!historyList) return;
     
-    // Categorize every item as either Safe or Threat
+    // Categorize every item using unified logic matching backend
     const safeItems = historyList.filter((item: any) => {
-      const status = item.status.toLowerCase();
-      // Safe categories
-      return status === "safe" || status === "strong" || status === "clean" || status === "secure";
+      const status = (item.status || "").toLowerCase();
+      return ["safe", "strong", "very_strong", "clean", "secure"].includes(status);
     });
     
     const threatItems = historyList.filter((item: any) => {
-      const status = item.status.toLowerCase();
-      // Threat categories (everything else)
-      // This includes phishing, breached, infected, dangerous, threat, weak, malicious, low, moderate, high
-      return !["safe", "strong", "clean", "secure"].includes(status);
+      const status = (item.status || "").toLowerCase();
+      return ["phishing", "breached", "infected", "dangerous", "malicious", "high", "threat", "very_weak", "weak"].includes(status);
+    });
+
+    const suspiciousItems = historyList.filter((item: any) => {
+        const status = (item.status || "").toLowerCase();
+        return !["safe", "strong", "very_strong", "clean", "secure", "phishing", "breached", "infected", "dangerous", "malicious", "high", "threat", "very_weak", "weak"].includes(status);
     });
 
     const safe = safeItems.length;
     const threats = threatItems.length;
-    const total = safe + threats;
+    const suspicious = suspiciousItems.length;
+    const total = historyList.length; // Use actual list length as total
 
     // Calculate detection rate
     const detectionRate = total > 0 ? Math.round((threats / total) * 100) : 0;
@@ -278,12 +281,13 @@ const Index = () => {
       ...prev,
       safe,
       threats,
+      suspicious,
       totalScans: total,
       detectionRate,
       lastScan,
     }));
 
-    console.log("stats updated dynamically from history:", { safe, threats, total, detectionRate });
+    console.log("stats updated dynamically from history:", { safe, threats, suspicious, total, detectionRate });
   }, [historyList]);
 
   // ============= EFFECTS: COUNT-UP ANIMATION FOR STATS SECTION =============
