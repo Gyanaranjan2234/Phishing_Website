@@ -469,7 +469,8 @@ const Index = () => {
 
   // ============= COMPUTED VALUES =============
   // Determine navbar active state based on current view
-  const navActiveSection = currentView === "scanning" ? "scanning" : currentView === "prevention" ? "prevention" : (activeSection || "home");
+  // For home view, use scroll-based activeSection; otherwise use currentView directly
+  const navActiveSection = (currentView === "home") ? (activeSection || "home") : currentView;
 
   console.log("[DEBUG] Index Render State:", { currentView, navActiveSection, isAuthenticated });
 
