@@ -45,3 +45,6 @@ class User(Base):
     
     # Flag to identify OAuth users
     is_oauth_user = Column(Boolean, default=False)
+    
+    # Email verification flag
+    is_verified = Column(Boolean, default=False)

@@ -195,9 +195,12 @@ export const updatePassword = async (data: { user_id: number, current_password: 
 };
 
 /**
- * Delete account
- * Note: This would need a backend endpoint to be implemented
- * For now, only clears localStorage
+ * Delete account - permanently removes user from database
+ * Calls backend DELETE /api/auth/delete-account endpoint.
+ * localStorage is only cleared AFTER the backend confirms deletion.
+ *
+ * @param data - Object containing password (required for non-OAuth users)
+ * @returns { success: boolean, message: string }
  */
 export const deleteAccount = async (data: { password: string }) => {
   const session = localStorage.getItem('user_session');
@@ -205,16 +208,40 @@ export const deleteAccount = async (data: { password: string }) => {
     throw new Error('Unauthorized');
   }
 
-  if (!data.password) {
-    throw new Error('Password required to delete account');
+  const user = JSON.parse(session);
+  const user_id = user.id;
+
+  if (!user_id) {
+    throw new Error('User ID not found in session');
   }
 
-  // Note: This doesn't actually delete the account from backend
-  // You would need a backend endpoint for this
-  localStorage.removeItem('user_session');
-  localStorage.removeItem('username');
+  try {
+    const response = await fetch(`${AUTH_API_URL}/delete-account`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: user_id,
+        password: data.password || null,
+      }),
+    });
 
-  return { success: true };
+    const result = await response.json();
+
+    if (result.status === 'success') {
+      // Only clear session AFTER backend confirms permanent deletion
+      localStorage.removeItem('user_session');
+      localStorage.removeItem('username');
+      localStorage.removeItem('user_id');
+      localStorage.removeItem('auth_token');
+      return { success: true, message: result.message };
+    } else {
+      // Backend rejected deletion — preserve session and surface the error
+      return { success: false, message: result.message || 'Account deletion failed.' };
+    }
+  } catch (error) {
+    console.error('Delete account error:', error);
+    return { success: false, message: 'Network error. Please try again later.' };
+  }
 };
 
 /**
@@ -254,6 +281,41 @@ export const resetPassword = async (token: string, new_password: string) => {
   }
 };
 
+/**
+ * Verify email address
+ * @param token Email verification token from email link
+ */
+export const verifyEmail = async (token: string) => {
+  try {
+    const response = await fetch(`${AUTH_API_URL}/verify-email?token=${encodeURIComponent(token)}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Verify email error:', error);
+    return { status: 'error', message: 'Network error. Please try again later.' };
+  }
+};
+
+/**
+ * Resend verification email
+ * @param email User's email address
+ */
+export const resendVerificationEmail = async (email: string) => {
+  try {
+    const response = await fetch(`${AUTH_API_URL}/resend-verification-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Resend verification email error:', error);
+    return { status: 'error', message: 'Network error. Please try again later.' };
+  }
+};
+
 // Export as apiAuth object for compatibility with existing code
 export const apiAuth = {
   signup,
@@ -265,6 +327,8 @@ export const apiAuth = {
   deleteAccount,
   forgotPassword,
   resetPassword,
+  verifyEmail,
+  resendVerificationEmail,
 };
 
 /**

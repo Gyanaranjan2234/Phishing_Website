@@ -136,10 +136,15 @@ const Profile = () => {
       });
 
       if (data.success) {
+        setShowDeleteDialog(false);
         toast.success("Account deleted successfully. Redirecting...");
         setTimeout(() => {
           navigate("/");
         }, 1500);
+      } else {
+        // Backend rejected — show error, keep dialog open so user can retry
+        toast.error(data.message || "Account deletion failed. Please check your password.");
+        setDeletePassword("");
       }
     } catch (err: any) {
       toast.error(err.message || "An error occurred while deleting your account");
@@ -147,7 +152,6 @@ const Profile = () => {
       setDeleteConfirmed(false);
     } finally {
       setLoading(false);
-      setShowDeleteDialog(false);
     }
   };
 

@@ -9,6 +9,33 @@ import { signup } from "@/lib/api-backend";  // ADDED: Import backend signup fun
 const Signup = () => {
   const navigate = useNavigate();
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Email validation regex
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const validateEmail = (email: string) => {
+    if (!email) {
+      setEmailError("Email is required");
+      return false;
+    }
+    if (!emailRegex.test(email)) {
+      setEmailError("Please enter a valid email address");
+      return false;
+    }
+    setEmailError("");
+    return true;
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setEmail(value);
+    if (value) validateEmail(value);
+  };
 
   const goBack = () => {
     if (window.history.length > 1) {
@@ -17,10 +44,6 @@ const Signup = () => {
       navigate("/");
     }
   };
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,6 +51,13 @@ const Signup = () => {
       toast.error("Please fill in all fields");
       return;
     }
+
+    // Validate email format
+    if (!validateEmail(email)) {
+      toast.error("Invalid email format");
+      return;
+    }
+
     if (password.length < 6) {
       toast.error("Password must be at least 6 characters");
       return;
@@ -39,7 +69,7 @@ const Signup = () => {
       const data = await signup(email, name, password);
       
       if (data.status === 'success') {
-        toast.success(data.message || "Account created successfully");
+        toast.success(data.message || "Account created! Check your email to verify.");
         // Redirect to login page after successful signup
         navigate("/login");
       } else {
@@ -78,7 +108,19 @@ const Signup = () => {
             </div>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10 bg-muted border-border text-foreground placeholder:text-muted-foreground" />
+              <Input 
+                type="email" 
+                placeholder="Email address" 
+                value={email} 
+                onChange={handleEmailChange}
+                onBlur={() => validateEmail(email)}
+                className={`pl-10 bg-muted border-border text-foreground placeholder:text-muted-foreground ${
+                  emailError ? 'border-red-500 border-2' : ''
+                }`} 
+              />
+              {emailError && (
+                <p className="text-red-500 text-xs mt-1">{emailError}</p>
+              )}
             </div>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

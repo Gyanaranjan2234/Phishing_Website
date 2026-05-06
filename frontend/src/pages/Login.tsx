@@ -104,7 +104,17 @@ const Login = () => {
         toast.success(data.message || "Login successful!");
         navigate("/");
       } else {
-        toast.error(data.message || "Invalid credentials");
+        // Check if email is not verified
+        if (data.message && data.message.includes("verify your email")) {
+          toast.error(data.message);
+          // Optionally, offer to resend verification email
+          const resendResponse = await apiAuth.resendVerificationEmail(loginEmail);
+          if (resendResponse.status === 'success') {
+            toast.info("Verification email resent. Please check your inbox.");
+          }
+        } else {
+          toast.error(data.message || "Invalid credentials");
+        }
       }
     } catch (err: any) {
       toast.error(err.message || "An error occurred during login");

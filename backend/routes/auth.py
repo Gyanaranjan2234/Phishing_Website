@@ -20,10 +20,12 @@ from sqlalchemy.orm import Session
 from database.db import get_db
 from models.user_model import User
 from models.contact_model import ContactMessage
-from models.token_model import PasswordResetToken
-from schemas.auth_schema import UserSignup, UserLogin, UserResponse, AuthResponse, ForgotPasswordRequest, ResetPasswordRequest, ChangePasswordRequest
+from models.token_model import PasswordResetToken, EmailVerificationToken
+from models.scan_model import ScanHistory
+from schemas.auth_schema import UserSignup, UserLogin, UserResponse, AuthResponse, ForgotPasswordRequest, ResetPasswordRequest, ChangePasswordRequest, DeleteAccountRequest
 from schemas.contact_schema import ContactCreate, ContactResponse
 from utils.security import hash_password, verify_password
+from utils.email_service import send_verification_email, send_contact_email, send_password_reset_email
 
 # Load environment variables from .env file
 load_dotenv()
@@ -37,67 +39,6 @@ GMAIL_RECEIVER = os.getenv("GMAIL_RECEIVER_EMAIL", "")
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
-def send_email_notification(name: str, email: str, message: str):
-    """
-    Send a contact form notification email via Gmail SMTP.
-    Uses App Password for secure authentication.
-    """
-    try:
-        if not GMAIL_SENDER or not GMAIL_PASSWORD or GMAIL_PASSWORD == "your_16_char_app_password_here":
-            print("⚠️  Email not configured. Skipping email notification.")
-            return False
-
-        # Create email message
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"[APGS Contact] New message from {name}"
-        msg["From"] = GMAIL_SENDER
-        msg["To"] = GMAIL_RECEIVER
-
-        # HTML email body
-        html_body = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; background: #0f1117; color: #e0e0e0; padding: 20px;">
-            <div style="max-width: 600px; margin: auto; background: #1a1d27; border-radius: 12px; border: 1px solid #00ff9c33; padding: 30px;">
-                <h2 style="color: #00ff9c; margin-bottom: 4px;">📩 New Contact Message</h2>
-                <p style="color: #aaa; font-size: 13px; margin-top: 0;">Received via APGS Contact Form</p>
-                <hr style="border-color: #00ff9c33; margin: 20px 0;" />
-                <table style="width: 100%; border-collapse: collapse;">
-                    <tr>
-                        <td style="padding: 8px; color: #aaa; width: 80px;"><strong>Name</strong></td>
-                        <td style="padding: 8px; color: #e0e0e0;">{name}</td>
-                    </tr>
-                    <tr style="background: #ffffff08;">
-                        <td style="padding: 8px; color: #aaa;"><strong>Email</strong></td>
-                        <td style="padding: 8px;"><a href="mailto:{email}" style="color: #00ff9c;">{email}</a></td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; color: #aaa; vertical-align: top;"><strong>Message</strong></td>
-                        <td style="padding: 8px; color: #e0e0e0; white-space: pre-wrap;">{message}</td>
-                    </tr>
-                </table>
-                <hr style="border-color: #00ff9c33; margin: 20px 0;" />
-                <p style="color: #555; font-size: 12px;">This notification was sent by the APGS backend system.</p>
-            </div>
-        </body>
-        </html>
-        """
-
-        msg.attach(MIMEText(html_body, "html"))
-
-        # Connect to Gmail SMTP and send
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(GMAIL_SENDER, GMAIL_PASSWORD)
-            server.sendmail(GMAIL_SENDER, GMAIL_RECEIVER, msg.as_string())
-
-        print(f"✅ Email notification sent to {GMAIL_RECEIVER}")
-        return True
-
-    except Exception as e:
-        # Email failure should NOT break the form submission
-        print(f"⚠️  Email send failed (non-critical): {str(e)}")
-        return False
-
-
 
 @router.post("/signup", response_model=AuthResponse)
 def signup(user_data: UserSignup, db: Session = Depends(get_db)):
@@ -105,8 +46,9 @@ def signup(user_data: UserSignup, db: Session = Depends(get_db)):
     User Signup Endpoint
     
     Creates a new user account with email, username, and hashed password.
+    Generates an email verification token and sends verification email.
     
-    UPDATED: Now accepts and stores username field.
+    UPDATED: Now sends email verification and sets is_verified to False.
     
     Args:
         user_data (UserSignup): Email, username, and password from request
@@ -126,7 +68,7 @@ def signup(user_data: UserSignup, db: Session = Depends(get_db)):
     Example Response (Success):
         {
             "status": "success",
-            "message": "User registered successfully",
+            "message": "Verification email sent. Please verify your email to complete registration.",
             "data": {
                 "id": 1,
                 "email": "user@example.com",
@@ -159,28 +101,54 @@ def signup(user_data: UserSignup, db: Session = Depends(get_db)):
                 message="Email already registered"
             )
         
-        # Create new user with hashed password
-        # UPDATED: Now includes username field
+        # Create new user with hashed password and is_verified=False
         new_user = User(
             email=user_data.email,
-            username=user_data.username.strip(),  # Store trimmed username
-            hashed_password=hash_password(user_data.password)
+            username=user_data.username.strip(),
+            hashed_password=hash_password(user_data.password),
+            is_verified=False  # Email not verified yet
         )
         
         # Add to database and commit
         db.add(new_user)
         db.commit()
-        db.refresh(new_user)  # Refresh to get the generated ID
+        db.refresh(new_user)
+        
+        # Generate verification token (24-hour expiration)
+        verification_token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(hours=24)
+        
+        email_token_record = EmailVerificationToken(
+            user_id=new_user.id,
+            token=verification_token,
+            expires_at=expires_at
+        )
+        db.add(email_token_record)
+        db.commit()
+        
+        # Construct verification link using frontend URL
+        FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+        verification_link = f"{FRONTEND_URL}/verify-email?token={verification_token}"
+        
+        # Send verification email
+        email_sent = send_verification_email(
+            email=new_user.email,
+            verification_link=verification_link,
+            username=new_user.username
+        )
+        
+        if not email_sent:
+            print(f"⚠️ Verification email failed for {new_user.email}, but signup continues")
         
         # Return success response
-        # UPDATED: Response now includes username
         return AuthResponse(
             status="success",
-            message="User registered successfully",
+            message="Account created! Please verify your email to complete registration.",
             data={
                 "id": new_user.id,
                 "email": new_user.email,
-                "username": new_user.username
+                "username": new_user.username,
+                "is_verified": new_user.is_verified
             }
         )
         
@@ -193,14 +161,171 @@ def signup(user_data: UserSignup, db: Session = Depends(get_db)):
         )
 
 
+@router.get("/verify-email")
+def verify_email(token: str, db: Session = Depends(get_db)):
+    """
+    Email Verification Endpoint
+    
+    Verifies the user's email using the token sent in the verification link.
+    Sets is_verified to True when successful.
+    
+    Args:
+        token (str): Email verification token from query parameters
+        db (Session): Database session (injected automatically)
+        
+    Returns:
+        dict: Status message
+        
+    Example Request:
+        GET /api/auth/verify-email?token=abc123...
+        
+    Example Response (Success):
+        {
+            "status": "success",
+            "message": "Email verified successfully! You can now login."
+        }
+        
+    Example Response (Error):
+        {
+            "status": "error",
+            "message": "Invalid or expired verification token"
+        }
+    """
+    try:
+        # Find the verification token
+        email_token = db.query(EmailVerificationToken).filter(
+            EmailVerificationToken.token == token
+        ).first()
+        
+        if not email_token:
+            return {
+                "status": "error",
+                "message": "Invalid verification token"
+            }
+        
+        # Check if token is expired
+        if email_token.expires_at < datetime.utcnow():
+            return {
+                "status": "error",
+                "message": "Verification token has expired. Please sign up again."
+            }
+        
+        # Find user and mark as verified
+        user = db.query(User).filter(User.id == email_token.user_id).first()
+        
+        if not user:
+            return {
+                "status": "error",
+                "message": "User not found"
+            }
+        
+        # Set is_verified to True
+        user.is_verified = True
+        db.add(user)
+        
+        # Delete the used token
+        db.delete(email_token)
+        db.commit()
+        
+        return {
+            "status": "success",
+            "message": "Email verified successfully! You can now login."
+        }
+        
+    except Exception as e:
+        db.rollback()
+        return {
+            "status": "error",
+            "message": f"Email verification failed: {str(e)}"
+        }
+
+
+@router.post("/resend-verification-email", response_model=AuthResponse)
+def resend_verification_email(user_data: dict, db: Session = Depends(get_db)):
+    """
+    Resend Email Verification
+    
+    Sends a new verification email to the user.
+    
+    Args:
+        user_data (dict): Contains "email" field
+        db (Session): Database session
+        
+    Returns:
+        AuthResponse: Status message
+    """
+    try:
+        email = user_data.get("email")
+        
+        if not email:
+            return AuthResponse(
+                status="error",
+                message="Email is required"
+            )
+        
+        user = db.query(User).filter(User.email == email).first()
+        
+        if not user:
+            return AuthResponse(
+                status="error",
+                message="Email not registered"
+            )
+        
+        if user.is_verified:
+            return AuthResponse(
+                status="error",
+                message="Email is already verified"
+            )
+        
+        # Delete old tokens for this user
+        db.query(EmailVerificationToken).filter(
+            EmailVerificationToken.user_id == user.id
+        ).delete()
+        
+        # Generate new token
+        verification_token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(hours=24)
+        
+        email_token_record = EmailVerificationToken(
+            user_id=user.id,
+            token=verification_token,
+            expires_at=expires_at
+        )
+        db.add(email_token_record)
+        db.commit()
+        
+        # Send email
+        FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+        verification_link = f"{FRONTEND_URL}/verify-email?token={verification_token}"
+        
+        send_verification_email(
+            email=user.email,
+            verification_link=verification_link,
+            username=user.username
+        )
+        
+        return AuthResponse(
+            status="success",
+            message="Verification email has been resent. Please check your inbox."
+        )
+        
+    except Exception as e:
+        db.rollback()
+        return AuthResponse(
+            status="error",
+            message=f"Failed to resend verification email: {str(e)}"
+        )
+
+
 @router.post("/login", response_model=AuthResponse)
 def login(user_data: UserLogin, db: Session = Depends(get_db)):
     """
     User Login Endpoint
     
     Authenticates user with email and password.
+    Email must be verified before login.
     
-    UPDATED: Response now includes username.
+    UPDATED: Now checks is_verified status.
     
     Args:
         user_data (UserLogin): Email and password from request
@@ -230,7 +355,7 @@ def login(user_data: UserLogin, db: Session = Depends(get_db)):
     Example Response (Error):
         {
             "status": "error",
-            "message": "Invalid email or password"
+            "message": "Please verify your email before logging in"
         }
     """
     
@@ -238,22 +363,36 @@ def login(user_data: UserLogin, db: Session = Depends(get_db)):
         # Find user by email
         user = db.query(User).filter(User.email == user_data.email).first()
         
-        # Check if user exists AND password is correct
-        if not user or not verify_password(user_data.password, user.hashed_password):
+        # Check if user exists
+        if not user:
+            return AuthResponse(
+                status="error",
+                message="User not registered"
+            )
+            
+        # Check if password is correct
+        if not verify_password(user_data.password, user.hashed_password):
             return AuthResponse(
                 status="error",
                 message="Invalid email or password"
             )
         
+        # Check if email is verified
+        if not user.is_verified:
+            return AuthResponse(
+                status="error",
+                message="Please verify your email before logging in"
+            )
+        
         # Return success with user data (without password)
-        # UPDATED: Response now includes username
         return AuthResponse(
             status="success",
             message="Login successful",
             data={
                 "id": user.id,
                 "email": user.email,
-                "username": user.username
+                "username": user.username,
+                "is_verified": user.is_verified
             }
         )
         
@@ -282,10 +421,12 @@ def send_contact_message(contact_data: ContactCreate, db: Session = Depends(get_
         db.refresh(new_message)
 
         # Send email notification (non-blocking - failure won't break the response)
-        send_email_notification(
+        GMAIL_RECEIVER = os.getenv("GMAIL_RECEIVER_EMAIL", "")
+        send_contact_email(
             name=contact_data.name.strip(),
             email=contact_data.email.strip(),
-            message=contact_data.message.strip()
+            message=contact_data.message.strip(),
+            receiver_email=GMAIL_RECEIVER
         )
         
         return ContactResponse(
@@ -299,50 +440,6 @@ def send_contact_message(contact_data: ContactCreate, db: Session = Depends(get_
             status="error",
             message=f"Failed to send message: {str(e)}"
         )
-
-
-def send_password_reset_email(email: str, reset_link: str):
-    """
-    Send a beautifully formatted password reset email.
-    """
-    try:
-        if not GMAIL_SENDER or not GMAIL_PASSWORD or GMAIL_PASSWORD == "your_16_char_app_password_here":
-            print("⚠️ Email not configured. Skipping reset email notification.")
-            return False
-
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = "APGS - Password Reset Request"
-        msg["From"] = f"APGS Support <{GMAIL_SENDER}>"
-        msg["To"] = email
-
-        html_body = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; background: #0f1117; color: #e0e0e0; padding: 20px;">
-            <div style="max-width: 600px; margin: auto; background: #1a1d27; border-radius: 12px; border: 1px solid #00ff9c33; padding: 30px;">
-                <h2 style="color: #00ff9c; margin-bottom: 20px; text-align: center;">Lock Verified</h2>
-                <p>Hello,</p>
-                <p>We received a request to reset your password for your Advanced Phishing Guard System account.</p>
-                <p style="text-align: center; margin: 30px 0;">
-                    <a href="{reset_link}" style="background-color: #00ff9c; color: #000; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Reset Password</a>
-                </p>
-                <p>If you didn't request a password reset, you can safely ignore this email.</p>
-                <p style="color: #555; font-size: 12px; margin-top: 30px;">This link will expire in 15 minutes.</p>
-            </div>
-        </body>
-        </html>
-        """
-
-        msg.attach(MIMEText(html_body, "html"))
-
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(GMAIL_SENDER, GMAIL_PASSWORD)
-            server.sendmail(GMAIL_SENDER, email, msg.as_string())
-
-        print(f"✅ Password reset email sent to {email}")
-        return True
-    except Exception as e:
-        print(f"⚠️ Failed to send reset email: {str(e)}")
-        return False
 
 
 @router.post("/forgot-password", response_model=AuthResponse)
@@ -465,6 +562,79 @@ def change_password(request: ChangePasswordRequest, db: Session = Depends(get_db
         return AuthResponse(
             status="error",
             message="Failed to update password."
+        )
+
+
+@router.delete("/delete-account", response_model=AuthResponse)
+def delete_account(request: DeleteAccountRequest, db: Session = Depends(get_db)):
+    """
+    Delete Account Endpoint
+
+    Permanently removes the user record and all associated data from the database.
+    After deletion, any login attempt with the same credentials will return
+    "User not registered".
+
+    Steps:
+        1. Verify user exists (return 404-style error if not)
+        2. For non-OAuth users, verify password before proceeding
+        3. Delete all scan history records for the user
+        4. Delete all password reset tokens for the user
+        5. Delete all email verification tokens for the user
+        6. Delete the user record itself
+
+    Args:
+        request (DeleteAccountRequest): user_id and optional password
+        db (Session): Database session (injected automatically)
+
+    Returns:
+        AuthResponse: Success or error message
+    """
+    try:
+        # Step 1: Verify user exists
+        user = db.query(User).filter(User.id == request.user_id).first()
+
+        if not user:
+            return AuthResponse(
+                status="error",
+                message="User not found."
+            )
+
+        # Step 2: Verify password for non-OAuth users
+        if not user.is_oauth_user and user.hashed_password:
+            if not request.password:
+                return AuthResponse(
+                    status="error",
+                    message="Password is required to delete your account."
+                )
+            if not verify_password(request.password, user.hashed_password):
+                return AuthResponse(
+                    status="error",
+                    message="Incorrect password. Account not deleted."
+                )
+
+        # Step 3: Delete all scan history records for this user
+        db.query(ScanHistory).filter(ScanHistory.user_id == request.user_id).delete()
+
+        # Step 4: Delete all password reset tokens for this user
+        db.query(PasswordResetToken).filter(PasswordResetToken.user_id == request.user_id).delete()
+
+        # Step 5: Delete all email verification tokens for this user
+        db.query(EmailVerificationToken).filter(EmailVerificationToken.user_id == request.user_id).delete()
+
+        # Step 6: Delete the user record permanently
+        db.delete(user)
+        db.commit()
+
+        return AuthResponse(
+            status="success",
+            message="Account permanently deleted. You can no longer log in with these credentials."
+        )
+
+    except Exception as e:
+        db.rollback()
+        return AuthResponse(
+            status="error",
+            message=f"Failed to delete account: {str(e)}"
         )
 
 
@@ -683,6 +853,8 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
                 user.google_id = google_id
             if not user.avatar_url and picture:
                 user.avatar_url = picture
+            # Mark as verified since they authenticated via Google
+            user.is_verified = True
             db.commit()
             db.refresh(user)
         else:
@@ -694,7 +866,8 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
                 hashed_password=None,  # No password for OAuth users
                 google_id=google_id,
                 avatar_url=picture,
-                is_oauth_user=True
+                is_oauth_user=True,
+                is_verified=True  # Google users are pre-verified
             )
             db.add(new_user)
             db.commit()

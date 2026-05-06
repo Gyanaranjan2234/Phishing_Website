@@ -60,6 +60,16 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
+class DeleteAccountRequest(BaseModel):
+    """
+    Schema for account deletion request.
+    Requires user_id for identification and password for verification.
+    Password is optional for OAuth (Google) users who have no password.
+    """
+    user_id: int
+    password: Optional[str] = None  # Optional for OAuth users
+
+
 # ============ Response Schemas ============
 
 class UserResponse(BaseModel):
@@ -72,6 +82,7 @@ class UserResponse(BaseModel):
     id: int
     email: str
     username: str
+    is_verified: bool
     
     class Config:
         # Allow reading from SQLAlchemy model (Pydantic v2 syntax)
